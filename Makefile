@@ -16,8 +16,10 @@ thread.o : $(SRC_DIR)/src/thread.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/thread.cc -I$(HEADER) -I$(MISCHEADER)
 
 
+daemon.o : $(SRC_DIR)/src/daemon.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc -I$(HEADER) -I$(MISCHEADER)
 
-OBJECTS = thread.o
+OBJECTS = thread.o daemon.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(LIBNAME) $(OBJECTS)
