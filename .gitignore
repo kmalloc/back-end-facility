@@ -1,2 +1,4 @@
 ./daemon
 .*.swp
+*.a
+*.o
