@@ -60,6 +60,7 @@ void daemonize()
 
 }
 
+/*
 int main()
 {
   daemonize();
@@ -69,3 +70,5 @@ int main()
   
   return 0;
 }
+*/
+
