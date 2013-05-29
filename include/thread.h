@@ -4,24 +4,7 @@
 #include <pthread.h>
 #include "noncopyable.h"
 
-
-class ITask
-{
-    public:
-
-      ITask():m_loop(false){}
-      virtual ~ITask(){}
-
-      virtual bool Run()=0;
-      
-      void SetLoop(bool loop = true); 
-      void StopLoop();
-      bool Loop() const { return m_loop; }
-      
-    private:
-      
-      bool m_loop;
-};
+class ITask;
 
 
 class Thread: public noncopyable

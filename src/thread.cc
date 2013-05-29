@@ -1,15 +1,7 @@
 #include "thread.h"
 #include "log.h"
+#include "ITask.h"
 
-void ITask::SetLoop(bool loop) 
-{
-    m_loop = loop;
-}
-
-void ITask::StopLoop() 
-{ 
-    m_loop = false; 
-}
 
 Thread::Thread(ITask* task,bool detachable)
 :m_tid(-1)
@@ -35,7 +27,7 @@ void* dummy_proc(void*)
 
 bool Thread::Start()
 {
-    if (m_threadStarted) return false;
+    if (m_threadStarted || m_task == NULL) return false;
 
     m_threadStarted = true;
     int status = pthread_attr_init(&m_attr);
