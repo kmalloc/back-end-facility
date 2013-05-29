@@ -9,7 +9,7 @@ class ITask
 {
     public:
 
-      ITask(){}
+      ITask():m_loop(false){}
       virtual ~ITask(){}
 
       virtual bool Run()=0;
