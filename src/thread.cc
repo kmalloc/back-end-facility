@@ -16,7 +16,7 @@ Thread::~Thread()
 }
 
 
-bool Thread::start()
+bool Thread::Start()
 {
     if (m_threadStarted) return false;
 
@@ -34,27 +34,27 @@ bool Thread::start()
 
     if (status != 0) return false;
 
-    status = pthread_create(&m_tid,&m_attr,Thread::run,static_cast<void*>(this));
+    status = pthread_create(&m_tid,&m_attr,Thread::Run,static_cast<void*>(this));
     
     return status;
 }
 
 
-void* Thread::run(void*arg)
+void* Thread::Run(void*arg)
 {
     Thread* thread  = static_cast<Thread*>(arg);
-    ITask * task    = thread->get_task();
+    ITask * task    = thread->GetTask();
 
     if (task == NULL) return NULL;
 
-    task->run();
+    task->Run();
 
     return task;
 }
 
 
 
-int Thread::join()
+int Thread::Join()
 {
     if (!m_detachable) return -1;
 
@@ -62,11 +62,12 @@ int Thread::join()
 }
 
 
-bool Thread::set_detachable(bool enable)
+bool Thread::SetDetachable(bool enable)
 {
     if (m_threadStarted)return false;
 
     m_detachable = enable;
+    return true;
 }
 
 

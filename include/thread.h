@@ -11,7 +11,7 @@ class ITask
       ITask();
       virtual ~ITask();
 
-      virtual bool run()=0;
+      virtual bool Run()=0;
 };
 
 
@@ -22,18 +22,18 @@ class Thread: public noncopyable
         Thread(ITask* = NULL,bool detachable = true);
         virtual ~Thread();
 
-        ITask* set_task(ITask*task);
-        bool   detachable() const { return m_detachable; }
-        bool   set_detachable(bool enable);
+        ITask* SetTask(ITask*task);
+        bool   IsDetachable() const { return m_detachable; }
+        bool   SetDetachable(bool enable);
 
-        bool   start();
-        int    join();
-        bool   is_started() const { return m_threadStarted; }
+        bool   Start();
+        int    Join();
+        bool   IsStarted() const { return m_threadStarted; }
 
-        ITask* get_task() const { return m_task; }
+        ITask* GetTask() const { return m_task; }
         
     protected:
-        static void* run(void*arg);        
+        static void* Run(void*arg);        
 
     private:
         pthread_t m_tid;
