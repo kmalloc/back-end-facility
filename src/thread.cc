@@ -20,6 +20,7 @@ bool Thread::Start()
 {
     if (m_threadStarted) return false;
 
+    m_threadStarted = true;
     int status = pthread_attr_init(&m_attr);
     if (status != 0) return false;
 
@@ -48,6 +49,8 @@ void* Thread::Run(void*arg)
     if (task == NULL) return NULL;
 
     task->Run();
+
+    thread->m_threadStarted = false;
 
     return task;
 }
