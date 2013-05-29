@@ -2,3 +2,5 @@
 .*.swp
 *.a
 *.o
+test*
+unittest/unittest

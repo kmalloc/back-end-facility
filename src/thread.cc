@@ -1,6 +1,8 @@
 #include "thread.h"
+#include <iostream.h>
+using namespace std;
 
-
+#define slog(s,...)
 
 void ITask::SetLoop(bool loop) 
 {
@@ -27,6 +29,13 @@ Thread::~Thread()
 }
 
 
+void* dummy_proc(void*)
+{
+    slog("dummy proc , gogogo\n");
+    slog("dummy proc , gogogo\n");
+}
+
+
 bool Thread::Start()
 {
     if (m_threadStarted) return false;
@@ -37,18 +46,21 @@ bool Thread::Start()
 
     if (m_detachable)
     {
-        pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_JOINABLE);
+        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_JOINABLE);
     }
     else
     {
-        pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_DETACHED);
+        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_DETACHED);
     }
 
     if (status != 0) return false;
 
     status = pthread_create(&m_tid,&m_attr,Thread::Run,static_cast<void*>(this));
     
-    return status;
+    if(status)
+       slog("error:%d %s\n",status,strerror(status));
+
+    return status == 0;
 }
 
 
@@ -56,6 +68,8 @@ void* Thread::Run(void*arg)
 {
     Thread* thread  = static_cast<Thread*>(arg);
     ITask * task    = thread->GetTask();
+
+    slog("thread::Run()\n");
 
     do
     {

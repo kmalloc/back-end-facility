@@ -7,9 +7,10 @@ using namespace std;
 class DummyTask:public ITask
 {
     public:
-        DummyTask() {}
+        DummyTask():counter(0) {}
         virtual ~DummyTask() {}
-        virtual bool Run()  { cout << "dumy task running" << endl; return true;}
+        virtual bool Run()  { cout << "dumy task running" << endl;++counter; return true;}
+        int counter;
 };
 
 
@@ -17,9 +18,13 @@ TEST(operation,threadtest)
 {
     DummyTask task;
     Thread thread1;
-    thread1.SetDetachable(true);
+    bool detachable = false;
+    thread1.SetDetachable(detachable);
     thread1.SetTask(&task);
-    thread1.Start();
+    EXPECT_TRUE(thread1.Start());
 
-    EXPECT_TRUE(thread1.IsDetachable());
+    thread1.Join();
+    cout << " test 2" << endl;
+    cout << "counter:"<<task.counter<<endl;
+    EXPECT_FALSE(thread1.IsDetachable());
 }
