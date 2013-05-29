@@ -1,8 +1,5 @@
 #include "thread.h"
-#include <iostream.h>
-using namespace std;
-
-#define slog(s,...)
+#include "log.h"
 
 void ITask::SetLoop(bool loop) 
 {
@@ -46,11 +43,11 @@ bool Thread::Start()
 
     if (m_detachable)
     {
-        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_JOINABLE);
+        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_DETACHED);
     }
     else
     {
-        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_DETACHED);
+        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_JOINABLE);
     }
 
     if (status != 0) return false;
@@ -88,7 +85,7 @@ void* Thread::Run(void*arg)
 
 int Thread::Join()
 {
-    if (!m_detachable) return -1;
+    if (m_detachable) return -1;
 
     return pthread_join(m_tid,NULL);
 }
