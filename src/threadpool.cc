@@ -1,32 +1,30 @@
-#include <unistd.h>
-#include <pthread.h>
+#include "threadpool.h"
 
 
-static void (* g_worker_proc)(void*parg);
-static int g_worker_num = 4;
 
-
-void register_worker_proc(workproc*proc)
+class Dispatcher:public ITask
 {
-    g_worker_proc = proc;
-}
+    public:
+        Dispatcher(ThreadPool* pool);
+        ~Dispatcher();
 
-void set_worker_number(int num)
+        virtual bool Run();
+        
+    private:
+
+        ThreadPool* m_pool;
+};
+
+
+ThreadPool::ThreadPool(int num)
+    :m_num(num)
 {
-    g_worker_proc = num;
-}
-
-static void worker(void*parg)
-{
-    if (g_worker_proc)
-        *g_worker_proc(parg);
-}
-
-
-void start_threadpool()
-{
-
+    m_dispatch = new Dispatcher();      
+    SetTask(m_dispatch);
 }
 
 
-
+ThreadPool::~ThreadPool()
+{
+   delete m_dispatch;
+}
