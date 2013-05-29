@@ -1,6 +1,9 @@
 
 # Where to find user code.
-USER_DIR = ./
+USER_DIR  = .
+SRC_DIR   = ../src
+SRC_HEAD  = -I../include
+SRC_HEAD += -I../misc
 
 GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 # Flags passed to the preprocessor.
@@ -9,26 +12,28 @@ CPPFLAGS += -I$(GTEST_DIR)/include
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra
 
-TESTS = sample1_unittest
+TESTS = unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
-GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
-                $(GTEST_DIR)/include/gtest/internal/*.h
+GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest 
+GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 
 # House-keeping build targets.
 
 all : $(TESTS)
 
-sample1.o : $(USER_DIR)/sample1.cc $(USER_DIR)/sample1.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/sample1.cc
+thread.o : $(SRC_DIR)/thread.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/thread.cc $(SRC_HEAD)
 
-sample1_unittest.o : $(USER_DIR)/sample1_unittest.cc \
-                     $(USER_DIR)/sample1.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/sample1_unittest.cc
+threadtest.o : $(USER_DIR)/threadtest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/threadtest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-sample1_unittest : sample1.o sample1_unittest.o
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lgtest_main -lpthread $^ -o $@
+
+OBJS = thread.o threadtest.o
+
+unittest : $(OBJS) 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lgtest_main $(OBJS) -o $(TESTS)
 
 
 

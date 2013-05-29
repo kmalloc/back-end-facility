@@ -1,6 +1,17 @@
 #include "thread.h"
 
 
+
+void ITask::SetLoop(bool loop) 
+{
+    m_loop = loop;
+}
+
+void ITask::StopLoop() 
+{ 
+    m_loop = false; 
+}
+
 Thread::Thread(ITask* task,bool detachable)
     :m_tid(-1)
     ,m_task(task)
@@ -12,7 +23,7 @@ Thread::Thread(ITask* task,bool detachable)
 
 Thread::~Thread()
 {
-    if(m_threadStarted) pthread_attr_destroy(&m_attr);
+    if (m_threadStarted) pthread_attr_destroy(&m_attr);
 }
 
 
@@ -46,9 +57,13 @@ void* Thread::Run(void*arg)
     Thread* thread  = static_cast<Thread*>(arg);
     ITask * task    = thread->GetTask();
 
-    if (task == NULL) return NULL;
+    do
+    {
+        if (task == NULL) return NULL;
 
-    task->Run();
+        task->Run();
+
+    } while(task->Loop());
 
     thread->m_threadStarted = false;
 

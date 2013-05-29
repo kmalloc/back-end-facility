@@ -8,10 +8,19 @@
 class ITask
 {
     public:
-      ITask();
-      virtual ~ITask();
+
+      ITask(){}
+      virtual ~ITask(){}
 
       virtual bool Run()=0;
+      
+      void SetLoop(bool loop = true); 
+      void StopLoop();
+      bool Loop() const { return m_loop; }
+      
+    private:
+      
+      bool m_loop;
 };
 
 
@@ -22,7 +31,7 @@ class Thread: public noncopyable
         Thread(ITask* = NULL,bool detachable = true);
         virtual ~Thread();
 
-        ITask* SetTask(ITask*task);
+        ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp;}
         bool   IsDetachable() const { return m_detachable; }
         bool   SetDetachable(bool enable);
 
