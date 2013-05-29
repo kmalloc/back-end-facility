@@ -24,6 +24,7 @@ TEST(operation,threadtest)
     EXPECT_TRUE(thread1.Start());
 
     thread1.Join();
+    EXPECT_FALSE(thread1.IsStarted());
     cout << " test 2" << endl;
     cout << "counter:"<<task.counter<<endl;
     EXPECT_FALSE(thread1.IsDetachable());
