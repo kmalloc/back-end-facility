@@ -12,10 +12,10 @@ void ITask::StopLoop()
 }
 
 Thread::Thread(ITask* task,bool detachable)
-    :m_tid(-1)
-    ,m_task(task)
-    ,m_threadStarted(false)
-    ,m_detachable(detachable)
+:m_tid(-1)
+,m_task(task)
+,m_threadStarted(false)
+,m_detachable(detachable)
 {
 
 }
@@ -53,9 +53,9 @@ bool Thread::Start()
     if (status != 0) return false;
 
     status = pthread_create(&m_tid,&m_attr,Thread::Run,static_cast<void*>(this));
-    
+
     if(status)
-       slog("error:%d %s\n",status,strerror(status));
+        slog("error:%d %s\n",status,strerror(status));
 
     return status == 0;
 }

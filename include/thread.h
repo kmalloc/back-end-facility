@@ -28,6 +28,7 @@ class Thread: public noncopyable
 {
 
     public:
+
         Thread(ITask* = NULL,bool detachable = true);
         virtual ~Thread();
 

@@ -1,15 +1,12 @@
 #include "gtest.h"
 #include "thread.h"
-#include <iostream>
-
-using namespace std;
 
 class DummyTask:public ITask
 {
     public:
         DummyTask():counter(0) {}
         virtual ~DummyTask() {}
-        virtual bool Run()  { cout << "dumy task running" << endl;++counter; return true;}
+        virtual bool Run()  { ++counter; return true;}
         int counter;
 };
 
@@ -23,9 +20,22 @@ TEST(operation,threadtest)
     thread1.SetTask(&task);
     EXPECT_TRUE(thread1.Start());
 
+    EXPECT_TRUE(thread1.IsStarted());
+    EXPECT_EQ(&task,thread1.GetTask());
+
     thread1.Join();
+
+    EXPECT_EQ(1,task.counter);
     EXPECT_FALSE(thread1.IsStarted());
-    cout << " test 2" << endl;
-    cout << "counter:"<<task.counter<<endl;
     EXPECT_FALSE(thread1.IsDetachable());
+
+
+    EXPECT_EQ(detachable,thread1.IsDetachable());
+    EXPECT_EQ(&task,thread1.GetTask());
+    EXPECT_TRUE(thread1.Start());
+
+    EXPECT_TRUE(thread1.IsStarted());
+
+    thread1.Join();
+    EXPECT_EQ(2,task.counter);
 }
