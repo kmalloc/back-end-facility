@@ -8,7 +8,7 @@ using namespace std;
 
 
 WorkerTask::WorkerTask(int msgSize)
-    :m_MaxSize(msgSize)
+:m_MaxSize(msgSize)
 {
     pthread_spin_init(&m_lock,0);
     sem_init(&m_sem,0,m_MaxSize);
@@ -35,12 +35,16 @@ bool WorkerTask::PutMessage(MessageBase*message)
 
     pthread_spin_lock(&m_lock);
     full = m_mailbox.size() > m_MaxSize;
-    pthread_spin_unlock(&m_lock);
 
     if (!full)
     {
         m_mailbox.push_back(message);
+        pthread_spin_unlock(&m_lock);
         sem_post(&m_sem);
+    }
+    else
+    {
+        pthread_spin_unlock(&m_lock);
     }
 
     return !full;
@@ -51,7 +55,7 @@ bool WorkerTask::PutMessage(MessageBase*message)
 MessageBase* WorkerTask::GetMessage()
 {
     MessageBase* msg = NULL;
-    
+
     sem_wait(&m_sem);
 
     pthread_spin_lock(&m_lock);

@@ -12,6 +12,7 @@ class MessageBase;
 class WorkerTask: public ITask
 {
     public:
+
         WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         virtual ~WorkerTask();
 
@@ -40,14 +41,14 @@ class Worker:public Thread
     public:
         Worker();
         ~Worker();
-        
+
         virtual bool IsRunning();
 
     protected:
 
         //disable set task. this is a special thread specific to a worker thread.
         //It should not be changed externally.
-        virtual ITask* SetTask(ITask*){ return NULL;}
+        virtual ITask* SetTask(ITask*) { return NULL;}
 
 };
 
