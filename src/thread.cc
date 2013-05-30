@@ -6,7 +6,7 @@
 Thread::Thread(ITask* task,bool detachable)
 :m_tid(-1)
 ,m_task(task)
-,m_threadStarted(false)
+,m_busy(false)
 ,m_detachable(detachable)
 {
 
@@ -14,7 +14,7 @@ Thread::Thread(ITask* task,bool detachable)
 
 Thread::~Thread()
 {
-    if (m_threadStarted) pthread_attr_destroy(&m_attr);
+    if (m_busy) pthread_attr_destroy(&m_attr);
 }
 
 
@@ -22,14 +22,16 @@ void* dummy_proc(void*)
 {
     slog("dummy proc , gogogo\n");
     slog("dummy proc , gogogo\n");
+    return NULL;
 }
 
 
 bool Thread::Start()
 {
-    if (m_threadStarted || m_task == NULL) return false;
+    if (m_busy || m_task == NULL) return false;
 
-    m_threadStarted = true;
+    m_busy = true;
+
     int status = pthread_attr_init(&m_attr);
     if (status != 0) return false;
 
@@ -56,7 +58,7 @@ bool Thread::Start()
 void* Thread::Run(void*arg)
 {
     Thread* thread  = static_cast<Thread*>(arg);
-    ITask * task    = thread->GetTask();
+    ITask * task    = thread->m_task;
 
     slog("thread::Run()\n");
 
@@ -68,7 +70,7 @@ void* Thread::Run(void*arg)
 
     } while(task->Loop());
 
-    thread->m_threadStarted = false;
+    thread->m_busy = false;
 
     return task;
 }
@@ -85,7 +87,7 @@ int Thread::Join()
 
 bool Thread::SetDetachable(bool enable)
 {
-    if (m_threadStarted)return false;
+    if (m_busy)return false;
 
     m_detachable = enable;
     return true;

@@ -5,3 +5,5 @@
 test*
 unittest/unittest
 filenametags
+cscope.*
+

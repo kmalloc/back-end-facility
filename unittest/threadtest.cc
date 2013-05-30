@@ -1,5 +1,6 @@
 #include "gtest.h"
 #include "thread.h"
+#include "ITask.h"
 
 class DummyTask:public ITask
 {
@@ -20,13 +21,13 @@ TEST(operation,threadtest)
     thread1.SetTask(&task);
     EXPECT_TRUE(thread1.Start());
 
-    EXPECT_TRUE(thread1.IsStarted());
+    EXPECT_TRUE(thread1.IsRunning());
     EXPECT_EQ(&task,thread1.GetTask());
 
     thread1.Join();
 
     EXPECT_EQ(1,task.counter);
-    EXPECT_FALSE(thread1.IsStarted());
+    EXPECT_FALSE(thread1.IsRunning());
     EXPECT_FALSE(thread1.IsDetachable());
 
 
@@ -34,7 +35,7 @@ TEST(operation,threadtest)
     EXPECT_EQ(&task,thread1.GetTask());
     EXPECT_TRUE(thread1.Start());
 
-    EXPECT_TRUE(thread1.IsStarted());
+    EXPECT_TRUE(thread1.IsRunning());
 
     thread1.Join();
     EXPECT_EQ(2,task.counter);
