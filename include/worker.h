@@ -2,18 +2,36 @@
 #define _WORKER_THREAD_H_
 
 #include "thread.h"
+#include "defs.h"
 #include "ITask.h"
+
+#include "semaphore.h"
+
+class MessageBase;
 
 class WorkerTask: public ITask
 {
     public:
-        WorkerTask();
-        ~WorkerTask();
+        WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+        virtual ~WorkerTask();
+
+        bool PutMessage(MessageBase*);
 
     protected:
 
         virtual bool Run();
 
+        //get message from mailbox
+        //may block when there is no message.
+        //caller take responsibility to free the message.
+        MessageBase* GetMessage();
+
+    private:
+
+        const int m_MaxSize;
+        sem_t m_sem;
+        pthread_spinlock_t m_lock;
+        std::queue<MessageBase*> m_mailbox;
 };
 
 
