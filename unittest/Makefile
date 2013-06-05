@@ -29,12 +29,20 @@ thread.o : $(SRC_DIR)/thread.cc
 threadtest.o : $(USER_DIR)/threadtest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/threadtest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
+worker.o : $(SRC_DIR)/worker.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/worker.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = thread.o threadtest.o
+message.o : $(SRC_DIR)/message.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/message.cc $(GTEST_HEADERS) $(SRC_HEAD)
+
+workertest.o : $(USER_DIR)/workertest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/workertest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+
+
+OBJS = thread.o threadtest.o worker.o workertest.o message.o
 
 unittest : $(OBJS) 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lgtest_main $(OBJS) -o $(TESTS)
-
 
 
 clean :

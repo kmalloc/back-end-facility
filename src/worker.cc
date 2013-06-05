@@ -1,35 +1,39 @@
 #include "worker.h"
 #include "message.h"
 
-#include <queue.h>
+#include <vector>
+#include <queue>
 
 
 using namespace std;
 
+/*
+ *     WorkerTask
+ */
 
 WorkerTask::WorkerTask(int msgSize)
-:m_MaxSize(msgSize)
+:m_MaxSize(msgSize), m_isRuning(false), m_shouldStop(false)
 {
     pthread_spin_init(&m_lock,0);
-    sem_init(&m_sem,0,m_MaxSize);
+    pthread_spin_init(&m_stoplock,0);
+    sem_init(&m_sem,0,0);
 }
 
 
 
 WorkerTask::~WorkerTask()
 {
-
-    queue<MessageBase*>::iterator it = m_mailbox.begin();
-
-    for (; it != m_mailbox.end();++it)
+    while (!m_mailbox.empty())
     {
-        delete (*it);
+        MessageBase*msg = m_mailbox.front();
+        m_mailbox.pop();
+        delete(msg);
     }
 }
 
 
 
-bool WorkerTask::PutMessage(MessageBase*message)
+bool WorkerTask::PostMessage(MessageBase* message)
 {
     bool full = true;
 
@@ -38,7 +42,7 @@ bool WorkerTask::PutMessage(MessageBase*message)
 
     if (!full)
     {
-        m_mailbox.push_back(message);
+        m_mailbox.push(message);
         pthread_spin_unlock(&m_lock);
         sem_post(&m_sem);
     }
@@ -50,21 +54,97 @@ bool WorkerTask::PutMessage(MessageBase*message)
     return !full;
 }
 
+int WorkerTask::GetMessageNumber()
+{
+    int count = -1;
+    
+    pthread_spin_lock(&m_lock);
+    count = m_mailbox.size();
+    pthread_spin_unlock(&m_lock);
 
+    return count;
+}
 
 MessageBase* WorkerTask::GetMessage()
 {
-    MessageBase* msg = NULL;
+    MessageBase* msg;
 
     sem_wait(&m_sem);
 
     pthread_spin_lock(&m_lock);
-    msg = m_mailbox.pop_front();
+    msg = m_mailbox.front();
+    m_mailbox.pop();
     pthread_spin_unlock(&m_lock);
 
     return msg;
 }
 
+void WorkerTask::SetStopState(bool shouldStop)
+{
+    pthread_spin_lock(&m_stoplock);
+    m_shouldStop = shouldStop;
+    pthread_spin_unlock(&m_stoplock);
+}
+
+bool WorkerTask::ShouldStop()
+{
+    bool stop;
+    pthread_spin_lock(&m_stoplock);
+    stop = m_shouldStop;
+    pthread_spin_unlock(&m_stoplock);
+
+    return stop;
+}
 
 
+void WorkerTask::StopRunning()
+{
+    SetStopState(true);
+}
+
+bool WorkerTask::Run()
+{
+    bool stop;
+
+    while(1)
+    {
+
+        m_isRuning = false;
+
+        stop = ShouldStop();
+                 
+        if (stop) break;
+
+        MessageBase* msg = GetMessage();
+
+        if (msg == NULL)continue;
+
+        m_isRuning = true;
+        msg->Run();
+
+        delete msg;
+    }
+
+    SetStopState(false);
+    return true;
+}
+
+
+/*
+ *    Worker
+ *
+ */
+
+
+Worker::Worker()
+:Thread()
+,m_workerTask()
+{
+   m_task = &m_workerTask;
+}
+
+
+Worker::~Worker()
+{
+}
 

@@ -1,24 +1,20 @@
 #ifndef _MESSAGE_H_
-#ifndef _MESSAGE_H_
+#define _MESSAGE_H_
 
 #include "ITask.h"
 
 
-class MessageBase 
+class MessageBase: public ITask 
 {
     public:
 
-        TaskMessage(): m_task(NULL) {}
-        virtual ~TaskMessage(){}
+        MessageBase(){}
+        virtual ~MessageBase(){}
 
-        ITask* GetTask() const { return m_task; }
-        void   SetTask(ITask* task) { m_task = task; }
+
+        bool Run() {}
 
         virtual void   PrepareMessage();
-
-    private:
-        
-        ITask* m_task;
 };
 
 

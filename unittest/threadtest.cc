@@ -14,6 +14,8 @@ class DummyTask:public ITask
 
 TEST(operation,threadtest)
 {
+    using namespace std;
+
     DummyTask task;
     Thread thread1;
     bool detachable = false;
@@ -22,7 +24,12 @@ TEST(operation,threadtest)
     EXPECT_TRUE(thread1.Start());
 
     EXPECT_TRUE(thread1.IsRunning());
-    EXPECT_EQ(&task,thread1.GetTask());
+
+
+    const void* src = &task;
+    const void* target = thread1.GetTask();
+
+    EXPECT_TRUE(src == target);
 
     thread1.Join();
 
@@ -30,8 +37,6 @@ TEST(operation,threadtest)
     EXPECT_FALSE(thread1.IsRunning());
     EXPECT_FALSE(thread1.IsDetachable());
 
-
-    EXPECT_EQ(detachable,thread1.IsDetachable());
     EXPECT_EQ(&task,thread1.GetTask());
     EXPECT_TRUE(thread1.Start());
 
