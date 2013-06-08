@@ -2,6 +2,7 @@
 # Where to find user code.
 USER_DIR  = .
 SRC_DIR   = ../src
+MIS_DIR   = ../misc
 SRC_HEAD  = -I../include
 SRC_HEAD += -I../misc
 
@@ -34,6 +35,7 @@ worker.o : $(SRC_DIR)/worker.cc
 
 message.o : $(SRC_DIR)/message.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/message.cc $(GTEST_HEADERS) $(SRC_HEAD)
+
 
 workertest.o : $(USER_DIR)/workertest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/workertest.cc $(GTEST_HEADERS) $(SRC_HEAD)

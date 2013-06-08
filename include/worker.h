@@ -4,8 +4,8 @@
 #include "thread.h"
 #include "defs.h"
 #include "ITask.h"
+#include "SpinLockQueue.h"
 
-#include <queue>
 #include <semaphore.h>
 
 class MessageBase;
@@ -37,14 +37,12 @@ class WorkerTask: public ITask
 
     private:
 
-        const int m_MaxSize;
         volatile bool m_isRuning;
         volatile bool m_shouldStop;
 
+        SpinLockQueue<MessageBase*> m_mailbox;
         sem_t m_sem;
-        pthread_spinlock_t m_lock;
         pthread_spinlock_t m_stoplock;
-        std::queue <MessageBase*> m_mailbox;
 };
 
 
