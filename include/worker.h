@@ -49,19 +49,20 @@ class WorkerTask: public ITask
 class Worker:public Thread
 {
     public:
+
         Worker();
         ~Worker();
 
-        virtual bool IsRunning(){ return m_workerTask.IsRunning();}
-        void StopRunning() { m_workerTask.StopRunning();}
-        bool PostMessage(MessageBase* msg) { return m_workerTask.PostMessage(msg);}
-        int  GetMessageNumber() { return m_workerTask.GetMessageNumber();}
+        virtual bool IsRunning(){ return m_workerTask.IsRunning(); }
+        void StopRunning() { m_workerTask.StopRunning(); }
+        bool PostMessage(MessageBase* msg) { return m_workerTask.PostMessage(msg); }
+        int  GetMessageNumber() { return m_workerTask.GetMessageNumber(); }
 
     protected:
 
-        //disable set task. this is a special thread specific to a worker thread.
+        //disable setting task. this is a special thread specific to a worker thread.
         //It should not be changed externally.
-        virtual ITask* SetTask(ITask*) { return NULL;}
+        virtual ITask* SetTask(ITask*) { return NULL; }
 
         WorkerTask m_workerTask;
 };
