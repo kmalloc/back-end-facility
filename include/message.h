@@ -12,7 +12,7 @@ class MessageBase: public ITask
         virtual ~MessageBase(){}
 
 
-        bool Run() {}
+        bool Run() { return true; }
 
         virtual void   PrepareMessage();
 };

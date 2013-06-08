@@ -12,9 +12,8 @@ using namespace std;
  */
 
 WorkerTask::WorkerTask(int msgSize)
-:m_MaxSize(msgSize), m_isRuning(false), m_shouldStop(false)
+:m_mailbox(msgSize), m_isRuning(false), m_shouldStop(false)
 {
-    pthread_spin_init(&m_lock,0);
     pthread_spin_init(&m_stoplock,0);
     sem_init(&m_sem,0,0);
 }
@@ -23,10 +22,9 @@ WorkerTask::WorkerTask(int msgSize)
 
 WorkerTask::~WorkerTask()
 {
-    while (!m_mailbox.empty())
+    while (!m_mailbox.IsEmpty())
     {
-        MessageBase*msg = m_mailbox.front();
-        m_mailbox.pop();
+        MessageBase*msg = m_mailbox.PopFront();
         delete(msg);
     }
 }
@@ -35,34 +33,17 @@ WorkerTask::~WorkerTask()
 
 bool WorkerTask::PostMessage(MessageBase* message)
 {
-    bool full = true;
 
-    pthread_spin_lock(&m_lock);
-    full = m_mailbox.size() > m_MaxSize;
+    bool ret = m_mailbox.PushBack(message);
 
-    if (!full)
-    {
-        m_mailbox.push(message);
-        pthread_spin_unlock(&m_lock);
-        sem_post(&m_sem);
-    }
-    else
-    {
-        pthread_spin_unlock(&m_lock);
-    }
+    if (ret) sem_post(&m_sem);
 
-    return !full;
+    return ret;
 }
 
 int WorkerTask::GetMessageNumber()
 {
-    int count = -1;
-    
-    pthread_spin_lock(&m_lock);
-    count = m_mailbox.size();
-    pthread_spin_unlock(&m_lock);
-
-    return count;
+    return m_mailbox.Size();
 }
 
 MessageBase* WorkerTask::GetMessage()
@@ -71,10 +52,7 @@ MessageBase* WorkerTask::GetMessage()
 
     sem_wait(&m_sem);
 
-    pthread_spin_lock(&m_lock);
-    msg = m_mailbox.front();
-    m_mailbox.pop();
-    pthread_spin_unlock(&m_lock);
+    msg = m_mailbox.PopFront();
 
     return msg;
 }
