@@ -7,7 +7,7 @@ class DummyTask:public ITask
     public:
         DummyTask():counter(0) {}
         virtual ~DummyTask() {}
-        virtual bool Run()  { ++counter; return true;}
+        virtual void Run()  { ++counter; }
         int counter;
 };
 

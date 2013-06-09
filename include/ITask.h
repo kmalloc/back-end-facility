@@ -4,19 +4,9 @@
 class ITask
 {
     public:
-
-      ITask():m_loop(false){}
+      ITask(){}
       virtual ~ITask(){}
-
-      virtual bool Run()=0;
-      
-      void SetLoop(bool loop = true); 
-      void StopLoop();
-      bool Loop() const { return m_loop; }
-      
-    private:
-      
-      bool m_loop;
+      virtual void Run()=0;
 };
 
 #endif

@@ -6,4 +6,5 @@ test*
 unittest/unittest
 filenametags
 cscope.*
+*.swo
 

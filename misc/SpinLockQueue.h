@@ -27,8 +27,17 @@ class SpinLockQueue
             Type val;
 
             pthread_spin_lock(&m_lock);
-            val = m_queue.front();
-            m_queue.pop();
+
+            if (!m_queue.empty())
+            {
+                val = m_queue.front();
+                m_queue.pop();
+            }
+            else
+            {
+                throw "queue empty";
+            }
+
             pthread_spin_unlock(&m_lock);
 
             return val;

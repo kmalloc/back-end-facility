@@ -14,7 +14,7 @@ class DummyMessage:public MessageBase
             m_number++;
         }
 
-        virtual bool Run() { sleep(1);++m_counter; return true;}
+        virtual void Run() { sleep(1);++m_counter; }
 
         static bool AllMsgDone() { return m_counter == m_number;}
 
@@ -40,7 +40,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     msg = new DummyMessage();
     worker.PostMessage(msg);
-    
+
     msg = new DummyMessage();
     worker.PostMessage(msg);
 
@@ -49,6 +49,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     worker.Start();
     sleep(3);
+    
     while(worker.GetMessageNumber() > 0) sleep(3);
    
     sleep(3);

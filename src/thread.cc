@@ -2,6 +2,9 @@
 #include "log.h"
 #include "ITask.h"
 
+#include <string.h>
+#include <errno.h>
+
 
 Thread::Thread(ITask* task,bool detachable)
 :m_tid(-1)
@@ -9,12 +12,11 @@ Thread::Thread(ITask* task,bool detachable)
 ,m_busy(false)
 ,m_detachable(detachable)
 {
-
 }
 
 Thread::~Thread()
 {
-    if (m_busy) pthread_attr_destroy(&m_attr);
+    pthread_attr_destroy(&m_attr);
 }
 
 
@@ -30,8 +32,6 @@ bool Thread::Start()
 {
     if (m_busy || m_task == NULL) return false;
 
-    m_busy = true;
-
     int status = pthread_attr_init(&m_attr);
     if (status != 0) return false;
 
@@ -46,10 +46,11 @@ bool Thread::Start()
 
     if (status != 0) return false;
 
+    m_busy = true;
+
     status = pthread_create(&m_tid,&m_attr,Thread::Run,static_cast<void*>(this));
 
-    if(status)
-        slog("error:%d %s\n",status,strerror(status));
+    if (status) slog("error:%d %s\n",status,strerror(status));
 
     return status == 0;
 }
@@ -60,15 +61,9 @@ void* Thread::Run(void*arg)
     Thread* thread  = static_cast<Thread*>(arg);
     ITask * task    = thread->m_task;
 
-    slog("thread::Run()\n");
+    if (task == NULL) return NULL;
 
-    do
-    {
-        if (task == NULL) return NULL;
-
-        task->Run();
-
-    } while(task->Loop());
+    task->Run();
 
     thread->m_busy = false;
 

@@ -15,16 +15,13 @@ all : $(LIBNAME)
 thread.o : $(SRC_DIR)/src/thread.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/thread.cc -I$(HEADER) -I$(MISCHEADER)
 
-ITask.o : $(SRC_DIR)/src/ITask.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/ITask.cc -I$(HEADER) -I$(MISCHEADER)
-	
 worker.o : $(SRC_DIR)/src/worker.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/worker.cc -I$(HEADER) -I$(MISCHEADER)
 
 daemon.o : $(SRC_DIR)/src/daemon.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc -I$(HEADER) -I$(MISCHEADER)
 
-OBJECTS = thread.o daemon.o worker.o ITask.o 
+OBJECTS = thread.o daemon.o worker.o 
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(LIBNAME) $(OBJECTS)

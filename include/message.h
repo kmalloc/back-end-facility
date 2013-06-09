@@ -9,10 +9,10 @@ class MessageBase: public ITask
     public:
 
         MessageBase(){}
+
         virtual ~MessageBase(){}
 
-
-        bool Run() { return true; }
+        virtual void Run() {}
 
         virtual void   PrepareMessage();
 };

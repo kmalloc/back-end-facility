@@ -25,14 +25,13 @@ class WorkerTask: public ITask
 
     protected:
 
-        virtual bool Run();
+        virtual void Run();
 
         //get message from mailbox
         //may block when there is no message.
         //caller take responsibility to free the message.
         MessageBase* GetMessage();
 
-        inline bool ShouldStop();
         inline void SetStopState(bool shouldStop);
 
     private:
@@ -42,7 +41,6 @@ class WorkerTask: public ITask
 
         SpinLockQueue<MessageBase*> m_mailbox;
         sem_t m_sem;
-        pthread_spinlock_t m_stoplock;
 };
 
 
