@@ -8,18 +8,25 @@
 #include <semaphore.h>
 
 template<class Type>
-class SpinLockQueue
+class SpinlockQueue
 {
     public:
 
-        SpinLockQueue(int Maxsize = DEFAULT_WORKER_TASK_MSG_SIZE)
+        SpinlockQueue(int Maxsize = DEFAULT_WORKER_TASK_MSG_SIZE)
             :m_maxSz(Maxsize)
         {
             pthread_spin_init(&m_lock,0);
         }
 
-        ~SpinLockQueue()
+        ~SpinlockQueue()
         {
+        }
+
+        //set up null value.
+        //this value will be return on when pop on empty queue.
+        void SetNullValue(const Type& val)
+        {
+            m_null = val;
         }
 
         Type PopFront()
@@ -31,7 +38,7 @@ class SpinLockQueue
             if (m_queue.empty())
             {
                 pthread_spin_unlock(&m_lock);
-                throw "queue empty";
+                return m_null;
             }
 
             val = m_queue.front();
@@ -46,7 +53,7 @@ class SpinLockQueue
             bool full = true;
 
             pthread_spin_lock(&m_lock);
-            full = m_queue.size() > m_maxSz;
+            full = m_queue.size() >= m_maxSz;
 
             if (!full)
             {
@@ -86,9 +93,10 @@ class SpinLockQueue
 
             return ret;
         }
-
+       
     private:
 
+        Type m_null; //null value, this value will be return if pop on empty queue.
         const int m_maxSz;
         volatile pthread_spinlock_t m_lock;
         std::queue <Type> m_queue;

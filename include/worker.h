@@ -4,7 +4,7 @@
 #include "thread.h"
 #include "defs.h"
 #include "ITask.h"
-#include "SpinLockQueue.h"
+#include "SpinlockQueue.h"
 
 #include <semaphore.h>
 
@@ -39,7 +39,7 @@ class WorkerTask: public ITask
         volatile bool m_isRuning;
         volatile bool m_shouldStop;
 
-        SpinLockQueue<MessageBase*> m_mailbox;
+        SpinlockQueue<MessageBase*> m_mailbox;
         sem_t m_sem;
 };
 

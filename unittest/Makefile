@@ -40,8 +40,11 @@ message.o : $(SRC_DIR)/message.cc
 workertest.o : $(USER_DIR)/workertest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/workertest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
+SpinlockQueueTest.o : $(USER_DIR)/SpinlockQueueTest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = thread.o threadtest.o worker.o workertest.o message.o
+
+OBJS = thread.o threadtest.o worker.o workertest.o message.o SpinlockQueueTest.o
 
 unittest : $(OBJS) 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lgtest_main $(OBJS) -o $(TESTS)
@@ -49,3 +52,4 @@ unittest : $(OBJS)
 
 clean :
 	rm -f $(TESTS) *.o
+

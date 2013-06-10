@@ -2,11 +2,11 @@
 #include "thread.h"
 #include "ITask.h"
 
-class DummyTask:public ITask
+class ThreadTestDummyTask:public ITask
 {
     public:
-        DummyTask():counter(0) {}
-        virtual ~DummyTask() {}
+        ThreadTestDummyTask():counter(0) {}
+        virtual ~ThreadTestDummyTask() {}
         virtual void Run()  { ++counter; }
         int counter;
 };
@@ -16,7 +16,7 @@ TEST(operation,threadtest)
 {
     using namespace std;
 
-    DummyTask task;
+    ThreadTestDummyTask task;
     Thread thread1;
     bool detachable = false;
     thread1.SetDetachable(detachable);
