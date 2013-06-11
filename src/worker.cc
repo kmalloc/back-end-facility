@@ -5,36 +5,36 @@
 
 
 /*
- *     WorkerTaskBase
+ *     WorkerBodyBase
  */
 
-WorkerTaskBase::WorkerTaskBase()
+WorkerBodyBase::WorkerBodyBase()
 :m_isRuning(false), m_shouldStop(false)
 {
     sem_init(&m_sem,0,0);
 }
 
-WorkerTaskBase::~WorkerTaskBase()
+WorkerBodyBase::~WorkerBodyBase()
 {
 }
 
 
-void WorkerTaskBase::SetStopState(bool shouldStop)
+void WorkerBodyBase::SetStopState(bool shouldStop)
 {
     m_shouldStop = shouldStop;
 }
 
-void WorkerTaskBase::SignalPost()
+void WorkerBodyBase::SignalPost()
 {
     sem_post(&m_sem);
 }
 
-void WorkerTaskBase::SignalConsume()
+void WorkerBodyBase::SignalConsume()
 {
     sem_wait(&m_sem);
 }
 
-void WorkerTaskBase::StopRunning()
+void WorkerBodyBase::StopRunning()
 {
     SetStopState(true);
 }
@@ -42,21 +42,21 @@ void WorkerTaskBase::StopRunning()
 
 
 /*
- * WorkerTask
+ * WorkerBody
  */
  
-WorkerTask::WorkerTask(int maxMsgSize)
-    :WorkerTaskBase(), m_mailbox(maxMsgSize)
+WorkerBody::WorkerBody(int maxMsgSize)
+    :WorkerBodyBase(), m_mailbox(maxMsgSize)
 {
     m_mailbox.SetNullValue(NULL);
 }
 
-WorkerTask::~WorkerTask()
+WorkerBody::~WorkerBody()
 {
 }
 
 
-void WorkerTask::ClearAllMsg()
+void WorkerBody::ClearAllMsg()
 {
     while (!m_mailbox.IsEmpty())
     {
@@ -66,7 +66,7 @@ void WorkerTask::ClearAllMsg()
 }
 
 
-bool WorkerTask::PostTask(ITask* task)
+bool WorkerBody::PostTask(ITask* task)
 {
     bool ret = m_mailbox.PushBack(task);
 
@@ -75,12 +75,12 @@ bool WorkerTask::PostTask(ITask* task)
     return ret;
 }
 
-int WorkerTask::GetTaskNumber() 
+int WorkerBody::GetTaskNumber() 
 {
     return m_mailbox.Size();
 }
 
-ITask* WorkerTask::GetTask()
+ITask* WorkerBody::GetTask()
 {
     ITask* msg;
 
@@ -90,7 +90,7 @@ ITask* WorkerTask::GetTask()
     return msg;
 }
 
-void WorkerTask::Run()
+void WorkerBody::Run()
 {
     while(1)
     {
@@ -122,13 +122,13 @@ void WorkerTask::Run()
 Worker::Worker(int maxMsgSize)
     :Thread()
 {
-   m_task = m_workerTask = new WorkerTask(maxMsgSize);
+   m_task = m_WorkerBody = new WorkerBody(maxMsgSize);
 }
 
-Worker::Worker(WorkerTaskBase* task)
+Worker::Worker(WorkerBodyBase* task)
     :Thread()
 {
-    m_task = m_workerTask = task;
+    m_task = m_WorkerBody = task;
 }
 
 Worker::~Worker()

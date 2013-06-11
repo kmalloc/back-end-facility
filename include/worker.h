@@ -8,12 +8,12 @@
 
 #include <semaphore.h>
 
-class WorkerTaskBase: public ITask
+class WorkerBodyBase: public ITask
 {
     public:
 
-        WorkerTaskBase();
-        virtual ~WorkerTaskBase();
+        WorkerBodyBase();
+        virtual ~WorkerBodyBase();
 
         virtual bool PostTask(ITask*) = 0;
         virtual int  GetTaskNumber() = 0;
@@ -44,12 +44,12 @@ class WorkerTaskBase: public ITask
 };
 
 
-class WorkerTask: public WorkerTaskBase
+class WorkerBody: public WorkerBodyBase
 {
     public:
 
-        WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
-        ~WorkerTask();
+        WorkerBody(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+        ~WorkerBody();
 
         virtual bool PostTask(ITask*);
         virtual int  GetTaskNumber();
@@ -73,24 +73,24 @@ class Worker:public Thread
         Worker(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Worker();
 
-        virtual bool IsRunning(){ return m_workerTask->IsRunning(); }
-        void StopRunning() { m_workerTask->StopRunning(); }
-        bool PostTask(ITask* msg) { return m_workerTask->PostTask(msg); }
-        int  GetTaskNumber() { return m_workerTask->GetTaskNumber(); }
+        virtual bool IsRunning(){ return m_WorkerBody->IsRunning(); }
+        void StopRunning() { m_WorkerBody->StopRunning(); }
+        bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
+        int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 
 
         bool StartWorking();
 
     protected:
 
-        Worker(WorkerTaskBase*);
+        Worker(WorkerBodyBase*);
 
         //disable setting task. this is a special thread specific to a worker thread.
         //It should not be changed externally.
         using Thread::SetTask;
         using Thread::Start;
 
-        WorkerTaskBase* m_workerTask;
+        WorkerBodyBase* m_WorkerBody;
 };
 
 #endif

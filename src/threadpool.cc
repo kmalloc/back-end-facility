@@ -9,7 +9,7 @@ struct CompareTaskPriority
     }
 };
 
-class Dispatcher:public WorkerTaskBase
+class Dispatcher:public WorkerBodyBase
 {
     public:
 
