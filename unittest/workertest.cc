@@ -1,15 +1,12 @@
 #include "gtest.h"
 
-
-#include "message.h"
-
 #include "worker.h"
 
 
-class DummyMessage:public MessageBase
+class workerTestDummyTask:public ITask
 {
     public:
-        DummyMessage()
+        workerTestDummyTask()
         {
             m_number++;
         }
@@ -23,49 +20,49 @@ class DummyMessage:public MessageBase
         static volatile int m_number;
 };
 
-volatile int DummyMessage::m_counter = 0;
-volatile int DummyMessage::m_number  = 0;
+volatile int workerTestDummyTask::m_counter = 0;
+volatile int workerTestDummyTask::m_number  = 0;
 
 TEST(WorkerTaskTest,WorkerTest)
 {
     using namespace std;
 
     Worker worker;
-    DummyMessage *msg;
+    workerTestDummyTask *msg;
 
     EXPECT_FALSE(worker.IsRunning());
 
-    msg = new DummyMessage();
-    worker.PostMessage(msg);
+    msg = new workerTestDummyTask();
+    worker.PostTask(msg);
 
-    msg = new DummyMessage();
-    worker.PostMessage(msg);
+    msg = new workerTestDummyTask();
+    worker.PostTask(msg);
 
-    msg = new DummyMessage();
-    worker.PostMessage(msg);
+    msg = new workerTestDummyTask();
+    worker.PostTask(msg);
 
 
-    EXPECT_EQ(DummyMessage::m_number, worker.GetMessageNumber());
+    EXPECT_EQ(workerTestDummyTask::m_number, worker.GetTaskNumber());
 
     worker.StartWorking();
     sleep(3);
     
-    while(worker.GetMessageNumber() > 0) sleep(3);
+    while(worker.GetTaskNumber() > 0) sleep(3);
    
     sleep(3);
-    EXPECT_EQ(DummyMessage::m_number,DummyMessage::m_counter);
-    EXPECT_TRUE(DummyMessage::AllMsgDone());
+    EXPECT_EQ(workerTestDummyTask::m_number,workerTestDummyTask::m_counter);
+    EXPECT_TRUE(workerTestDummyTask::AllMsgDone());
 
 
     for (int i = 0 ; i < 100; ++i)
     {
-        msg = new DummyMessage();
-        worker.PostMessage(msg);
+        msg = new workerTestDummyTask();
+        worker.PostTask(msg);
     }
 
     worker.StopRunning();
 
-    EXPECT_FALSE(DummyMessage::AllMsgDone());
-    EXPECT_TRUE(worker.GetMessageNumber() > 0);
+    EXPECT_FALSE(workerTestDummyTask::AllMsgDone());
+    EXPECT_TRUE(worker.GetTaskNumber() > 0);
 
 }

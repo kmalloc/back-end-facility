@@ -1,5 +1,4 @@
 #include "worker.h"
-#include "message.h"
 
 #include <vector>
 #include <queue>
@@ -61,29 +60,29 @@ void WorkerTask::ClearAllMsg()
 {
     while (!m_mailbox.IsEmpty())
     {
-        MessageBase*msg = m_mailbox.PopFront();
+        ITask*msg = m_mailbox.PopFront();
         if (msg) delete(msg);
     }
 }
 
 
-bool WorkerTask::PostMessage(MessageBase* message)
+bool WorkerTask::PostTask(ITask* task)
 {
-    bool ret = m_mailbox.PushBack(message);
+    bool ret = m_mailbox.PushBack(task);
 
     if (ret) SignalPost();
 
     return ret;
 }
 
-int WorkerTask::GetMessageNumber() 
+int WorkerTask::GetTaskNumber() 
 {
     return m_mailbox.Size();
 }
 
-MessageBase* WorkerTask::GetMessage()
+ITask* WorkerTask::GetTask()
 {
-    MessageBase* msg;
+    ITask* msg;
 
     SignalConsume();
     msg = m_mailbox.PopFront();
@@ -100,7 +99,7 @@ void WorkerTask::Run()
 
         if (m_shouldStop) break;
 
-        MessageBase* msg = GetMessage();
+        ITask* msg = GetTask();
 
         if (msg == NULL)continue;
 

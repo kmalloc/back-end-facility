@@ -8,8 +8,6 @@
 
 #include <semaphore.h>
 
-class MessageBase;
-
 class WorkerTaskBase: public ITask
 {
     public:
@@ -17,8 +15,8 @@ class WorkerTaskBase: public ITask
         WorkerTaskBase();
         virtual ~WorkerTaskBase();
 
-        virtual bool PostMessage(MessageBase*) = 0;
-        virtual int  GetMessageNumber() = 0;
+        virtual bool PostTask(ITask*) = 0;
+        virtual int  GetTaskNumber() = 0;
         virtual void ClearAllMsg()=0;
 
         virtual void StopRunning();
@@ -28,10 +26,10 @@ class WorkerTaskBase: public ITask
 
         virtual void Run()=0;
 
-        //get message from mailbox
-        //may block when there is no message.
-        //caller take responsibility to free the message.
-        virtual MessageBase* GetMessage() = 0;
+        //get task from mailbox
+        //may block when there is no task.
+        //caller take responsibility to free the task.
+        virtual ITask* GetTask() = 0;
 
         inline void SetStopState(bool shouldStop);
         inline void SignalPost();
@@ -53,18 +51,18 @@ class WorkerTask: public WorkerTaskBase
         WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~WorkerTask();
 
-        virtual bool PostMessage(MessageBase*);
-        virtual int  GetMessageNumber();
+        virtual bool PostTask(ITask*);
+        virtual int  GetTaskNumber();
         virtual void ClearAllMsg();
 
     protected:
 
         virtual void Run();
-        virtual MessageBase* GetMessage();
+        virtual ITask* GetTask();
         
     private:
 
-        SpinlockQueue<MessageBase*> m_mailbox;
+        SpinlockQueue<ITask*> m_mailbox;
 };
 
 
@@ -77,8 +75,8 @@ class Worker:public Thread
 
         virtual bool IsRunning(){ return m_workerTask->IsRunning(); }
         void StopRunning() { m_workerTask->StopRunning(); }
-        bool PostMessage(MessageBase* msg) { return m_workerTask->PostMessage(msg); }
-        int  GetMessageNumber() { return m_workerTask->GetMessageNumber(); }
+        bool PostTask(ITask* msg) { return m_workerTask->PostTask(msg); }
+        int  GetTaskNumber() { return m_workerTask->GetTaskNumber(); }
 
 
         bool StartWorking();
