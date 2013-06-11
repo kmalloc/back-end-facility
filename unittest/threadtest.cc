@@ -5,10 +5,20 @@
 class ThreadTestDummyTask:public ITask
 {
     public:
-        ThreadTestDummyTask():counter(0) {}
+        ThreadTestDummyTask():m_stop(false),counter(0) {}
         virtual ~ThreadTestDummyTask() {}
-        virtual void Run()  { ++counter; }
+        virtual void Run()  
+        {
+            while(!m_stop)
+            {
+                ++counter; 
+                sleep(1);
+            }
+        }
+        void init() { m_stop = false;}
+        void stop() { m_stop = true;}
         int counter;
+        bool m_stop;
 };
 
 
@@ -31,17 +41,39 @@ TEST(operation,threadtest)
 
     EXPECT_TRUE(src == target);
 
+    sleep(3);
+
+    task.stop();
     thread1.Join();
 
-    EXPECT_EQ(1,task.counter);
+    EXPECT_TRUE(task.counter > 1);
     EXPECT_FALSE(thread1.IsRunning());
     EXPECT_FALSE(thread1.IsDetachable());
+    EXPECT_EQ(&task, thread1.GetTask());
 
-    EXPECT_EQ(&task,thread1.GetTask());
+    task.init();
     EXPECT_TRUE(thread1.Start());
 
+    sleep(3);
     EXPECT_TRUE(thread1.IsRunning());
-
+    EXPECT_FALSE(thread1.IsDetachable());
+    EXPECT_EQ(&task,thread1.GetTask());
+    task.stop();
     thread1.Join();
-    EXPECT_EQ(2,task.counter);
+    EXPECT_TRUE(task.counter > 2);
+
+
+    task.init();
+    EXPECT_TRUE(thread1.Start());
+
+    sleep(2);
+
+    EXPECT_TRUE(thread1.Cancel());
+    sleep(1);
+
+    void* ret;
+    EXPECT_TRUE(thread1.Join(&ret));
+
+    EXPECT_EQ(PTHREAD_CANCELED, ret);
 }
+

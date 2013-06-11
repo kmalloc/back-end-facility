@@ -16,6 +16,8 @@ Thread::Thread(ITask* task,bool detachable)
 
 Thread::~Thread()
 {
+    if (m_busy) pthread_cancel(m_tid);
+
     pthread_attr_destroy(&m_attr);
 }
 
@@ -63,6 +65,7 @@ void* Thread::Run(void*arg)
 
     if (task == NULL) return NULL;
 
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
     task->Run();
 
     thread->m_busy = false;
@@ -70,15 +73,18 @@ void* Thread::Run(void*arg)
     return task;
 }
 
-
-
-int Thread::Join()
+bool Thread::Join(void** ret)
 {
-    if (m_detachable) return -1;
+    if (m_detachable) return false;
 
-    return pthread_join(m_tid,NULL);
+    return pthread_join(m_tid,ret) == 0;
 }
 
+bool Thread::Cancel() 
+{
+    if (!m_busy) return true;
+    return pthread_cancel(m_tid) == 0;
+}
 
 bool Thread::SetDetachable(bool enable)
 {

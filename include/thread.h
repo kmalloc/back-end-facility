@@ -19,7 +19,8 @@ class Thread: public noncopyable
         bool   SetDetachable(bool enable);
 
         bool   Start();
-        int    Join();
+        bool   Join(void** ret = NULL);
+        bool   Cancel();
 
         virtual bool IsRunning() const { return m_busy; }
 
