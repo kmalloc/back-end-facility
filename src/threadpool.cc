@@ -18,7 +18,7 @@ class Dispatcher:public WorkerBodyBase
 
         virtual bool PostTask(ITask*);
         virtual int  GetTaskNumber();
-        virtual void ClearAllMsg();
+        virtual void ClearAllTask();
 
     protected:
 
@@ -28,6 +28,8 @@ class Dispatcher:public WorkerBodyBase
     private:
 
         ThreadPool* m_pool;
+        sem_t m_notifyer;
+
         std::vector<Thread*> m_workers;
         SpinlockQueue<ITask*, std::priority_queue<ITask*, \
             std::vector<ITask*>, CompareTaskPriority> > m_queue;

@@ -9,7 +9,9 @@
  */
 
 WorkerBodyBase::WorkerBodyBase()
-:m_isRuning(false), m_shouldStop(false)
+    :m_isRuning(false)
+    ,m_shouldStop(false)
+    ,m_notifyer(NULL)
 {
     sem_init(&m_sem,0,0);
 }
@@ -34,6 +36,11 @@ void WorkerBodyBase::SignalConsume()
     sem_wait(&m_sem);
 }
 
+bool WorkerBodyBase::TryConsume()
+{
+    return sem_trywait(&m_sem) == 0;
+}
+
 void WorkerBodyBase::StopRunning()
 {
     SetStopState(true);
@@ -56,7 +63,7 @@ WorkerBody::~WorkerBody()
 }
 
 
-void WorkerBody::ClearAllMsg()
+void WorkerBody::ClearAllTask()
 {
     while (!m_mailbox.IsEmpty())
     {
@@ -90,14 +97,33 @@ ITask* WorkerBody::GetTask()
     return msg;
 }
 
+ITask* WorkerBody::TryGetTask()
+{
+    ITask* task = NULL;
+
+    if (TryConsume())
+    {
+        task = m_mailbox.PopFront();
+    }
+
+    return task;
+}
+
+bool WorkerBody::CheckAvailability()
+{
+    return m_mailbox.IsEmpty();
+}
+
 void WorkerBody::Run()
 {
+    m_isRuning = false;
+
     while(1)
     {
 
-        m_isRuning = false;
-
         if (m_shouldStop) break;
+
+        if (CheckAvailability()) Notify();
 
         ITask* msg = GetTask();
 
@@ -107,6 +133,9 @@ void WorkerBody::Run()
         msg->Run();
 
         delete msg;
+        
+        m_isRuning = false;
+        
     }
 
     SetStopState(false);

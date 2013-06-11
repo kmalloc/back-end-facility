@@ -21,7 +21,6 @@ class WorkerBodyBase: public ITask
 
         virtual void StopRunning();
         virtual bool IsRunning() const {return m_isRuning;}
-        virtual void SetNotifyer(sem_t* notify) { m_notifyer = notify; }
 
     protected:
 
@@ -35,17 +34,13 @@ class WorkerBodyBase: public ITask
         inline void SetStopState(bool shouldStop);
         inline void SignalPost();
         inline void SignalConsume();
-        inline bool TryConsume();
-        inline void Notify() { if (m_notifyer) sem_post(m_notifyer); }
 
         volatile bool m_isRuning;
         volatile bool m_shouldStop;
 
-
     private:
 
         sem_t m_sem;
-        sem_t* m_notifyer;
 };
 
 
@@ -58,20 +53,13 @@ class WorkerBody: public WorkerBodyBase
 
         virtual bool PostTask(ITask*);
         virtual int  GetTaskNumber();
-        virtual void ClearAllTask();
-
-        //take care of calling this function.
-        //multitasking-opertion on m_mailbox will 
-        //greatly reduce performance.
-        //don't call it unless really necessary.
-        ITask* TryGetTask();
+        virtual void ClearAllMsg();
 
     protected:
 
         virtual void Run();
         virtual ITask* GetTask();
-        inline bool CheckAvailability();
-
+        
     private:
 
         SpinlockQueue<ITask*> m_mailbox;
@@ -97,8 +85,7 @@ class Worker:public Thread
 
         Worker(WorkerBodyBase*);
 
-        //disable setting task. 
-        //this is a special thread specific to a worker thread.
+        //disable setting task. this is a special thread specific to a worker thread.
         //It should not be changed externally.
         using Thread::SetTask;
         using Thread::Start;
