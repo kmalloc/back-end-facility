@@ -21,7 +21,10 @@ worker.o : $(SRC_DIR)/src/worker.cc
 daemon.o : $(SRC_DIR)/src/daemon.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc -I$(HEADER) -I$(MISCHEADER)
 
-OBJECTS = thread.o daemon.o worker.o 
+threadpool.o : $(SRC_DIR)/src/threadpool.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/threadpool.cc -I$(HEADER) -I$(MISCHEADER)
+
+OBJECTS = thread.o daemon.o worker.o threadpool.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(LIBNAME) $(OBJECTS)

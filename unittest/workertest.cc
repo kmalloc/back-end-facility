@@ -28,10 +28,10 @@ volatile int DummyMessage::m_number  = 0;
 
 TEST(WorkerTaskTest,WorkerTest)
 {
+    using namespace std;
 
     Worker worker;
     DummyMessage *msg;
-
 
     EXPECT_FALSE(worker.IsRunning());
 
@@ -47,7 +47,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     EXPECT_EQ(DummyMessage::m_number, worker.GetMessageNumber());
 
-    worker.Start();
+    worker.StartWorking();
     sleep(3);
     
     while(worker.GetMessageNumber() > 0) sleep(3);

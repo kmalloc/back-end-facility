@@ -10,37 +10,61 @@
 
 class MessageBase;
 
-class WorkerTask: public ITask
+class WorkerTaskBase: public ITask
 {
     public:
 
-        WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
-        virtual ~WorkerTask();
+        WorkerTaskBase();
+        virtual ~WorkerTaskBase();
 
-        bool PostMessage(MessageBase*);
+        virtual bool PostMessage(MessageBase*) = 0;
+        virtual int  GetMessageNumber() = 0;
+        virtual void ClearAllMsg()=0;
 
-        void StopRunning();
-        bool IsRunning() const {return m_isRuning;}
-        int  GetMessageNumber();
+        virtual void StopRunning();
+        virtual bool IsRunning() const {return m_isRuning;}
 
     protected:
 
-        virtual void Run();
+        virtual void Run()=0;
 
         //get message from mailbox
         //may block when there is no message.
         //caller take responsibility to free the message.
-        MessageBase* GetMessage();
+        virtual MessageBase* GetMessage() = 0;
 
         inline void SetStopState(bool shouldStop);
-
-    private:
+        inline void SignalPost();
+        inline void SignalConsume();
 
         volatile bool m_isRuning;
         volatile bool m_shouldStop;
 
-        SpinlockQueue<MessageBase*> m_mailbox;
+    private:
+
         sem_t m_sem;
+};
+
+
+class WorkerTask: public WorkerTaskBase
+{
+    public:
+
+        WorkerTask(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+        ~WorkerTask();
+
+        virtual bool PostMessage(MessageBase*);
+        virtual int  GetMessageNumber();
+        virtual void ClearAllMsg();
+
+    protected:
+
+        virtual void Run();
+        virtual MessageBase* GetMessage();
+        
+    private:
+
+        SpinlockQueue<MessageBase*> m_mailbox;
 };
 
 
@@ -48,21 +72,27 @@ class Worker:public Thread
 {
     public:
 
-        Worker();
+        Worker(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Worker();
 
-        virtual bool IsRunning(){ return m_workerTask.IsRunning(); }
-        void StopRunning() { m_workerTask.StopRunning(); }
-        bool PostMessage(MessageBase* msg) { return m_workerTask.PostMessage(msg); }
-        int  GetMessageNumber() { return m_workerTask.GetMessageNumber(); }
+        virtual bool IsRunning(){ return m_workerTask->IsRunning(); }
+        void StopRunning() { m_workerTask->StopRunning(); }
+        bool PostMessage(MessageBase* msg) { return m_workerTask->PostMessage(msg); }
+        int  GetMessageNumber() { return m_workerTask->GetMessageNumber(); }
+
+
+        bool StartWorking();
 
     protected:
 
+        Worker(WorkerTaskBase*);
+
         //disable setting task. this is a special thread specific to a worker thread.
         //It should not be changed externally.
-        virtual ITask* SetTask(ITask*) { return NULL; }
+        using Thread::SetTask;
+        using Thread::Start;
 
-        WorkerTask m_workerTask;
+        WorkerTaskBase* m_workerTask;
 };
 
 #endif

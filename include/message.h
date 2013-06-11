@@ -15,6 +15,12 @@ class MessageBase: public ITask
         virtual void Run() {}
 
         virtual void   PrepareMessage();
+
+        int Priority() const { return m_priority;}
+
+    private:
+
+        int m_priority;
 };
 
 

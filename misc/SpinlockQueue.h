@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-template<class Type>
+template<class Type,class QUEUE=std::queue<Type> >
 class SpinlockQueue
 {
     public:
@@ -99,7 +99,7 @@ class SpinlockQueue
         Type m_null; //null value, this value will be return if pop on empty queue.
         const int m_maxSz;
         volatile pthread_spinlock_t m_lock;
-        std::queue <Type> m_queue;
+        QUEUE m_queue;
 };
 
 

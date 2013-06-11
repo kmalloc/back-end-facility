@@ -1,24 +1,21 @@
 #ifndef _THREAD_POOL_H_
 #define _THREAD_POOL_H_
 
-#include "Thread.h"
+#include "worker.h"
+
+#include <vector>
 
 
-class ThreadPool:public Thread
+class ThreadPool: public Worker 
 {
     public:
 
         ThreadPool(int num = 0);
         ~ThreadPool();
 
-    private:
+    protected:
 
-        friend class Dispatcher;
-
-        int m_num;
-        ITask* m_dispatch;
-
-        std::vector<Thread*> m_workers;
+        int CalcDefaultThreadNum();
 };
 
 #endif
