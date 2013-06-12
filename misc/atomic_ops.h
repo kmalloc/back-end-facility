@@ -4,24 +4,24 @@
 #define cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 
 
-inline void atomic_add(volatile long * val, long gap)
+inline void atomic_add(volatile int * val, int gap)
 {
-    long oldval;
-    long newval;
+    int oldval;
+    int newval;
 
     do
     {
         oldval = *val;
         newval = oldval + gap;
-    } while (cas(val, oldval, newval);
+    } while (!cas(val, oldval, newval));
 }
 
-inline void atomic_increment(volatile lone * val)
+inline void atomic_increment(volatile int * val)
 {
     atomic_add(val, 1);
 }
 
-inline void atomic_decrement(volatile lone * val)
+inline void atomic_decrement(volatile int * val)
 {
     atomic_add(val, -1);
 }

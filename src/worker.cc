@@ -1,17 +1,25 @@
 #include "worker.h"
+#include "threadpool.h"
 
 #include <vector>
 #include <queue>
+
+#include <time.h>
+#include <errno.h>
 
 
 /*
  *     WorkerBodyBase
  */
 
-WorkerBodyBase::WorkerBodyBase()
+WorkerBodyBase::WorkerBodyBase(Worker* worker)
     :m_isRuning(false)
     ,m_shouldStop(false)
     ,m_notify(false)
+    ,m_timeout(5)
+    ,m_req(0)
+    ,m_worker(worker)
+    ,m_reqThreshold(3)
 {
     sem_init(&m_sem,0,0);
 }
@@ -36,6 +44,21 @@ void WorkerBodyBase::SignalConsume()
     sem_wait(&m_sem);
 }
 
+bool WorkerBodyBase::SignalConsumeTimeout(int sec)
+{
+    int s;
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME,&ts) == -1)
+        return false;
+
+    ts.tv_sec += sec;
+
+    while ((s = sem_timedwait(&m_sem,&ts)) == -1 && errno == EINTR)
+        continue;
+
+    return (s == 0);
+}
+
 bool WorkerBodyBase::TryConsume()
 {
     return sem_trywait(&m_sem) == 0;
@@ -48,10 +71,12 @@ void WorkerBodyBase::StopRunning()
 
 int WorkerBodyBase::Notify()
 {
-    if (m_pool)
+    if (m_worker)
     {
-        m_pool->SetWorkerNotify(this);
+        return m_worker->Notify();
     }
+
+    return 0;
 }
 
 void WorkerBodyBase::Run()
@@ -63,9 +88,7 @@ void WorkerBodyBase::Run()
 
         if (m_shouldStop) break;
 
-        if (m_notify && !HasTask()) Notify();
-
-        ITask* msg = GetTask();
+        ITask* msg = GetRunTask();
 
         m_isRuning = true;
 
@@ -108,11 +131,30 @@ bool WorkerBodyBase::PostTask(ITask* task)
     return ret;
 }
 
-ITask* WorkerBodyBase::GetTask()
+ITask* WorkerBodyBase::GetRunTask()
 {
     ITask* msg;
 
-    SignalConsume();
+    while(1)
+    {
+        if (!m_notify || m_req > m_reqThreshold)
+        {
+            SignalConsume();
+            break;
+        }
+        else
+        {
+            if (SignalConsumeTimeout(m_timeout))
+            {
+                break;
+            }
+
+            Notify();
+            m_req++;
+        }
+    }
+
+    m_req = 0;
     msg = GetTaskFromContainer();
 
     return msg;
@@ -123,8 +165,8 @@ ITask* WorkerBodyBase::GetTask()
  * WorkerBody
  */
  
-WorkerBody::WorkerBody(int maxMsgSize)
-    :WorkerBodyBase(), m_mailbox(maxMsgSize)
+WorkerBody::WorkerBody(Worker*work, int maxMsgSize)
+    :WorkerBodyBase(work), m_mailbox(maxMsgSize)
 {
     m_mailbox.SetNullValue(NULL);
 }
@@ -168,7 +210,7 @@ void WorkerBody::HandleTask(ITask* task)
 Worker::Worker(ThreadPool* pool, int id, int maxMsgSize)
     :Thread(), m_pool(pool), m_id(id)
 {
-   m_task = m_WorkerBody = new WorkerBody(maxMsgSize);
+   m_task = m_WorkerBody = new WorkerBody(this,maxMsgSize);
 }
 
 Worker::Worker(WorkerBodyBase* task)
@@ -185,5 +227,15 @@ Worker::~Worker()
 bool Worker::StartWorking()
 {
     return Thread::Start();
+}
+
+int Worker::Notify()
+{
+    if (m_pool)
+    {
+        return m_pool->SetWorkerNotify(this); 
+    }
+
+    return 0;
 }
 

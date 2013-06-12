@@ -2,10 +2,12 @@
 #include "SpinlockQueue.h"
 #include "atomic_ops.h"
 
+#include <memory.h>
+
 
 struct CompareTaskPriority 
 {
-    inline bool operator()(const ITask*& x, const ITask*&y) const 
+    inline bool operator()(ITask*& x, ITask*&y) const 
     {
         return x->Priority() < y->Priority();
     }
@@ -18,36 +20,41 @@ class Dispatcher:public WorkerBodyBase
         Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
-        virtual bool PostTask(ITask*);
+        void StopRunning();
+        void StopWorker();
         virtual int  GetTaskNumber();
-        virtual bool HasTask() const;
+        virtual bool HasTask();
 
         /*
          * worker calls this function to require task to Run
-         * keep in mind that this function will be called in different thread
+         * keep in mind that this function will be called in different threads
          */
-        int SetWorkerNotify(WorkerBodyBase* worker);
+        int SetWorkerNotify(Worker* worker);
 
     protected:
 
-        virtual void HandleTask();
-        virtual ITask* GetTask();
+        virtual void HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
+        virtual bool PushTaskToContainer(ITask*);
         bool HandleWorkerRequest();
         void DispatchTask(ITask*);
-        Thread* SelectFreeWorker();
+        Worker* SelectFreeWorker();
         
     private:
 
-        int m_requestThreshold;
+        Worker* FindRequestWorker();
+        ITask*  FindRunTaskFromOtherWorker();
+
+        int m_singleRequestThreshold;
+        int m_totalRequestThreashold;
+
         const int m_workerNum;
         volatile int m_totalRequest;
-        int m_request[m_workerNum];
+        volatile int *m_request;
         ThreadPool* m_pool;
 
-        std::vector<Thread*> m_workers;
-        SpinlockQueue<ITask*, std::priority_queue<ITask*, \
-            std::vector<ITask*>, CompareTaskPriority> > m_queue;
+        std::vector<Worker*> m_workers;
+        SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > m_queue;
 };
 
 
@@ -56,36 +63,55 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     ,m_pool(pool)
     ,m_workerNum(workerNum)
     ,m_totalRequest(0)
-    ,m_requestThreshold(5)
+    ,m_singleRequestThreshold(2)
+    ,m_totalRequestThreashold(m_workerNum/4 > m_singleRequestThreshold?m_workerNum/4:m_singleRequestThreshold)
 {
+    m_request = new int[m_workerNum];
+
     m_workers.reserve(m_workerNum);
     for (int i = 0; i < m_workerNum; ++i)
     {
         Worker* worker = new Worker(m_pool, i);
-        worker.EnableNotify(true);
+        worker->EnableNotify(true);
         m_workers.push_back(worker);
         m_request[i] = 0;
     }
 }
 
-
 Dispatcher::~Dispatcher()
 {
     for (int i = 0; i < m_workerNum; ++i)
     {
+        m_workers[i]->Cancel();
         delete m_workers[i];
+    }
+
+    delete []m_request;
+}
+
+void Dispatcher::StopWorker()
+{
+    for (int i = 0; i < m_workerNum; ++i)
+    {
+        m_workers[i]->StopRunning();
+        m_workers[i]->Join();
     }
 }
 
+void Dispatcher::StopRunning()
+{
+    WorkerBodyBase::StopRunning();
+    StopWorker();
+}
 
-ITask* Dispatcher::PushTaskToContainer(ITask* task)
+bool Dispatcher::PushTaskToContainer(ITask* task)
 {
     return m_queue.PushBack(task);
 }
 
 ITask* Dispatcher::GetTaskFromContainer()
 {
-    m_queue.PopFront();
+    return m_queue.PopFront();
 }
 
 int Dispatcher::GetTaskNumber() 
@@ -93,7 +119,7 @@ int Dispatcher::GetTaskNumber()
     return m_queue.Size();
 }
 
-bool Dispatcher::HasTask() const 
+bool Dispatcher::HasTask()
 {
     return !m_queue.IsEmpty();
 }
@@ -132,10 +158,9 @@ void Dispatcher::DispatchTask(ITask* task)
     worker->PostTask(task);
 }
 
-
-int Dispatcher::SetWorkerNotify(WorkerBodyBase* worker)
+int Dispatcher::SetWorkerNotify(Worker* worker)
 {
-    if (m_queue.IsEmpty())
+    if (!HasTask())
     {
         int id = worker->GetWorkerId();
         if (id < 0 || id >= m_workerNum) return -1;
@@ -143,7 +168,54 @@ int Dispatcher::SetWorkerNotify(WorkerBodyBase* worker)
         atomic_increment(&m_request[id]);
         atomic_increment(&m_totalRequest);
         PostTask(NULL);
+        return 1;
     }
+
+    return 0;
+}
+
+
+/*
+ * find a worker that sends most request.
+ * this might fail if requst does not meet the threshhold required.
+ */
+Worker* Dispatcher::FindRequestWorker()
+{
+    int chosen, min = -1;
+    for (int i = 0; i < m_workerNum; ++i)
+    {
+        int req = m_request[i];
+        if (req > m_singleRequestThreshold && req > min)
+        {
+            if (m_workers[i]->IsRunning())
+            {
+                m_request[i] = 0;
+                atomic_add(&m_totalRequest, -req);
+
+                if (m_totalRequest < m_totalRequestThreashold)
+                    return NULL;
+
+                continue;
+            }
+
+            m_request[i] = 0;
+            atomic_add(&m_totalRequest, -req);
+            min = m_request[i];
+            chosen = i;
+            break;
+        }
+    }
+
+    if (chosen != -1) return m_workers[chosen];
+
+    m_totalRequest = m_totalRequestThreashold/2;
+    return NULL;
+}
+
+ITask* Dispatcher::FindRunTaskFromOtherWorker()
+{
+    //TODO
+    return NULL;
 }
 
 /*
@@ -152,8 +224,34 @@ int Dispatcher::SetWorkerNotify(WorkerBodyBase* worker)
  */
 bool Dispatcher::HandleWorkerRequest()
 {
-    if (m_totalRequest > m_requestThreshold)
+    if (HasTask())
     {
+        atomic_decrement(&m_totalRequest);
+        return true;
+    }
+
+    if (m_totalRequest > m_totalRequestThreashold)
+    {
+        Worker* worker = FindRequestWorker();
+        if (worker)
+        {
+            ITask* task = FindRunTaskFromOtherWorker();
+            if (task) 
+            {
+                int id = worker->GetWorkerId();
+                int req = m_request[id];
+
+                atomic_add(&m_totalRequest,-req);
+                m_request[id] = 0;
+
+                worker->PostTask(task);
+            }
+            else
+            {
+                m_totalRequest = 0;
+                memset((void*)m_request, 0, sizeof(int)*m_workerNum);
+            }
+        }
     }
 }
 
@@ -162,7 +260,7 @@ void Dispatcher::HandleTask(ITask* task)
 {
     if (task == NULL)
     {
-        //null task serves as a special msg to require ThreadPool
+        //null task serves as a special msg to inform ThreadPool
         //to handle worker request.
         HandleWorkerRequest();
     }
@@ -177,10 +275,27 @@ void Dispatcher::HandleTask(ITask* task)
  */
 
 ThreadPool::ThreadPool(int num)
-    :Worker(new Dispatcher(this, num))
+   :Worker(new Dispatcher(this, num))
 {
+    m_dispatcher = static_cast<Dispatcher*>(m_WorkerBody);
 }
 
 ThreadPool::~ThreadPool()
 {
 }
+
+bool ThreadPool::StartPooling()
+{
+    return Worker::StartWorking();
+}
+
+void ThreadPool::StopPooling()
+{
+    m_WorkerBody->StopRunning();
+}
+
+int ThreadPool::SetWorkerNotify(Worker* worker)
+{
+    return m_dispatcher->SetWorkerNotify(worker);
+}
+

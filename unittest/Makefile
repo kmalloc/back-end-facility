@@ -33,19 +33,20 @@ threadtest.o : $(USER_DIR)/threadtest.cc
 worker.o : $(SRC_DIR)/worker.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/worker.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
+threadpool.o : $(SRC_DIR)/threadpool.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/threadpool.cc $(GTEST_HEADERS) $(SRC_HEAD)
+
 workertest.o : $(USER_DIR)/workertest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/workertest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
 SpinlockQueueTest.o : $(USER_DIR)/SpinlockQueueTest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-#threadpool.o : $(SRC_DIR)/threadpool.cc 
-	#$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/threadpool.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = thread.o threadtest.o worker.o workertest.o SpinlockQueueTest.o #threadpool.o
+OBJS = thread.o threadtest.o worker.o workertest.o SpinlockQueueTest.o threadpool.o
 
 unittest : $(OBJS) 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lgtest_main $(OBJS) -o $(TESTS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lrt -lgtest_main $(OBJS) -o $(TESTS)
 
 
 clean :

@@ -3,9 +3,53 @@
 
 #include "defs.h"
 
+#include <vector>
 #include <queue>
 #include <pthread.h>
 #include <semaphore.h>
+
+template<class Type, class cmp = std::less<Type> >
+class PriorityQueue
+{
+    public:
+        PriorityQueue() {}
+        ~PriorityQueue(){}
+
+        const Type& front()
+        {
+            return m_queue.top();
+        }
+
+        void pop()
+        {
+            m_queue.pop();
+        }
+
+        void push(const Type& x)
+        {
+            m_queue.push(x);
+        }
+
+        bool empty() const
+        {
+            return m_queue.empty();
+        }
+
+        size_t size() const
+        {
+            return m_queue.size();
+        }
+
+        void clear()
+        {
+            m_queue.clear();
+        }
+
+    private:
+
+        std::priority_queue<Type, std::vector<Type>, cmp> m_queue;
+
+};
 
 template<class Type,class QUEUE=std::queue<Type> >
 class SpinlockQueue
@@ -101,7 +145,6 @@ class SpinlockQueue
         volatile pthread_spinlock_t m_lock;
         QUEUE m_queue;
 };
-
 
 #endif
 
