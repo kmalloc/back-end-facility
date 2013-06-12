@@ -11,7 +11,7 @@
 WorkerBodyBase::WorkerBodyBase()
     :m_isRuning(false)
     ,m_shouldStop(false)
-    ,m_notifyer(NULL)
+    ,m_notify(false)
 {
     sem_init(&m_sem,0,0);
 }
@@ -46,7 +46,46 @@ void WorkerBodyBase::StopRunning()
     SetStopState(true);
 }
 
+int WorkerBodyBase::Notify()
+{
+    if (m_pool)
+    {
+        m_pool->SetWorkerNotify(this);
+    }
+}
 
+void WorkerBodyBase::Run()
+{
+    m_isRuning = false;
+
+    while(1)
+    {
+
+        if (m_shouldStop) break;
+
+        if (m_notify && !HasTask()) Notify();
+
+        ITask* msg = GetTask();
+
+        m_isRuning = true;
+
+        HandleTask(msg);
+        
+        m_isRuning = false;
+        
+    }
+
+    SetStopState(false);
+}
+
+void WorkerBodyBase::ClearAllTask()
+{
+    while (HasTask())
+    {
+        ITask*msg = TryGetTask();
+        if (msg) delete(msg);
+    }
+}
 
 /*
  * WorkerBody
@@ -63,14 +102,6 @@ WorkerBody::~WorkerBody()
 }
 
 
-void WorkerBody::ClearAllTask()
-{
-    while (!m_mailbox.IsEmpty())
-    {
-        ITask*msg = m_mailbox.PopFront();
-        if (msg) delete(msg);
-    }
-}
 
 
 bool WorkerBody::PostTask(ITask* task)
@@ -109,37 +140,18 @@ ITask* WorkerBody::TryGetTask()
     return task;
 }
 
-bool WorkerBody::CheckAvailability()
+bool WorkerBody::HasTask()
 {
     return m_mailbox.IsEmpty();
 }
 
-void WorkerBody::Run()
+
+void WorkerBody::HandleTask(ITask* task)
 {
-    m_isRuning = false;
-
-    while(1)
-    {
-
-        if (m_shouldStop) break;
-
-        if (CheckAvailability()) Notify();
-
-        ITask* msg = GetTask();
-
-        if (msg == NULL)continue;
-
-        m_isRuning = true;
-        msg->Run();
-
-        delete msg;
-        
-        m_isRuning = false;
-        
-    }
-
-    SetStopState(false);
+    task->Run();
+    delete task;
 }
+
 
 
 /*
@@ -148,14 +160,14 @@ void WorkerBody::Run()
  */
 
 
-Worker::Worker(int maxMsgSize)
-    :Thread()
+Worker::Worker(ThreadPool* pool, int id, int maxMsgSize)
+    :Thread(), m_pool(pool), m_id(id)
 {
    m_task = m_WorkerBody = new WorkerBody(maxMsgSize);
 }
 
 Worker::Worker(WorkerBodyBase* task)
-    :Thread()
+    :Thread(), m_pool(NULL), m_id(-1)
 {
     m_task = m_WorkerBody = task;
 }

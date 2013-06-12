@@ -12,6 +12,7 @@ enum TaskPriority
 class ITask
 {
     public:
+
       ITask(TaskPriority prio = TP_NORMAL): m_priority(prio){}
       virtual ~ITask(){}
       virtual void Run()=0;

@@ -17,15 +17,24 @@ class WorkerBodyBase: public ITask
 
         virtual bool PostTask(ITask*) = 0;
         virtual int  GetTaskNumber() = 0;
-        virtual void ClearAllTask()=0;
+        virtual void ClearAllTask();
 
         virtual void StopRunning();
         virtual bool IsRunning() const {return m_isRuning;}
-        virtual void SetNotifyer(sem_t* notify) { m_notifyer = notify; }
+        virtual void EnableNotify(bool enable = true) { m_notify = enable; }
+
+        //take care of calling this function.
+        //multitasking-opertion on m_mailbox will 
+        //greatly reduce performance.
+        //don't call it unless really necessary.
+        ITask* TryGetTask() = 0;
 
     protected:
 
-        virtual void Run()=0;
+        virtual void Run();
+
+        virtual void HandleTask(ITask*) = 0;
+        inline bool  HasTask() const = 0; 
 
         //get task from mailbox
         //may block when there is no task.
@@ -36,7 +45,7 @@ class WorkerBodyBase: public ITask
         inline void SignalPost();
         inline void SignalConsume();
         inline bool TryConsume();
-        inline void Notify() { if (m_notifyer) sem_post(m_notifyer); }
+        inline int  Notify();
 
         volatile bool m_isRuning;
         volatile bool m_shouldStop;
@@ -45,7 +54,7 @@ class WorkerBodyBase: public ITask
     private:
 
         sem_t m_sem;
-        sem_t* m_notifyer;
+        bool m_notify;
 };
 
 
@@ -58,19 +67,14 @@ class WorkerBody: public WorkerBodyBase
 
         virtual bool PostTask(ITask*);
         virtual int  GetTaskNumber();
-        virtual void ClearAllTask();
 
-        //take care of calling this function.
-        //multitasking-opertion on m_mailbox will 
-        //greatly reduce performance.
-        //don't call it unless really necessary.
         ITask* TryGetTask();
 
     protected:
 
-        virtual void Run();
+        virtual void HandleTask();
         virtual ITask* GetTask();
-        inline bool CheckAvailability();
+        inline bool HasTask();
 
     private:
 
@@ -82,7 +86,9 @@ class Worker:public Thread
 {
     public:
 
-        Worker(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+        Worker(ThreadPool* pool = NULL, int id = -1
+                ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+
         ~Worker();
 
         virtual bool IsRunning(){ return m_WorkerBody->IsRunning(); }
@@ -90,8 +96,9 @@ class Worker:public Thread
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
         int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 
-
         bool StartWorking();
+
+        int GetWorkerId const { return m_id; } 
 
     protected:
 
@@ -103,6 +110,8 @@ class Worker:public Thread
         using Thread::SetTask;
         using Thread::Start;
 
+        const int m_id;
+        ThreadPool* m_pool;
         WorkerBodyBase* m_WorkerBody;
 };
 
