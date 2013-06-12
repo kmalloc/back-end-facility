@@ -15,31 +15,32 @@ class WorkerBodyBase: public ITask
         WorkerBodyBase();
         virtual ~WorkerBodyBase();
 
-        virtual bool PostTask(ITask*) = 0;
         virtual int  GetTaskNumber() = 0;
-        virtual void ClearAllTask();
 
-        virtual void StopRunning();
-        virtual bool IsRunning() const {return m_isRuning;}
-        virtual void EnableNotify(bool enable = true) { m_notify = enable; }
+        void ClearAllTask();
+        void StopRunning();
+        bool IsRunning() const {return m_isRuning;}
+        void EnableNotify(bool enable = true) { m_notify = enable; }
 
         //take care of calling this function.
         //multitasking-opertion on m_mailbox will 
         //greatly reduce performance.
         //don't call it unless really necessary.
-        ITask* TryGetTask() = 0;
+        ITask* TryGetTask();
 
     protected:
-
-        virtual void Run();
 
         virtual void HandleTask(ITask*) = 0;
         inline bool  HasTask() const = 0; 
 
+        //be aware: this function may block if there is no task
+        inline virtual ITask* GetTaskFromContainer() = 0;
+        inline virtual bool   PushTaskToContainer() = 0;
+
         //get task from mailbox
         //may block when there is no task.
         //caller take responsibility to free the task.
-        virtual ITask* GetTask() = 0;
+        ITask* GetTask();
 
         inline void SetStopState(bool shouldStop);
         inline void SignalPost();
@@ -53,6 +54,8 @@ class WorkerBodyBase: public ITask
 
     private:
 
+        void Run();
+
         sem_t m_sem;
         bool m_notify;
 };
@@ -65,16 +68,14 @@ class WorkerBody: public WorkerBodyBase
         WorkerBody(int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~WorkerBody();
 
-        virtual bool PostTask(ITask*);
         virtual int  GetTaskNumber();
-
-        ITask* TryGetTask();
 
     protected:
 
         virtual void HandleTask();
-        virtual ITask* GetTask();
         inline bool HasTask();
+        inline virtual ITask* GetTaskFromContainer();
+        inline virtual bool   PushTaskToContainer();
 
     private:
 

@@ -87,6 +87,38 @@ void WorkerBodyBase::ClearAllTask()
     }
 }
 
+ITask* WorkerBodyBase::TryGetTask()
+{
+    ITask* task = NULL;
+
+    if (TryConsume())
+    {
+        task = GetTaskFromContainer();
+    }
+
+    return task;
+}
+
+bool WorkerBodyBase::PostTask(ITask* task)
+{
+    bool ret = PushTaskToContainer(task);
+
+    if (ret) SignalPost();
+
+    return ret;
+}
+
+ITask* WorkerBodyBase::GetTask()
+{
+    ITask* msg;
+
+    SignalConsume();
+    msg = GetTaskFromContainer();
+
+    return msg;
+}
+
+
 /*
  * WorkerBody
  */
@@ -101,16 +133,14 @@ WorkerBody::~WorkerBody()
 {
 }
 
-
-
-
-bool WorkerBody::PostTask(ITask* task)
+ITask* WorkerBody::GetTaskFromContainer()
 {
-    bool ret = m_mailbox.PushBack(task);
+    return m_mailbox.PopFront();
+}
 
-    if (ret) SignalPost();
-
-    return ret;
+bool WorkerBody::PushTaskToContainer(ITask* task)
+{
+    return m_mailbox.PushBack(task);
 }
 
 int WorkerBody::GetTaskNumber() 
@@ -118,33 +148,10 @@ int WorkerBody::GetTaskNumber()
     return m_mailbox.Size();
 }
 
-ITask* WorkerBody::GetTask()
-{
-    ITask* msg;
-
-    SignalConsume();
-    msg = m_mailbox.PopFront();
-
-    return msg;
-}
-
-ITask* WorkerBody::TryGetTask()
-{
-    ITask* task = NULL;
-
-    if (TryConsume())
-    {
-        task = m_mailbox.PopFront();
-    }
-
-    return task;
-}
-
 bool WorkerBody::HasTask()
 {
-    return m_mailbox.IsEmpty();
+    return !m_mailbox.IsEmpty();
 }
-
 
 void WorkerBody::HandleTask(ITask* task)
 {
@@ -153,12 +160,10 @@ void WorkerBody::HandleTask(ITask* task)
 }
 
 
-
 /*
  *    Worker
  *
  */
-
 
 Worker::Worker(ThreadPool* pool, int id, int maxMsgSize)
     :Thread(), m_pool(pool), m_id(id)

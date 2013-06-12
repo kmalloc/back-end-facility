@@ -1,5 +1,6 @@
 #include "threadpool.h"
 #include "SpinlockQueue.h"
+#include "atomic_ops.h"
 
 
 struct CompareTaskPriority 
@@ -21,8 +22,6 @@ class Dispatcher:public WorkerBodyBase
         virtual int  GetTaskNumber();
         virtual bool HasTask() const;
 
-        ITask* TryGetTask();
-
         /*
          * worker calls this function to require task to Run
          * keep in mind that this function will be called in different thread
@@ -33,13 +32,17 @@ class Dispatcher:public WorkerBodyBase
 
         virtual void HandleTask();
         virtual ITask* GetTask();
+        virtual ITask* GetTaskFromContainer();
         bool HandleWorkerRequest();
         void DispatchTask(ITask*);
         Thread* SelectFreeWorker();
         
     private:
 
-        int m_workerNum;
+        int m_requestThreshold;
+        const int m_workerNum;
+        volatile int m_totalRequest;
+        int m_request[m_workerNum];
         ThreadPool* m_pool;
 
         std::vector<Thread*> m_workers;
@@ -52,6 +55,8 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     :WorkerBodyBase()
     ,m_pool(pool)
     ,m_workerNum(workerNum)
+    ,m_totalRequest(0)
+    ,m_requestThreshold(5)
 {
     m_workers.reserve(m_workerNum);
     for (int i = 0; i < m_workerNum; ++i)
@@ -59,6 +64,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         Worker* worker = new Worker(m_pool, i);
         worker.EnableNotify(true);
         m_workers.push_back(worker);
+        m_request[i] = 0;
     }
 }
 
@@ -71,22 +77,15 @@ Dispatcher::~Dispatcher()
     }
 }
 
-bool Dispatcher::PostTask(ITask* task)
+
+ITask* Dispatcher::PushTaskToContainer(ITask* task)
 {
-    bool ret = m_queue.PushBack(task);
-
-    if (ret) SignalPost();
-
-    return ret;
+    return m_queue.PushBack(task);
 }
 
-ITask* Dispatcher::GetTask()
+ITask* Dispatcher::GetTaskFromContainer()
 {
-    ITask* msg;
-
-    SignalConsume();
-    msg = m_queue.PopFront();
-    return msg;
+    m_queue.PopFront();
 }
 
 int Dispatcher::GetTaskNumber() 
@@ -94,14 +93,9 @@ int Dispatcher::GetTaskNumber()
     return m_queue.Size();
 }
 
-
-void Dispatcher::ClearAllTask()
+bool Dispatcher::HasTask() const 
 {
-    while (!m_queue.IsEmpty())
-    {
-        ITask*msg = m_mailbox.PopFront();
-        if (msg) delete(msg);
-    }
+    return !m_queue.IsEmpty();
 }
 
 /*
@@ -143,6 +137,11 @@ int Dispatcher::SetWorkerNotify(WorkerBodyBase* worker)
 {
     if (m_queue.IsEmpty())
     {
+        int id = worker->GetWorkerId();
+        if (id < 0 || id >= m_workerNum) return -1;
+
+        atomic_increment(&m_request[id]);
+        atomic_increment(&m_totalRequest);
         PostTask(NULL);
     }
 }
@@ -153,6 +152,9 @@ int Dispatcher::SetWorkerNotify(WorkerBodyBase* worker)
  */
 bool Dispatcher::HandleWorkerRequest()
 {
+    if (m_totalRequest > m_requestThreshold)
+    {
+    }
 }
 
 
