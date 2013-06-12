@@ -9,7 +9,7 @@ struct CompareTaskPriority
 {
     inline bool operator()(ITask*& x, ITask*&y) const 
     {
-        return x->Priority() < y->Priority();
+        return x->Priority() >= y->Priority();
     }
 };
 
@@ -20,8 +20,8 @@ class Dispatcher:public WorkerBodyBase
         Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
-        void StopRunning();
         void StopWorker();
+        virtual bool StopRunning();
         virtual int  GetTaskNumber();
         virtual bool HasTask();
 
@@ -36,6 +36,7 @@ class Dispatcher:public WorkerBodyBase
         virtual void HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
+        virtual bool PushTaskToContainerFront(ITask*);
 
         int  SetWorkerRequest(Worker*);
         bool HandleWorkerRequest();
@@ -97,20 +98,30 @@ void Dispatcher::StopWorker()
 {
     for (int i = 0; i < m_workerNum; ++i)
     {
-        m_workers[i]->StopRunning();
-        m_workers[i]->Join();
+        m_workers[i]->StopWorking();
     }
 }
 
-void Dispatcher::StopRunning()
+bool Dispatcher::StopRunning()
 {
-    WorkerBodyBase::StopRunning();
-    StopWorker();
+    bool ret = WorkerBodyBase::StopRunning();
+    
+    if (ret) StopWorker();
+
+    return ret;
 }
 
 bool Dispatcher::PushTaskToContainer(ITask* task)
 {
     return m_queue.PushBack(task);
+}
+
+bool Dispatcher::PushTaskToContainerFront(ITask* task)
+{
+    if (task && task->GetInternalFlag() == TF_EXIT)
+        return PushTaskToContainer(task);
+
+    return false;
 }
 
 ITask* Dispatcher::GetTaskFromContainer()
@@ -312,9 +323,9 @@ bool ThreadPool::StartPooling()
     return m_worker->StartWorking();
 }
 
-void ThreadPool::StopPooling()
+bool ThreadPool::StopPooling()
 {
-    m_worker->StopRunning();
+    return m_worker->StopWorking();
 }
 
 int ThreadPool::SetWorkerNotify(Worker* worker)

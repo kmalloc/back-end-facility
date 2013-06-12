@@ -21,7 +21,7 @@ class WorkerBodyBase: public ITask
         void ClearAllTask();
         virtual int GetTaskNumber() = 0;
 
-        virtual void StopRunning();
+        virtual bool StopRunning();
         bool IsRunning() const { return m_isRuning; }
         int  TaskDone() const { return m_done; }
         void EnableNotify(bool enable = true) { m_notify = enable; }
@@ -41,15 +41,21 @@ class WorkerBodyBase: public ITask
         virtual ITask* GetTaskFromContainer() = 0;
         virtual bool   PushTaskToContainer(ITask*) = 0;
 
+        //this is used to put a exit task in the msg queue.
+        //so that we can exit the worker loop in an elegant way.
+        //be aware, using this function will put the task in run
+        //immediatly after current task is finished.
+        //this is for INTERNAL usage only.
+        virtual bool   PushTaskToContainerFront(ITask*) = 0;
 
         inline void SignalPost();
         inline void SignalConsume();
         inline bool SignalConsumeTimeout(int);
         inline bool TryConsume();
         inline int  Notify();
+        inline bool PostExit();
 
         volatile bool m_isRuning;
-        volatile bool m_shouldStop;
 
     private:
 
@@ -61,9 +67,6 @@ class WorkerBodyBase: public ITask
         //caller take responsibility to free the task.
         ITask* GetRunTask();
 
-        //this is part of some ugly code.
-        //don't use it outside.
-        inline void SetStopState(bool shouldStop);
         bool CheckExit(ITask*);
 
         //timeout for sem_timewait
@@ -102,10 +105,11 @@ class WorkerBody: public WorkerBodyBase
         virtual bool HasTask();
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
+        virtual bool PushTaskToContainerFront(ITask*);
 
     private:
 
-        SpinlockQueue<ITask*> m_mailbox;
+        SpinlockWeakPriorityQueue<ITask*> m_mailbox;
 };
 
 class WorkerManagerBase
@@ -130,7 +134,7 @@ class Worker:public Thread
         ~Worker();
 
         virtual bool IsRunning(){ return m_WorkerBody->IsRunning(); }
-        void StopRunning() { m_WorkerBody->StopRunning(); }
+        bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
         int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 

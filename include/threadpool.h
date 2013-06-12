@@ -20,7 +20,7 @@ class ThreadPool: public WorkerManagerBase
         //otherwise, on destruction,
         //destructor will shutdown all the threads using pthread_cancel,
         //which is totally out of control.
-        void StopPooling();
+        bool StopPooling();
 
         virtual int SetWorkerNotify(Worker* worker);
 

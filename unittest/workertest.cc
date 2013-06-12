@@ -11,33 +11,33 @@ class workerTestDummyTask:public ITask
             m_number++;
         }
 
-        virtual void Run() { sleep(1);++m_counter; }
+        virtual void Run() { sleep(1);m_order.push_back(m_counter);++m_counter; }
         static bool AllMsgDone() { return m_counter == m_number;}
 
-        static volatile int m_counter;
-        static volatile int m_number;
+        static int m_counter;
+        static int m_number;
+
+        static std::vector<int> m_order;
 };
 
-volatile int workerTestDummyTask::m_counter = 0;
-volatile int workerTestDummyTask::m_number  = 0;
+int workerTestDummyTask::m_counter = 0;
+int workerTestDummyTask::m_number  = 0;
+std::vector<int> workerTestDummyTask::m_order;
 
 TEST(WorkerTaskTest,WorkerTest)
 {
 
+    int c = 0;
     Worker worker;
     workerTestDummyTask *msg;
 
     EXPECT_FALSE(worker.IsRunning());
 
-    msg = new workerTestDummyTask();
-    worker.PostTask(msg);
-
-    msg = new workerTestDummyTask();
-    worker.PostTask(msg);
-
-    msg = new workerTestDummyTask();
-    worker.PostTask(msg);
-
+    for (int i = 0; i < 4; i++)
+    {
+        msg = new workerTestDummyTask();
+        worker.PostTask(msg);
+    }
 
     EXPECT_EQ(workerTestDummyTask::m_number, worker.GetTaskNumber());
 
@@ -58,8 +58,17 @@ TEST(WorkerTaskTest,WorkerTest)
 
     EXPECT_EQ(prevTotal, worker.TaskDone());
 
-    worker.StopRunning();
-    sleep(2);
+    EXPECT_TRUE(worker.StopWorking(true));
+
+    EXPECT_EQ(workerTestDummyTask::m_number,workerTestDummyTask::m_order.size());
+
+
+    int ci = 0;
+    for (; ci < workerTestDummyTask::m_counter; ++ci)
+    {
+        int ii = workerTestDummyTask::m_order[ci];
+        EXPECT_EQ(ci,ii);
+    }
 
     for (int i = 0 ; i < 100; ++i)
     {
@@ -71,9 +80,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     sleep(8);
 
-    worker.StopRunning();
-
-    sleep(2);
+    worker.StopWorking(true);
 
     int left = worker.GetTaskNumber();
     int done = worker.TaskDone();
@@ -89,4 +96,9 @@ TEST(WorkerTaskTest,WorkerTest)
         << ",counter:" << workerTestDummyTask::m_counter 
         << ",done:" << done << ",left:" << left;
 
+    for (; ci < workerTestDummyTask::m_counter; ++ci)
+    {
+        int ii = workerTestDummyTask::m_order[ci];
+        EXPECT_EQ(ci,ii);
+    }
 }

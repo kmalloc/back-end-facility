@@ -12,7 +12,7 @@ class Thread: public noncopyable
 
     public:
 
-        Thread(ITask* = NULL,bool detachable = true);
+        Thread(ITask* = NULL,bool detachable = false);
         virtual ~Thread();
 
         bool   IsDetachable() const { return m_detachable; }

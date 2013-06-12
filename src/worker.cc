@@ -15,7 +15,6 @@
 
 WorkerBodyBase::WorkerBodyBase(Worker* worker)
     :m_isRuning(false)
-    ,m_shouldStop(false)
     ,m_notify(false)
     ,m_timeout(5)
     ,m_req(0)
@@ -28,12 +27,6 @@ WorkerBodyBase::WorkerBodyBase(Worker* worker)
 
 WorkerBodyBase::~WorkerBodyBase()
 {
-}
-
-
-void WorkerBodyBase::SetStopState(bool shouldStop)
-{
-    m_shouldStop = shouldStop;
 }
 
 void WorkerBodyBase::SignalPost()
@@ -66,10 +59,9 @@ bool WorkerBodyBase::TryConsume()
     return sem_trywait(&m_sem) == 0;
 }
 
-void WorkerBodyBase::StopRunning()
+bool WorkerBodyBase::StopRunning()
 {
-    SetStopState(true);
-    SignalPost();
+    return PostExit();
 }
 
 int WorkerBodyBase::Notify()
@@ -84,23 +76,13 @@ int WorkerBodyBase::Notify()
 
 bool WorkerBodyBase::CheckExit(ITask* task)
 {
-    bool ret = false;
-
     if (task && task->GetInternalFlag() == TF_EXIT)
     {
         delete task;
-        ret = true;
-    }
-    else if (m_shouldStop)
-    {
-        //consume the dummy semaphore
-        //m_shouldStop == true always comes with sem_post()
-        SignalConsume();
-        PostTask(task);
-        ret = true;
+        return true;
     }
 
-    return ret;
+    return false;
 }
 
 void WorkerBodyBase::Run()
@@ -109,8 +91,6 @@ void WorkerBodyBase::Run()
 
     while(1)
     {
-        if (m_shouldStop) break;
-
         ITask* msg = GetRunTask();
 
         if (CheckExit(msg)) break;
@@ -123,8 +103,6 @@ void WorkerBodyBase::Run()
         
         ++m_done;
     }
-
-    SetStopState(false);
 }
 
 void WorkerBodyBase::ClearAllTask()
@@ -157,6 +135,20 @@ bool WorkerBodyBase::PostTask(ITask* task)
     return ret;
 }
 
+bool WorkerBodyBase::PostExit()
+{
+    ITask* task = new DummyExitTask();
+
+    bool ret = PushTaskToContainerFront(task);
+
+    if (ret) 
+        SignalPost();
+    else
+        delete task;
+
+    return ret;
+}
+
 ITask* WorkerBodyBase::GetRunTask()
 {
     ITask* msg;
@@ -181,9 +173,6 @@ ITask* WorkerBodyBase::GetRunTask()
     }
         
     m_req = 0;
-
-    if (m_shouldStop)
-        return new DummyExitTask();
 
     msg = GetTaskFromContainer();
 
@@ -213,6 +202,11 @@ ITask* WorkerBody::GetTaskFromContainer()
 bool WorkerBody::PushTaskToContainer(ITask* task)
 {
     return m_mailbox.PushBack(task);
+}
+
+bool WorkerBody::PushTaskToContainerFront(ITask* task)
+{
+    return m_mailbox.PushFront(task);
 }
 
 int WorkerBody::GetTaskNumber() 
@@ -268,3 +262,11 @@ int Worker::Notify()
     return 0;
 }
 
+bool Worker::StopWorking(bool join)
+{
+    bool ret =  m_WorkerBody->StopRunning(); 
+
+    if (join && ret) ret = Join();
+
+    return ret;
+}

@@ -5,6 +5,7 @@
 
 enum TaskPriority
 {
+    TP_EXTREME,
     TP_HIGH,
     TP_NORMAL,
     TP_LOW

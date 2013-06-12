@@ -32,7 +32,11 @@ bool Thread::Start()
 
     pthread_attr_t attr;
     int status = pthread_attr_init(&attr);
-    if (status != 0) return false; 
+    if (status != 0)
+    {
+        slog("init attr fail:%d %s\n",status,strerror(status));
+        return false; 
+    }
 
     if (m_detachable)
     {
@@ -43,7 +47,11 @@ bool Thread::Start()
         status = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     }
 
-    if (status != 0) return false;
+    if (status != 0) 
+    {
+        slog("set detachable fail:%d %s\n",status,strerror(status));
+        return false;
+    }
 
     m_busy = true;
 
