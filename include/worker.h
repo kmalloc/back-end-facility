@@ -22,7 +22,8 @@ class WorkerBodyBase: public ITask
         virtual int GetTaskNumber() = 0;
 
         virtual void StopRunning();
-        bool IsRunning() const {return m_isRuning;}
+        bool IsRunning() const { return m_isRuning; }
+        int  TaskDone() const { return m_done; }
         void EnableNotify(bool enable = true) { m_notify = enable; }
 
         //take care of calling this function.
@@ -41,7 +42,6 @@ class WorkerBodyBase: public ITask
         virtual bool   PushTaskToContainer(ITask*) = 0;
 
 
-        inline void SetStopState(bool shouldStop);
         inline void SignalPost();
         inline void SignalConsume();
         inline bool SignalConsumeTimeout(int);
@@ -61,6 +61,11 @@ class WorkerBodyBase: public ITask
         //caller take responsibility to free the task.
         ITask* GetRunTask();
 
+        //this is part of some ugly code.
+        //don't use it outside.
+        inline void SetStopState(bool shouldStop);
+        bool CheckExit(ITask*);
+
         //timeout for sem_timewait
         const int m_timeout;
         
@@ -72,6 +77,9 @@ class WorkerBodyBase: public ITask
 
         //semaphore for waiting for task.
         sem_t m_sem;
+
+        //task processed.
+        int   m_done;
 
         //notify thread pool I am free now, send me some tasks
         bool m_notify;
@@ -133,6 +141,8 @@ class Worker:public Thread
         int GetWorkerId() const { return m_id; } 
 
         int Notify(); 
+
+        int TaskDone() const { return m_WorkerBody->TaskDone(); }
 
     protected:
 

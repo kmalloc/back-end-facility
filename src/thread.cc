@@ -7,7 +7,7 @@
 
 
 Thread::Thread(ITask* task,bool detachable)
-:m_tid(-1)
+:m_tid(0)
 ,m_task(task)
 ,m_busy(false)
 ,m_detachable(detachable)
@@ -17,10 +17,7 @@ Thread::Thread(ITask* task,bool detachable)
 Thread::~Thread()
 {
     if (m_busy) pthread_cancel(m_tid);
-
-    pthread_attr_destroy(&m_attr);
 }
-
 
 void* dummy_proc(void*)
 {
@@ -29,28 +26,30 @@ void* dummy_proc(void*)
     return NULL;
 }
 
-
 bool Thread::Start()
 {
     if (m_busy || m_task == NULL) return false;
 
-    int status = pthread_attr_init(&m_attr);
-    if (status != 0) return false;
+    pthread_attr_t attr;
+    int status = pthread_attr_init(&attr);
+    if (status != 0) return false; 
 
     if (m_detachable)
     {
-        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_DETACHED);
+        status = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     }
     else
     {
-        status = pthread_attr_setdetachstate(&m_attr, PTHREAD_CREATE_JOINABLE);
+        status = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     }
 
     if (status != 0) return false;
 
     m_busy = true;
 
-    status = pthread_create(&m_tid,&m_attr,Thread::Run,static_cast<void*>(this));
+    status = pthread_create(&m_tid,&attr,Thread::Run,static_cast<void*>(this));
+
+    pthread_attr_destroy(&attr);
 
     if (status) slog("error:%d %s\n",status,strerror(status));
 

@@ -1,5 +1,7 @@
 #include "worker.h"
 
+#include "log.h"
+
 #include <vector>
 #include <queue>
 
@@ -19,6 +21,7 @@ WorkerBodyBase::WorkerBodyBase(Worker* worker)
     ,m_req(0)
     ,m_worker(worker)
     ,m_reqThreshold(3)
+    ,m_done(0)
 {
     sem_init(&m_sem,0,0);
 }
@@ -66,6 +69,7 @@ bool WorkerBodyBase::TryConsume()
 void WorkerBodyBase::StopRunning()
 {
     SetStopState(true);
+    SignalPost();
 }
 
 int WorkerBodyBase::Notify()
@@ -78,16 +82,38 @@ int WorkerBodyBase::Notify()
     return 0;
 }
 
+bool WorkerBodyBase::CheckExit(ITask* task)
+{
+    bool ret = false;
+
+    if (task && task->GetInternalFlag() == TF_EXIT)
+    {
+        delete task;
+        ret = true;
+    }
+    else if (m_shouldStop)
+    {
+        //consume the dummy semaphore
+        //m_shouldStop == true always comes with sem_post()
+        SignalConsume();
+        PostTask(task);
+        ret = true;
+    }
+
+    return ret;
+}
+
 void WorkerBodyBase::Run()
 {
     m_isRuning = false;
 
     while(1)
     {
-
         if (m_shouldStop) break;
 
         ITask* msg = GetRunTask();
+
+        if (CheckExit(msg)) break;
 
         m_isRuning = true;
 
@@ -95,6 +121,7 @@ void WorkerBodyBase::Run()
         
         m_isRuning = false;
         
+        ++m_done;
     }
 
     SetStopState(false);
@@ -152,8 +179,12 @@ ITask* WorkerBodyBase::GetRunTask()
             m_req++;
         }
     }
-
+        
     m_req = 0;
+
+    if (m_shouldStop)
+        return new DummyExitTask();
+
     msg = GetTaskFromContainer();
 
     return msg;
@@ -199,7 +230,6 @@ void WorkerBody::HandleTask(ITask* task)
     task->Run();
     delete task;
 }
-
 
 /*
  *    Worker
