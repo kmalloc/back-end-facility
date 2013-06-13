@@ -2,13 +2,11 @@
 #define _THREAD_POOL_H_
 
 #include "worker.h"
-
 #include <vector>
-
 
 class Dispatcher;
 
-class ThreadPool: public WorkerManagerBase, public Worker 
+class ThreadPool: public WorkerManagerBase
 {
     public:
 
@@ -29,9 +27,8 @@ class ThreadPool: public WorkerManagerBase, public Worker
     protected:
 
         int CalcDefaultThreadNum();
-        using Worker::StartWorking;
-        using Worker::GetWorkerId;
 
+        Worker*     m_worker;
         Dispatcher* m_dispatcher;
 };
 

@@ -289,33 +289,37 @@ void Dispatcher::HandleTask(ITask* task)
     }
 }
 
+
+
 /*
  * thread pool definition
  */
 
 ThreadPool::ThreadPool(int num)
    :WorkerManagerBase()
-   ,Worker(new Dispatcher(this, num))
 {
-    m_dispatcher = static_cast<Dispatcher*>(m_WorkerBody);
+    m_dispatcher = new Dispatcher(this, num); 
+    m_worker = new Worker(m_dispatcher);
 }
 
 ThreadPool::~ThreadPool()
 {
+    delete m_worker;
 }
 
 bool ThreadPool::StartPooling()
 {
-    return Worker::StartWorking();
+    return m_worker->StartWorking();
 }
 
 void ThreadPool::StopPooling()
 {
-    m_WorkerBody->StopRunning();
+    m_worker->StopRunning();
 }
 
 int ThreadPool::SetWorkerNotify(Worker* worker)
 {
     return m_dispatcher->SetWorkerNotify(worker);
 }
+
 

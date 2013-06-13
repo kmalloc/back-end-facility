@@ -212,8 +212,8 @@ Worker::Worker(WorkerManagerBase* man, int id, int maxMsgSize)
    m_task = m_WorkerBody = new WorkerBody(this,maxMsgSize);
 }
 
-Worker::Worker(WorkerBodyBase* task)
-    :Thread(), m_manager(NULL), m_id(-1)
+Worker::Worker(WorkerBodyBase* task, int id, WorkerManagerBase* man)
+    :Thread(), m_manager(man), m_id(id)
 {
     m_task = m_WorkerBody = task;
 }

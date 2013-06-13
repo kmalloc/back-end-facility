@@ -117,6 +117,8 @@ class Worker:public Thread
         Worker(WorkerManagerBase* manager = NULL, int id = -1
                 ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
+        Worker(WorkerBodyBase*, int id = -1, WorkerManagerBase* man = NULL);
+
         ~Worker();
 
         virtual bool IsRunning(){ return m_WorkerBody->IsRunning(); }
@@ -133,8 +135,6 @@ class Worker:public Thread
         int Notify(); 
 
     protected:
-
-        Worker(WorkerBodyBase*);
 
         //disable setting task. 
         //this is a special thread specific to a worker thread.
