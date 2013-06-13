@@ -1,5 +1,4 @@
 #include "worker.h"
-#include "threadpool.h"
 
 #include <vector>
 #include <queue>
@@ -207,14 +206,14 @@ void WorkerBody::HandleTask(ITask* task)
  *
  */
 
-Worker::Worker(ThreadPool* pool, int id, int maxMsgSize)
-    :Thread(), m_pool(pool), m_id(id)
+Worker::Worker(WorkerManagerBase* man, int id, int maxMsgSize)
+    :Thread(), m_manager(man), m_id(id)
 {
    m_task = m_WorkerBody = new WorkerBody(this,maxMsgSize);
 }
 
 Worker::Worker(WorkerBodyBase* task)
-    :Thread(), m_pool(NULL), m_id(-1)
+    :Thread(), m_manager(NULL), m_id(-1)
 {
     m_task = m_WorkerBody = task;
 }
@@ -231,9 +230,9 @@ bool Worker::StartWorking()
 
 int Worker::Notify()
 {
-    if (m_pool)
+    if (m_manager)
     {
-        return m_pool->SetWorkerNotify(this); 
+        return m_manager->SetWorkerNotify(this); 
     }
 
     return 0;

@@ -8,7 +8,7 @@
 
 class Dispatcher;
 
-class ThreadPool: public Worker 
+class ThreadPool: public WorkerManagerBase, public Worker 
 {
     public:
 
@@ -24,8 +24,7 @@ class ThreadPool: public Worker
         //which is totally out of control.
         void StopPooling();
 
-
-        int SetWorkerNotify(Worker* worker);
+        virtual int SetWorkerNotify(Worker* worker);
 
     protected:
 

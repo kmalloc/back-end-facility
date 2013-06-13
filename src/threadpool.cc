@@ -145,7 +145,7 @@ Worker* Dispatcher::SelectFreeWorker()
         {
             min_task = sz;
             i = chosen;
-            if ( sz == 0) break;
+            if (sz == 0) break;
         }
     }
 

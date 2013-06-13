@@ -8,7 +8,6 @@
 
 #include <semaphore.h>
 
-class ThreadPool;
 class Worker;
 
 class WorkerBodyBase: public ITask
@@ -101,13 +100,23 @@ class WorkerBody: public WorkerBodyBase
         SpinlockQueue<ITask*> m_mailbox;
 };
 
+class Worker;
 
+class WorkerManagerBase
+{
+    public:
+
+        WorkerManagerBase();
+        ~WorkerManagerBase();
+
+        virtual int SetWorkerNotify(Worker*) = 0;
+};
 
 class Worker:public Thread
 {
     public:
 
-        Worker(ThreadPool* pool = NULL, int id = -1
+        Worker(WorkerManagerBase* manager = NULL, int id = -1
                 ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
         ~Worker();
@@ -136,7 +145,7 @@ class Worker:public Thread
         using Thread::Start;
 
         const int m_id;
-        ThreadPool* m_pool;
+        WorkerManagerBase* m_manager;
         WorkerBodyBase* m_WorkerBody;
 };
 
