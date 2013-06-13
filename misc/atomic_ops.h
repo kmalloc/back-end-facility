@@ -3,7 +3,6 @@
 
 #define cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 
-
 inline void atomic_add(volatile int * val, int gap)
 {
     int oldval;
@@ -26,5 +25,5 @@ inline void atomic_decrement(volatile int * val)
     atomic_add(val, -1);
 }
 
-#endif
+#endif //_ATMOMIC_H_
 

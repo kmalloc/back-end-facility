@@ -36,6 +36,8 @@ class Dispatcher:public WorkerBodyBase
         virtual void HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
+
+        int  SetWorkerRequest(Worker*);
         bool HandleWorkerRequest();
         void DispatchTask(ITask*);
         Worker* SelectFreeWorker();
@@ -48,6 +50,7 @@ class Dispatcher:public WorkerBodyBase
         int m_singleRequestThreshold;
         int m_totalRequestThreashold;
 
+        sem_t m_freeWorker;
         const int m_workerNum;
         volatile int m_totalRequest;
         volatile int *m_request;
@@ -66,6 +69,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     ,m_singleRequestThreshold(2)
     ,m_totalRequestThreashold(m_workerNum/4 > m_singleRequestThreshold?m_workerNum/4:m_singleRequestThreshold)
 {
+    sem_init(&m_freeWorker,0,0);
     m_request = new int[m_workerNum];
 
     m_workers.reserve(m_workerNum);
@@ -154,11 +158,23 @@ Worker* Dispatcher::SelectFreeWorker()
 
 void Dispatcher::DispatchTask(ITask* task)
 {
-    Worker* worker = SelectFreeWorker();
+    Worker* worker;
+    do
+    {
+        sem_wait(&m_freeWorker);
+        worker = SelectFreeWorker();
+
+    }while (worker == NULL);
+    
     worker->PostTask(task);
 }
 
 int Dispatcher::SetWorkerNotify(Worker* worker)
+{
+    sem_post(&m_freeWorker);
+}
+
+int Dispatcher::SetWorkerRequest(Worker*worker)
 {
     if (!HasTask())
     {
@@ -262,7 +278,10 @@ void Dispatcher::HandleTask(ITask* task)
     {
         //null task serves as a special msg to inform ThreadPool
         //to handle worker request.
-        HandleWorkerRequest();
+        //request handling is troublesome, and not quite efficient, 
+        //so disable it for the moment.
+        //and use semaphore instead.
+        //HandleWorkerRequest();
     }
     else
     {
@@ -275,7 +294,8 @@ void Dispatcher::HandleTask(ITask* task)
  */
 
 ThreadPool::ThreadPool(int num)
-   :Worker(new Dispatcher(this, num))
+   :WorkerManagerBase()
+   ,Worker(new Dispatcher(this, num))
 {
     m_dispatcher = static_cast<Dispatcher*>(m_WorkerBody);
 }

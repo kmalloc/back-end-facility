@@ -100,14 +100,12 @@ class WorkerBody: public WorkerBodyBase
         SpinlockQueue<ITask*> m_mailbox;
 };
 
-class Worker;
-
 class WorkerManagerBase
 {
     public:
 
-        WorkerManagerBase();
-        ~WorkerManagerBase();
+        WorkerManagerBase() {}
+        virtual ~WorkerManagerBase() {}
 
         virtual int SetWorkerNotify(Worker*) = 0;
 };
