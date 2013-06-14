@@ -1,6 +1,7 @@
 #include "threadpool.h"
-#include "SpinlockQueue.h"
+
 #include "atomic_ops.h"
+#include "SpinlockQueue.h"
 
 #include <memory.h>
 
@@ -21,9 +22,9 @@ class Dispatcher:public WorkerBodyBase
         ~Dispatcher();
 
         void StopWorker();
+        virtual bool HasTask();
         virtual bool StopRunning();
         virtual int  GetTaskNumber();
-        virtual bool HasTask();
 
         /*
          * worker calls this function to require task to Run
@@ -38,9 +39,9 @@ class Dispatcher:public WorkerBodyBase
         virtual bool PushTaskToContainer(ITask*);
         virtual bool PushTaskToContainerFront(ITask*);
 
-        int  SetWorkerRequest(Worker*);
         bool HandleWorkerRequest();
         void DispatchTask(ITask*);
+        int  SetWorkerRequest(Worker*);
         Worker* SelectFreeWorker();
         
     private:

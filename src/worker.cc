@@ -270,3 +270,4 @@ bool Worker::StopWorking(bool join)
 
     return ret;
 }
+
