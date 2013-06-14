@@ -12,6 +12,8 @@ class LockFreeStack
 {
 };
 
+
+
 template<class Type>
 class LockFreeQueue
 {

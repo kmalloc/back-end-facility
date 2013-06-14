@@ -6,6 +6,7 @@
 class LockFreeBuffer
 {
     public:
+
         LockFreeBuffer(int bufsz, int poolsz);
         ~LockFreeBuffer();
 
