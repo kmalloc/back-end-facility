@@ -119,10 +119,7 @@ bool Dispatcher::PushTaskToContainer(ITask* task)
 
 bool Dispatcher::PushTaskToContainerFront(ITask* task)
 {
-    if (task && task->GetInternalFlag() == TF_EXIT)
-        return PushTaskToContainer(task);
-
-    return false;
+    return PushTaskToContainer(task);
 }
 
 ITask* Dispatcher::GetTaskFromContainer()

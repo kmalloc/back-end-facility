@@ -75,17 +75,17 @@ class WorkerBodyBase: public ITask
         //record how many time we send notify without 
         //response, when this variable meet a certain threshhold.
         //shutdown timeout operation.
-        int m_req;
+        volatile int m_req;
         const int m_reqThreshold;
 
         //semaphore for waiting for task.
         sem_t m_sem;
 
         //task processed.
-        int   m_done;
+        volatile int m_done;
 
         //notify thread pool I am free now, send me some tasks
-        bool m_notify;
+        volatile bool m_notify;
         Worker* m_worker;
 };
 

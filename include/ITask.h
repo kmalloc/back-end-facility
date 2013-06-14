@@ -11,18 +11,11 @@ enum TaskPriority
     TP_LOW
 };
 
-enum TaskFlag
-{
-    TF_NULL,
-    TF_EXIT,
-    TF_POOL_WORKER_REQUEST,
-};
-
 class ITask
 {
     public:
 
-        ITask(TaskPriority prio = TP_NORMAL): m_internal(TF_NULL), m_priority(prio){}
+        ITask(TaskPriority prio = TP_NORMAL): m_priority(prio){}
         virtual ~ITask(){}
         virtual void Run()=0;
 
@@ -34,30 +27,9 @@ class ITask
             return old;
         }
 
-        TaskFlag GetInternalFlag() const { return m_internal; }
-
     protected:
 
         TaskPriority m_priority;
-
-        //special variable for internal usage.
-        //indicate special task.
-        //eg, make function run.
-        TaskFlag m_internal;
-};
-
-
-
-class DummyExitTask: public ITask
-{
-    public:
-
-        DummyExitTask(): ITask(TP_LOW) { m_internal = TF_EXIT; }
-
-        virtual ~DummyExitTask() {}
-
-        virtual void Run() { assert(0); }
-
 };
 
 #endif

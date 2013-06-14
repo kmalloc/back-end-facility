@@ -8,6 +8,17 @@
 #include <time.h>
 #include <errno.h>
 
+class DummyExitTask: public ITask
+{
+    public:
+
+        DummyExitTask(){}
+
+        virtual ~DummyExitTask() {}
+
+        virtual void Run() { assert(0); }
+
+};
 
 /*
  *     WorkerBodyBase
@@ -76,7 +87,7 @@ int WorkerBodyBase::Notify()
 
 bool WorkerBodyBase::CheckExit(ITask* task)
 {
-    if (task && task->GetInternalFlag() == TF_EXIT)
+    if (task && dynamic_cast<DummyExitTask*>(task) != NULL)
     {
         delete task;
         return true;

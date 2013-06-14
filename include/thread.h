@@ -38,7 +38,7 @@ class Thread: public noncopyable
         pthread_t m_tid;
         
         volatile bool m_busy;
-        bool m_detachable;
+        volatile bool m_detachable;
 };
 
 
