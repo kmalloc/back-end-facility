@@ -1,5 +1,6 @@
 #include "threadpool.h"
 
+#include "log.h"
 #include "atomic_ops.h"
 #include "SpinlockQueue.h"
 
@@ -35,31 +36,22 @@ class Dispatcher:public WorkerBodyBase
 
     protected:
 
+        virtual void PreHandleTask();
         virtual void HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
         virtual bool PushTaskToContainerFront(ITask*);
 
-        bool HandleWorkerRequest();
         void DispatchTask(ITask*);
-        int  SetWorkerRequest(Worker*);
         Worker* SelectFreeWorker();
         
     private:
 
-        Worker* FindRequestWorker();
-        ITask*  FindRunTaskFromOtherWorker();
-
-
         ThreadPool* m_pool;
         const int m_workerNum;
-        volatile int m_totalRequest;
-        volatile int *m_request;
 
-        int m_singleRequestThreshold;
-        int m_totalRequestThreashold;
-
-        sem_t m_freeWorker;
+        sem_t m_workerNotify;
+        Worker* m_freeWorker;//keep this variable using in dispatch thread only, eliminating volatile
         std::vector<Worker*> m_workers;
         SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > m_queue;
 };
@@ -69,24 +61,19 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     :WorkerBodyBase()
     ,m_pool(pool)
     ,m_workerNum(workerNum)
-    ,m_totalRequest(0)
-    ,m_singleRequestThreshold(2)
-    ,m_totalRequestThreashold(m_workerNum/4 > m_singleRequestThreshold?m_workerNum/4:m_singleRequestThreshold)
+    ,m_freeWorker(NULL)
 {
-    m_request = new int[m_workerNum];
-
     m_workers.reserve(m_workerNum);
     for (int i = 0; i < m_workerNum; ++i)
     {
         Worker* worker = new Worker(m_pool, i);
         worker->EnableNotify(true);
         m_workers.push_back(worker);
-        m_request[i] = 0;
 
         worker->StartWorking();
     }
 
-    sem_init(&m_freeWorker,0,m_workerNum);
+    sem_init(&m_workerNotify,0,m_workerNum);
 }
 
 Dispatcher::~Dispatcher()
@@ -96,8 +83,6 @@ Dispatcher::~Dispatcher()
         m_workers[i]->Cancel();
         delete m_workers[i];
     }
-
-    delete []m_request;
 }
 
 
@@ -152,9 +137,7 @@ bool Dispatcher::HasTask()
 }
 
 /*
- * return one worker that is :
- * a) not busy.
- * b) with least working tasks
+ * return one worker that is free: with no task to run
  *
  * considering the total amount of workers is usually rather small,
  * we don't have to apply any advanced algorithm and data structure to 
@@ -163,158 +146,48 @@ bool Dispatcher::HasTask()
  */
 Worker* Dispatcher::SelectFreeWorker()
 {
-    int chosen = -1, min_task = -1;
-
     for (int i = 0; i < m_workerNum; ++i)
     {
         int sz = m_workers[i]->GetTaskNumber(); 
-        if (sz > min_task)
+        if (sz == 0)
         {
-            min_task = sz;
-            chosen = i;
-            if (sz == 0) break;
+            return m_workers[i];
         }
     }
 
-    assert(chosen >= 0);
-    return m_workers[chosen];
+    return NULL;
+}
+
+void Dispatcher::PreHandleTask()
+{
+    Worker* worker;
+
+    do
+    {
+        sem_wait(&m_workerNotify);
+        worker = SelectFreeWorker();
+
+    }while (worker == NULL);
+
+    m_freeWorker = worker;
 }
 
 void Dispatcher::DispatchTask(ITask* task)
 {
-    Worker* worker;
-    do
-    {
-        sem_wait(&m_freeWorker);
-        worker = SelectFreeWorker();
-
-    }while (worker == NULL);
-    
-    worker->PostTask(task);
+    assert(m_freeWorker);
+    m_freeWorker->PostTask(task);
 }
 
 int Dispatcher::SetWorkerNotify(Worker* worker)
 {
-    if (worker)
-    return sem_post(&m_freeWorker);
+    if (worker) return sem_post(&m_workerNotify);
 
     return 0;
-}
-
-int Dispatcher::SetWorkerRequest(Worker*worker)
-{
-    if (!HasTask())
-    {
-        int id = worker->GetWorkerId();
-        if (id < 0 || id >= m_workerNum) return -1;
-
-        atomic_increment(&m_request[id]);
-        atomic_increment(&m_totalRequest);
-        PostTask(NULL);
-        return 1;
-    }
-
-    return 0;
-}
-
-
-/*
- * find a worker that sends most request.
- * this might fail if requst does not meet the threshhold required.
- */
-Worker* Dispatcher::FindRequestWorker()
-{
-    int chosen, min = -1;
-    for (int i = 0; i < m_workerNum; ++i)
-    {
-        int req = m_request[i];
-        if (req > m_singleRequestThreshold && req > min)
-        {
-            if (m_workers[i]->IsRunning())
-            {
-                m_request[i] = 0;
-                atomic_add(&m_totalRequest, -req);
-
-                if (m_totalRequest < m_totalRequestThreashold)
-                    return NULL;
-
-                continue;
-            }
-
-            m_request[i] = 0;
-            atomic_add(&m_totalRequest, -req);
-            min = m_request[i];
-            chosen = i;
-            break;
-        }
-    }
-
-    if (chosen != -1) return m_workers[chosen];
-
-    m_totalRequest = m_totalRequestThreashold/2;
-    return NULL;
-}
-
-ITask* Dispatcher::FindRunTaskFromOtherWorker()
-{
-    //TODO
-    return NULL;
-}
-
-/*
- * in an ideal circumstance , this function should be called as least as possible.
- *
- */
-bool Dispatcher::HandleWorkerRequest()
-{
-    if (HasTask())
-    {
-        atomic_decrement(&m_totalRequest);
-        return true;
-    }
-
-    if (m_totalRequest > m_totalRequestThreashold)
-    {
-        Worker* worker = FindRequestWorker();
-        if (worker)
-        {
-            ITask* task = FindRunTaskFromOtherWorker();
-            if (task) 
-            {
-                int id = worker->GetWorkerId();
-                int req = m_request[id];
-
-                atomic_add(&m_totalRequest,-req);
-                m_request[id] = 0;
-
-                worker->PostTask(task);
-            }
-            else
-            {
-                m_totalRequest = 0;
-                memset((void*)m_request, 0, sizeof(int)*m_workerNum);
-            }
-        }
-    }
-
-    return true;
 }
 
 void Dispatcher::HandleTask(ITask* task)
 {
-    if (task == NULL)
-    {
-        //null task serves as a special msg to inform ThreadPool
-        //to handle worker request.
-        //request handling is troublesome, and not quite efficient, 
-        //so disable it for the moment.
-        //and use semaphore instead.
-        //HandleWorkerRequest();
-    }
-    else
-    {
-        DispatchTask(task);
-    }
+    DispatchTask(task);
 }
 
 
@@ -337,16 +210,19 @@ ThreadPool::~ThreadPool()
 
 bool ThreadPool::StartPooling()
 {
+    m_running = true;
     return m_worker->StartWorking();
 }
 
 bool ThreadPool::StopPooling()
 {
+    m_running = false;
     return m_worker->StopWorking();
 }
 
 void ThreadPool::ForceShutdown()
 {
+    m_running = false;
     m_worker->Cancel();
     m_dispatcher->KillAllWorker();
 }
@@ -358,7 +234,7 @@ int ThreadPool::SetWorkerNotify(Worker* worker)
 
 bool ThreadPool::IsRunning() const
 {
-    return m_worker->IsRunning();
+    return m_running;
 } 
 
 int ThreadPool::GetTaskNumber()

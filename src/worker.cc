@@ -102,6 +102,9 @@ void WorkerBodyBase::Run()
 
     while(1)
     {
+
+        PreHandleTask();
+
         ITask* msg = GetRunTask();
 
         if (CheckExit(msg)) break;

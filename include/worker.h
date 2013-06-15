@@ -37,6 +37,7 @@ class WorkerBodyBase: public ITask
 
     protected:
 
+        virtual void PreHandleTask() {}
         virtual void HandleTask(ITask*) = 0;
         virtual bool  HasTask() = 0; 
 

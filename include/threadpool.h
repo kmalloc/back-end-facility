@@ -35,6 +35,7 @@ class ThreadPool: public WorkerManagerBase
 
         int CalcDefaultThreadNum();
 
+        bool        m_running;
         Worker*     m_worker;
         Dispatcher* m_dispatcher;
 };
