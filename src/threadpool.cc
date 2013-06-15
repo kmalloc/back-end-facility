@@ -21,10 +21,11 @@ class Dispatcher:public WorkerBodyBase
         Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
+        void KillAllWorker();
         void StopWorker();
         virtual bool HasTask();
         virtual bool StopRunning();
-        virtual int  GetTaskNumber();
+        virtual int  GetContainerSize();
 
         /*
          * worker calls this function to require task to Run
@@ -71,7 +72,6 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     ,m_singleRequestThreshold(2)
     ,m_totalRequestThreashold(m_workerNum/4 > m_singleRequestThreshold?m_workerNum/4:m_singleRequestThreshold)
 {
-    sem_init(&m_freeWorker,0,0);
     m_request = new int[m_workerNum];
 
     m_workers.reserve(m_workerNum);
@@ -81,7 +81,11 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         worker->EnableNotify(true);
         m_workers.push_back(worker);
         m_request[i] = 0;
+
+        worker->StartWorking();
     }
+
+    sem_init(&m_freeWorker,0,m_workerNum);
 }
 
 Dispatcher::~Dispatcher()
@@ -93,6 +97,15 @@ Dispatcher::~Dispatcher()
     }
 
     delete []m_request;
+}
+
+
+void Dispatcher::KillAllWorker()
+{
+    for (int i = 0; i < m_workerNum; ++i)
+    {
+        m_workers[i]->Cancel();
+    }
 }
 
 void Dispatcher::StopWorker()
@@ -127,7 +140,7 @@ ITask* Dispatcher::GetTaskFromContainer()
     return m_queue.PopFront();
 }
 
-int Dispatcher::GetTaskNumber() 
+int Dispatcher::GetContainerSize() 
 {
     return m_queue.Size();
 }
@@ -157,11 +170,12 @@ Worker* Dispatcher::SelectFreeWorker()
         if (sz > min_task)
         {
             min_task = sz;
-            i = chosen;
+            chosen = i;
             if (sz == 0) break;
         }
     }
 
+    assert(chosen >= 0);
     return m_workers[chosen];
 }
 
@@ -280,7 +294,6 @@ bool Dispatcher::HandleWorkerRequest()
     }
 }
 
-
 void Dispatcher::HandleTask(ITask* task)
 {
     if (task == NULL)
@@ -326,9 +339,28 @@ bool ThreadPool::StopPooling()
     return m_worker->StopWorking();
 }
 
+void ThreadPool::ForceShutdown()
+{
+    m_worker->Cancel();
+    m_dispatcher->KillAllWorker();
+}
+
 int ThreadPool::SetWorkerNotify(Worker* worker)
 {
     return m_dispatcher->SetWorkerNotify(worker);
 }
 
+bool ThreadPool::IsRunning() const
+{
+    return m_worker->IsRunning();
+} 
 
+int ThreadPool::GetTaskNumber()
+{
+    return m_worker->GetTaskNumber();
+}
+
+bool ThreadPool::PostTask(ITask* task)
+{
+    return m_worker->PostTask(task);
+}

@@ -42,11 +42,11 @@ workertest.o : $(USER_DIR)/workertest.cc
 SpinlockQueueTest.o : $(USER_DIR)/SpinlockQueueTest.cc 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-threadpooltest.o : $(USER_DIR)/SpinlockQueueTest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+threadpooltest.o : $(USER_DIR)/threadpooltest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/threadpooltest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
 
-OBJS = thread.o threadtest.o worker.o workertest.o SpinlockQueueTest.o threadpool.o
+OBJS = thread.o threadtest.o worker.o workertest.o SpinlockQueueTest.o threadpool.o threadpooltest.o
 
 unittest : $(OBJS) 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) -lpthread -lrt -lgtest_main $(OBJS) -o $(TESTS)

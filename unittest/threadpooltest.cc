@@ -6,7 +6,7 @@ class BusyTaskForThreadPoolTest:public ITask
 {
     public:
 
-        BusyTaskForThreadPoolTest():m_stop(false), m_dest(0),m_exe(0) {}
+        BusyTaskForThreadPoolTest():m_stop(false){}
         ~BusyTaskForThreadPoolTest() { ++m_dest; }
 
         void Run() 
@@ -25,10 +25,14 @@ class BusyTaskForThreadPoolTest:public ITask
         bool m_stop;
 };
 
+
+int BusyTaskForThreadPoolTest::m_exe = 0;
+int BusyTaskForThreadPoolTest::m_dest = 0;
+
 class NormalTaskForThreadPoolTest:public ITask
 {
     public:
-        NormalTaskForThreadPoolTest():m_counter(0),m_stop(false), m_exe(0), m_dest(0) { }
+        NormalTaskForThreadPoolTest():m_counter(0),m_stop(false) { }
         ~NormalTaskForThreadPoolTest() { ++m_dest; }
 
         void Run()
@@ -54,6 +58,11 @@ class NormalTaskForThreadPoolTest:public ITask
         static int m_dest;
 };
 
+
+int NormalTaskForThreadPoolTest::m_dest = 0;
+int NormalTaskForThreadPoolTest::m_exe = 0;
+
+
 TEST(threadpooltest, alltest)
 {
     const int mbsz = 12;
@@ -67,7 +76,6 @@ TEST(threadpooltest, alltest)
     
     EXPECT_FALSE(pool.IsRunning());
     EXPECT_TRUE(pool.StartPooling()); 
-    EXPECT_TRUE(pool.IsRunning());
     EXPECT_EQ(0,pool.GetTaskNumber());
 
 
@@ -79,15 +87,16 @@ TEST(threadpooltest, alltest)
 
     sleep(2);
 
+    EXPECT_TRUE(pool.IsRunning());
 
-    EXPECT_EQ(mbsz-worker, pool.GetTaskNumber());
-    
+    EXPECT_EQ(mbsz - worker, pool.GetTaskNumber());
 
     for (int i = 0; i < mnsz; ++i)
     {
         m_norm[i] = new NormalTaskForThreadPoolTest();
     }
 
+    pool.ForceShutdown();
 
     EXPECT_EQ(mbsz, BusyTaskForThreadPoolTest::m_dest);
     EXPECT_EQ(mnsz, NormalTaskForThreadPoolTest::m_dest);

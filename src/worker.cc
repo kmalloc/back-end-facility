@@ -190,6 +190,16 @@ ITask* WorkerBodyBase::GetRunTask()
     return msg;
 }
 
+int WorkerBodyBase::GetTaskNumber() 
+{
+    return GetContainerSize() + (m_isRuning?1:0);
+}
+
+
+volatile bool WorkerBodyBase::IsRunning() const 
+{ 
+    return m_isRuning; 
+}
 
 /*
  * WorkerBody
@@ -220,7 +230,7 @@ bool WorkerBody::PushTaskToContainerFront(ITask* task)
     return m_mailbox.PushFront(task);
 }
 
-int WorkerBody::GetTaskNumber() 
+int WorkerBody::GetContainerSize()
 {
     return m_mailbox.Size();
 }

@@ -19,10 +19,13 @@ class WorkerBodyBase: public ITask
 
         bool PostTask(ITask*);
         void ClearAllTask();
-        virtual int GetTaskNumber() = 0;
+
+        virtual int GetContainerSize() = 0;
+        int GetTaskNumber();
 
         virtual bool StopRunning();
-        bool IsRunning() const { return m_isRuning; }
+
+        volatile bool IsRunning() const;
         int  TaskDone() const { return m_done; }
         void EnableNotify(bool enable = true) { m_notify = enable; }
 
@@ -55,7 +58,6 @@ class WorkerBodyBase: public ITask
         inline int  Notify();
         inline bool PostExit();
 
-        volatile bool m_isRuning;
 
     private:
 
@@ -68,6 +70,10 @@ class WorkerBodyBase: public ITask
         ITask* GetRunTask();
 
         bool CheckExit(ITask*);
+
+
+        //is running task.
+        volatile bool m_isRuning;
 
         //timeout for sem_timewait
         const int m_timeout;
@@ -97,7 +103,7 @@ class WorkerBody: public WorkerBodyBase
         WorkerBody(Worker* worker = NULL, int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~WorkerBody();
 
-        virtual int  GetTaskNumber();
+        virtual int  GetContainerSize();
 
     protected:
 
@@ -133,10 +139,11 @@ class Worker:public Thread
 
         ~Worker();
 
-        virtual bool IsRunning(){ return m_WorkerBody->IsRunning(); }
+        volatile bool IsRunning() const { return m_WorkerBody->IsRunning(); }
         bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
-        int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
+        
+        virtual int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 
         void EnableNotify(bool enable = true) { m_WorkerBody->EnableNotify(enable); }
 

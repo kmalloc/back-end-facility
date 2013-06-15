@@ -42,6 +42,9 @@ TEST(WorkerTaskTest,WorkerTest)
     EXPECT_EQ(workerTestDummyTask::m_number, worker.GetTaskNumber());
 
     ASSERT_TRUE(worker.StartWorking());
+    sleep(1);
+    EXPECT_TRUE(worker.IsRunning());
+
     sleep(3);
     
     while(worker.GetTaskNumber() > 0) sleep(3);
@@ -78,9 +81,14 @@ TEST(WorkerTaskTest,WorkerTest)
 
     ASSERT_TRUE(worker.StartWorking());
 
+    sleep(1);
+    EXPECT_TRUE(worker.IsRunning());
+
     sleep(8);
 
     worker.StopWorking(true);
+
+    EXPECT_FALSE(worker.IsRunning());
 
     int left = worker.GetTaskNumber();
     int done = worker.TaskDone();

@@ -22,7 +22,7 @@ class Thread: public noncopyable
         bool   Join(void** ret = NULL);
         bool   Cancel();
 
-        virtual bool IsRunning() const { return m_busy; }
+        virtual volatile bool IsRunning() const { return m_busy; }
 
         virtual ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp;}
         virtual const ITask* GetTask() const { return m_task; }
