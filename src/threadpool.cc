@@ -50,15 +50,16 @@ class Dispatcher:public WorkerBodyBase
         Worker* FindRequestWorker();
         ITask*  FindRunTaskFromOtherWorker();
 
+
+        ThreadPool* m_pool;
+        const int m_workerNum;
+        volatile int m_totalRequest;
+        volatile int *m_request;
+
         int m_singleRequestThreshold;
         int m_totalRequestThreashold;
 
         sem_t m_freeWorker;
-        const int m_workerNum;
-        volatile int m_totalRequest;
-        volatile int *m_request;
-        ThreadPool* m_pool;
-
         std::vector<Worker*> m_workers;
         SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > m_queue;
 };
@@ -194,7 +195,10 @@ void Dispatcher::DispatchTask(ITask* task)
 
 int Dispatcher::SetWorkerNotify(Worker* worker)
 {
-    sem_post(&m_freeWorker);
+    if (worker)
+    return sem_post(&m_freeWorker);
+
+    return 0;
 }
 
 int Dispatcher::SetWorkerRequest(Worker*worker)
@@ -292,6 +296,8 @@ bool Dispatcher::HandleWorkerRequest()
             }
         }
     }
+
+    return true;
 }
 
 void Dispatcher::HandleTask(ITask* task)
@@ -364,3 +370,4 @@ bool ThreadPool::PostTask(ITask* task)
 {
     return m_worker->PostTask(task);
 }
+

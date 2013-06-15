@@ -52,8 +52,8 @@ class NormalTaskForThreadPoolTest:public ITask
             }
         }
 
-        bool m_stop;
         int m_counter;
+        bool m_stop;
         static int m_exe;
         static int m_dest;
 };

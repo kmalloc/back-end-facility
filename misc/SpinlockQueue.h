@@ -188,7 +188,7 @@ class SpinlockQueue
     protected:
 
         Type m_null; //null value, this value will be return if pop on empty queue.
-        const int m_maxSz;
+        const size_t m_maxSz;
         volatile pthread_spinlock_t m_lock;
         QUEUE m_queue;
 };

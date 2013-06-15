@@ -25,7 +25,7 @@ class WorkerBodyBase: public ITask
 
         virtual bool StopRunning();
 
-        volatile bool IsRunning() const;
+        bool IsRunning() const;
         int  TaskDone() const { return m_done; }
         void EnableNotify(bool enable = true) { m_notify = enable; }
 
@@ -139,7 +139,7 @@ class Worker:public Thread
 
         ~Worker();
 
-        volatile bool IsRunning() const { return m_WorkerBody->IsRunning(); }
+        virtual bool IsRunning() const { return m_WorkerBody->IsRunning(); }
         bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
         

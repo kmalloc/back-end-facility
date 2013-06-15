@@ -26,12 +26,12 @@ class DummyExitTask: public ITask
 
 WorkerBodyBase::WorkerBodyBase(Worker* worker)
     :m_isRuning(false)
-    ,m_notify(false)
     ,m_timeout(5)
     ,m_req(0)
-    ,m_worker(worker)
     ,m_reqThreshold(3)
     ,m_done(0)
+    ,m_notify(false)
+    ,m_worker(worker)
 {
     sem_init(&m_sem,0,0);
 }
@@ -196,7 +196,7 @@ int WorkerBodyBase::GetTaskNumber()
 }
 
 
-volatile bool WorkerBodyBase::IsRunning() const 
+bool WorkerBodyBase::IsRunning() const 
 { 
     return m_isRuning; 
 }
@@ -252,13 +252,13 @@ void WorkerBody::HandleTask(ITask* task)
  */
 
 Worker::Worker(WorkerManagerBase* man, int id, int maxMsgSize)
-    :Thread(), m_manager(man), m_id(id)
+    :Thread(), m_id(id), m_manager(man)
 {
    m_task = m_WorkerBody = new WorkerBody(this,maxMsgSize);
 }
 
 Worker::Worker(WorkerBodyBase* task, int id, WorkerManagerBase* man)
-    :Thread(), m_manager(man), m_id(id)
+    :Thread(), m_id(id), m_manager(man)
 {
     m_task = m_WorkerBody = task;
 }

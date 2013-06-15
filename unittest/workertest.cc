@@ -27,7 +27,6 @@ std::vector<int> workerTestDummyTask::m_order;
 TEST(WorkerTaskTest,WorkerTest)
 {
 
-    int c = 0;
     Worker worker;
     workerTestDummyTask *msg;
 
@@ -63,7 +62,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     EXPECT_TRUE(worker.StopWorking(true));
 
-    EXPECT_EQ(workerTestDummyTask::m_number,workerTestDummyTask::m_order.size());
+    EXPECT_EQ(workerTestDummyTask::m_number, (int)workerTestDummyTask::m_order.size());
 
 
     int ci = 0;

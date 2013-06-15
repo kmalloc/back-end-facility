@@ -17,8 +17,8 @@ class ThreadTestDummyTask:public ITask
         }
         void init() { m_stop = false;}
         void stop() { m_stop = true;}
-        int counter;
         bool m_stop;
+        int counter;
 };
 
 

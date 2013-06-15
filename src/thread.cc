@@ -7,8 +7,8 @@
 
 
 Thread::Thread(ITask* task,bool detachable)
-:m_tid(0)
-,m_task(task)
+:m_task(task)
+,m_tid(0)
 ,m_busy(false)
 ,m_detachable(detachable)
 {

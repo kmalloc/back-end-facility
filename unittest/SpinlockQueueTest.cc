@@ -12,10 +12,10 @@ class slqTestDummyTask: public ITask
 {
     public:
 
-        slqTestDummyTask(SpinlockQueue<int>& queue):m_queue(queue)
-                                             ,m_full(false)
+        slqTestDummyTask(SpinlockQueue<int>& queue):m_full(false)
                                              ,m_switch(false)
                                              ,m_exit(false)
+                                             ,m_queue(queue)
         {
         }
 
