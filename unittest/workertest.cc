@@ -2,6 +2,7 @@
 
 #include "worker.h"
 
+#include <semaphore.h>
 
 class workerTestDummyTask:public ITask
 {
@@ -11,18 +12,28 @@ class workerTestDummyTask:public ITask
             m_number++;
         }
 
-        virtual void Run() { sleep(1);m_order.push_back(m_counter);++m_counter; }
+        virtual void Run() 
+        { 
+            sleep(1);
+            m_order.push_back(m_counter);
+            ++m_counter;
+            sem_post(&m_sem);
+        }
+
         static bool AllMsgDone() { return m_counter == m_number;}
 
         static int m_counter;
         static int m_number;
 
         static std::vector<int> m_order;
+
+        static sem_t m_sem;
 };
 
 int workerTestDummyTask::m_counter = 0;
 int workerTestDummyTask::m_number  = 0;
 std::vector<int> workerTestDummyTask::m_order;
+sem_t workerTestDummyTask::m_sem;
 
 TEST(WorkerTaskTest,WorkerTest)
 {
@@ -44,11 +55,9 @@ TEST(WorkerTaskTest,WorkerTest)
     sleep(1);
     EXPECT_TRUE(worker.IsRunning());
 
-    sleep(3);
-    
-    while(worker.GetTaskNumber() > 0) sleep(3);
+    for (int i = 0; i < 4; ++i)
+        sem_wait(&workerTestDummyTask::m_sem);
    
-    sleep(3);
     EXPECT_EQ(workerTestDummyTask::m_number,workerTestDummyTask::m_counter);
     EXPECT_TRUE(workerTestDummyTask::AllMsgDone());
     EXPECT_EQ(workerTestDummyTask::m_counter, worker.TaskDone());
@@ -72,7 +81,7 @@ TEST(WorkerTaskTest,WorkerTest)
         EXPECT_EQ(ci,ii);
     }
 
-    for (int i = 0 ; i < 100; ++i)
+    for (int i = 0 ; i < 10; ++i)
     {
         msg = new workerTestDummyTask();
         EXPECT_TRUE(worker.PostTask(msg)) << i;
@@ -83,7 +92,8 @@ TEST(WorkerTaskTest,WorkerTest)
     sleep(1);
     EXPECT_TRUE(worker.IsRunning());
 
-    sleep(8);
+    for (int i = 0; i < 10; ++i)
+        sem_wait(&workerTestDummyTask::m_sem);
 
     worker.StopWorking(true);
 
@@ -92,11 +102,11 @@ TEST(WorkerTaskTest,WorkerTest)
     int left = worker.GetTaskNumber();
     int done = worker.TaskDone();
 
-    EXPECT_FALSE(workerTestDummyTask::AllMsgDone());
-    EXPECT_TRUE(left > 0);
-    EXPECT_TRUE(done < workerTestDummyTask::m_number);
+    EXPECT_TRUE(workerTestDummyTask::AllMsgDone());
+    EXPECT_EQ(0, left) << "left:" << left;
+    EXPECT_EQ(done, workerTestDummyTask::m_number);
 
-    EXPECT_TRUE(workerTestDummyTask::m_counter < workerTestDummyTask::m_number);
+    EXPECT_EQ(workerTestDummyTask::m_counter,  workerTestDummyTask::m_number);
 
     EXPECT_EQ(workerTestDummyTask::m_number, done + left)
         << "total:" << workerTestDummyTask::m_number 
@@ -109,3 +119,4 @@ TEST(WorkerTaskTest,WorkerTest)
         EXPECT_EQ(ci,ii);
     }
 }
+

@@ -79,10 +79,6 @@ class WorkerBodyBase: public ITask
         //timeout for sem_timewait
         const int m_timeout;
         
-        //record how many time we send notify without 
-        //response, when this variable meet a certain threshhold.
-        //shutdown timeout operation.
-        volatile int m_req;
         const int m_reqThreshold;
 
         //semaphore for waiting for task.
@@ -148,7 +144,7 @@ class Worker:public Thread
 
         void EnableNotify(bool enable = true) { m_WorkerBody->EnableNotify(enable); }
 
-        bool StartWorking();
+        virtual bool StartWorking();
 
         int GetWorkerId() const { return m_id; } 
 

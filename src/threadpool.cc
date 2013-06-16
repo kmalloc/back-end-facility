@@ -22,8 +22,9 @@ class Dispatcher:public WorkerBodyBase
         Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
-        void KillAllWorker();
+        void StartWorker();
         void StopWorker();
+        void KillAllWorker();
         virtual bool HasTask();
         virtual bool StopRunning();
         virtual int  GetContainerSize();
@@ -69,8 +70,6 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         Worker* worker = new Worker(m_pool, i);
         worker->EnableNotify(true);
         m_workers.push_back(worker);
-
-        worker->StartWorking();
     }
 
     sem_init(&m_workerNotify,0,m_workerNum);
@@ -85,6 +84,11 @@ Dispatcher::~Dispatcher()
     }
 }
 
+void Dispatcher::StartWorker()
+{
+    for (int i = 0; i < m_workerNum; ++i)
+        m_workers[i]->StartWorking();
+}
 
 void Dispatcher::KillAllWorker()
 {
@@ -211,6 +215,7 @@ ThreadPool::~ThreadPool()
 bool ThreadPool::StartPooling()
 {
     m_running = true;
+    m_dispatcher->StartWorker();
     return m_worker->StartWorking();
 }
 

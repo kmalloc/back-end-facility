@@ -27,7 +27,6 @@ class DummyExitTask: public ITask
 WorkerBodyBase::WorkerBodyBase(Worker* worker)
     :m_isRuning(false)
     ,m_timeout(5)
-    ,m_req(0)
     ,m_reqThreshold(3)
     ,m_done(0)
     ,m_notify(false)
@@ -166,28 +165,29 @@ bool WorkerBodyBase::PostExit()
 ITask* WorkerBodyBase::GetRunTask()
 {
     ITask* msg;
+    int req = 0;
 
     while(1)
     {
-        if (!m_notify || m_req > m_reqThreshold)
+        if (!m_notify || req > m_reqThreshold)
         {
             SignalConsume();
             break;
         }
         else
         {
+            if (TryConsume()) break;
+
+            Notify();
+            req++;
+
             if (SignalConsumeTimeout(m_timeout))
             {
                 break;
             }
-
-            Notify();
-            m_req++;
         }
     }
         
-    m_req = 0;
-
     msg = GetTaskFromContainer();
 
     return msg;
