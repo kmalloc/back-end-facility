@@ -45,13 +45,6 @@ class WorkerBodyBase: public ITask
         virtual ITask* GetTaskFromContainer() = 0;
         virtual bool   PushTaskToContainer(ITask*) = 0;
 
-        //this is used to put a exit task in the msg queue.
-        //so that we can exit the worker loop in an elegant way.
-        //be aware, using this function will put the task in run
-        //immediatly after current task is finished.
-        //this is for INTERNAL usage only.
-        virtual bool   PushTaskToContainerFront(ITask*) = 0;
-
         inline void SignalPost();
         inline void SignalConsume();
         inline bool SignalConsumeTimeout(int);
@@ -65,13 +58,20 @@ class WorkerBodyBase: public ITask
         //disable overloading from child
         void Run();
 
-        //get task from mailbox
+        //get task from mailbox or m_cmd
         //may block when there is no task.
         //caller take responsibility to free the task.
-        ITask* GetRunTask();
+        //return false if get task from m_cmd.
+        bool GetRunTask(ITask*& task);
 
-        bool CheckExit(ITask*);
+        //set up flag to make worker loop exit;
+        //will be called in worker thread only.
+        inline void SetExitState();
 
+        inline bool PostInternalCmd(ITask*);
+        inline bool PushInternalCmd(ITask*);
+        inline ITask* GetInternalCmd();
+        inline void ProcessInternalCmd(ITask*);
 
         //is running task.
         volatile bool m_isRuning;
@@ -90,6 +90,17 @@ class WorkerBodyBase: public ITask
         //notify thread pool I am free now, send me some tasks
         volatile bool m_notify;
         Worker* m_worker;
+
+        //note this is for internal usage only.
+        //supporting worker internal activities: exit.
+        SpinlockQueue<ITask*> m_cmd;
+
+        //exit flag.
+        //this variable will be accessed on in the worker thread.
+        //It will be set by DummyExitTask only.
+        bool m_ShouldStop;
+
+        friend class DummyExitTask;
 };
 
 
@@ -108,7 +119,6 @@ class WorkerBody: public WorkerBodyBase
         virtual bool HasTask();
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
-        virtual bool PushTaskToContainerFront(ITask*);
 
     private:
 

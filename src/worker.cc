@@ -12,12 +12,21 @@ class DummyExitTask: public ITask
 {
     public:
 
-        DummyExitTask(){}
+        DummyExitTask(WorkerBodyBase* worker)
+            :m_worker(worker)
+        {
+        }
 
         virtual ~DummyExitTask() {}
 
-        virtual void Run() { assert(0); }
+        virtual void Run() 
+        { 
+            m_worker->SetExitState();
+        }
 
+    private:
+
+        WorkerBodyBase* m_worker;
 };
 
 /*
@@ -69,10 +78,6 @@ bool WorkerBodyBase::TryConsume()
     return sem_trywait(&m_sem) == 0;
 }
 
-bool WorkerBodyBase::StopRunning()
-{
-    return PostExit();
-}
 
 int WorkerBodyBase::Notify()
 {
@@ -84,37 +89,66 @@ int WorkerBodyBase::Notify()
     return 0;
 }
 
-bool WorkerBodyBase::CheckExit(ITask* task)
+bool WorkerBodyBase::GetRunTask(ITask*& msg)
 {
-    if (task && dynamic_cast<DummyExitTask*>(task) != NULL)
-    {
-        delete task;
-        return true;
-    }
+    int req = 0;
 
-    return false;
+    while(1)
+    {
+        if (!m_notify || req > m_reqThreshold)
+        {
+            SignalConsume();
+            break;
+        }
+        else
+        {
+            if (TryConsume()) break;
+
+            Notify();
+            req++;
+
+            if (SignalConsumeTimeout(m_timeout))
+            {
+                break;
+            }
+        }
+    }
+    
+    msg = GetInternalCmd();
+    if (msg) return false;
+
+    msg = GetTaskFromContainer();
+
+    return true;
 }
 
 void WorkerBodyBase::Run()
 {
     m_isRuning = false;
+    m_ShouldStop = false;
 
     while(1)
     {
+        ITask* msg = NULL;
 
         PreHandleTask();
 
-        ITask* msg = GetRunTask();
+        if (GetRunTask(msg))
+        {
+            m_isRuning = true;
 
-        if (CheckExit(msg)) break;
+            HandleTask(msg);
 
-        m_isRuning = true;
+            m_isRuning = false;
 
-        HandleTask(msg);
-        
-        m_isRuning = false;
-        
-        ++m_done;
+            ++m_done;
+        }
+        else
+        {
+            ProcessInternalCmd(msg);
+        }
+
+        if (m_ShouldStop) break;
     }
 }
 
@@ -148,11 +182,9 @@ bool WorkerBodyBase::PostTask(ITask* task)
     return ret;
 }
 
-bool WorkerBodyBase::PostExit()
+bool WorkerBodyBase::PostInternalCmd(ITask* task)
 {
-    ITask* task = new DummyExitTask();
-
-    bool ret = PushTaskToContainerFront(task);
+    bool ret = PushInternalCmd(task);
 
     if (ret) 
         SignalPost();
@@ -162,35 +194,43 @@ bool WorkerBodyBase::PostExit()
     return ret;
 }
 
-ITask* WorkerBodyBase::GetRunTask()
+bool WorkerBodyBase::PushInternalCmd(ITask* task)
 {
-    ITask* msg;
-    int req = 0;
+    return m_cmd.PushBack(task);
+}
 
-    while(1)
-    {
-        if (!m_notify || req > m_reqThreshold)
-        {
-            SignalConsume();
-            break;
-        }
-        else
-        {
-            if (TryConsume()) break;
+ITask* WorkerBodyBase::GetInternalCmd()
+{
+    if (!m_cmd.IsEmpty())
+        return m_cmd.PopFront();
 
-            Notify();
-            req++;
+    return NULL;
+}
 
-            if (SignalConsumeTimeout(m_timeout))
-            {
-                break;
-            }
-        }
-    }
-        
-    msg = GetTaskFromContainer();
+void WorkerBodyBase::ProcessInternalCmd(ITask* task)
+{
+    if (task == NULL) return;
 
-    return msg;
+    task->Run();
+
+    delete task;
+}
+
+void WorkerBodyBase::SetExitState()
+{
+    m_ShouldStop = true;
+}
+
+bool WorkerBodyBase::PostExit()
+{
+    ITask* task = new DummyExitTask(this);
+
+    return PostInternalCmd(task);
+}
+
+bool WorkerBodyBase::StopRunning()
+{
+    return PostExit();
 }
 
 int WorkerBodyBase::GetTaskNumber() 
@@ -226,11 +266,6 @@ ITask* WorkerBody::GetTaskFromContainer()
 bool WorkerBody::PushTaskToContainer(ITask* task)
 {
     return m_mailbox.PushBack(task);
-}
-
-bool WorkerBody::PushTaskToContainerFront(ITask* task)
-{
-    return m_mailbox.PushFront(task);
 }
 
 int WorkerBody::GetContainerSize()

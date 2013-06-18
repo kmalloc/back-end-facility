@@ -185,7 +185,7 @@ TEST(threadpooltest, alltest)
     EXPECT_EQ(0, NormalTaskForThreadPoolTest::m_exe);
     EXPECT_EQ(mnsz, NormalTaskForThreadPoolTest::m_done);
 
-    sleep(1);
+    sleep(2);
     if (mbsz - worker > worker)
     {
         EXPECT_EQ(worker, BusyTaskForThreadPoolTest::m_exe);

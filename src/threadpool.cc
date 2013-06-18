@@ -41,7 +41,6 @@ class Dispatcher:public WorkerBodyBase
         virtual void HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
-        virtual bool PushTaskToContainerFront(ITask*);
 
         void DispatchTask(ITask*);
         Worker* SelectFreeWorker();
@@ -118,11 +117,6 @@ bool Dispatcher::StopRunning()
 bool Dispatcher::PushTaskToContainer(ITask* task)
 {
     return m_queue.PushBack(task);
-}
-
-bool Dispatcher::PushTaskToContainerFront(ITask* task)
-{
-    return PushTaskToContainer(task);
 }
 
 ITask* Dispatcher::GetTaskFromContainer()
