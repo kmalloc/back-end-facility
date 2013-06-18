@@ -7,19 +7,20 @@
 class workerTestDummyTask:public ITask
 {
     public:
-        workerTestDummyTask()
+        workerTestDummyTask():m_sleep(1)
         {
             m_number++;
         }
 
         virtual void Run() 
         { 
-            sleep(1);
+            sleep(m_sleep);
             m_order.push_back(m_counter);
             ++m_counter;
             sem_post(&m_sem);
         }
 
+        int m_sleep;
         static bool AllMsgDone() { return m_counter == m_number;}
 
         static int m_counter;
@@ -118,5 +119,22 @@ TEST(WorkerTaskTest,WorkerTest)
         int ii = workerTestDummyTask::m_order[ci];
         EXPECT_EQ(ci,ii);
     }
+
+
+    for (int i = 0; i < 5; i++)
+    {
+        workerTestDummyTask * task = new workerTestDummyTask();
+        task->m_sleep = 4;
+        worker.PostTask(task);
+    }
+
+    EXPECT_TRUE(worker.StartWorking());
+
+    sem_wait(&workerTestDummyTask::m_sem);
+    EXPECT_TRUE(worker.GetTaskNumber() > 0);
+
+    worker.StopWorking();
+
+    EXPECT_TRUE(worker.GetTaskNumber() > 0);
 }
 

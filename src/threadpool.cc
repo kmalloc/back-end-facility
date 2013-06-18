@@ -81,6 +81,8 @@ Dispatcher::~Dispatcher()
         m_workers[i]->Cancel();
         delete m_workers[i];
     }
+
+    WorkerBodyBase::ClearAllTask();
 }
 
 void Dispatcher::StartWorker()

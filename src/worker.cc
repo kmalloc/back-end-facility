@@ -156,7 +156,7 @@ void WorkerBodyBase::ClearAllTask()
 {
     while (HasTask())
     {
-        ITask*msg = TryGetTask();
+        ITask* msg = TryGetTask();
         if (msg) delete(msg);
     }
 }
@@ -256,6 +256,7 @@ WorkerBody::WorkerBody(Worker*work, int maxMsgSize)
 
 WorkerBody::~WorkerBody()
 {
+    WorkerBodyBase::ClearAllTask();
 }
 
 ITask* WorkerBody::GetTaskFromContainer()

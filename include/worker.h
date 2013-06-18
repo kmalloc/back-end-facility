@@ -20,8 +20,8 @@ class WorkerBodyBase: public ITask
         bool PostTask(ITask*);
         void ClearAllTask();
 
-        virtual int GetContainerSize() = 0;
         int GetTaskNumber();
+        virtual int GetContainerSize() = 0;
 
         virtual bool StopRunning();
 
@@ -51,7 +51,6 @@ class WorkerBodyBase: public ITask
         inline bool TryConsume();
         inline int  Notify();
         inline bool PostExit();
-
 
     private:
 
