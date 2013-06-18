@@ -1,7 +1,7 @@
 #include "gtest.h"
 
 #include "threadpool.h"
-#include "atomic_ops.h"
+#include "misc/atomic_ops.h"
 
 #include <semaphore.h>
 
@@ -142,7 +142,7 @@ TEST(threadpooltest, alltest)
         sem_wait(&BusyTaskForThreadPoolTest::m_sem);
 
     sleep(1);
-    EXPECT_EQ(newRun, NormalTaskForThreadPoolTest::m_exe);
+    ASSERT_EQ(newRun, NormalTaskForThreadPoolTest::m_exe);
     EXPECT_EQ(newRun, BusyTaskForThreadPoolTest::m_done);
     EXPECT_EQ(busyLeft, BusyTaskForThreadPoolTest::m_exe);
 
@@ -159,7 +159,7 @@ TEST(threadpooltest, alltest)
     if (mnsz - worker > worker)
     {
         EXPECT_EQ(0, BusyTaskForThreadPoolTest::m_exe);
-        EXPECT_EQ(worker, NormalTaskForThreadPoolTest::m_exe);
+        ASSERT_EQ(worker, NormalTaskForThreadPoolTest::m_exe);
     }
 
     EXPECT_EQ(worker, NormalTaskForThreadPoolTest::m_done);
@@ -176,7 +176,7 @@ TEST(threadpooltest, alltest)
             }
         }
 
-        if (co == 0) break;
+        if (co == 0 && NormalTaskForThreadPoolTest::m_done == mnsz) break;
 
         for (int i = 0; i < co; ++i)
             sem_wait(&NormalTaskForThreadPoolTest::m_sem);

@@ -1,8 +1,8 @@
 #ifndef _THREAD_BASE_H_
 #define _THREAD_BASE_H_
 
+#include "misc/noncopyable.h"
 #include <pthread.h>
-#include "noncopyable.h"
 
 class ITask;
 

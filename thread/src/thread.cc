@@ -1,6 +1,6 @@
 #include "thread.h"
-#include "log.h"
 #include "ITask.h"
+#include "misc/log.h"
 
 #include <string.h>
 #include <errno.h>

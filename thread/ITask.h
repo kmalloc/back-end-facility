@@ -1,8 +1,6 @@
 #ifndef _I_TASK_H_
 #define _I_TASK_H_
 
-#include <assert.h>
-
 enum TaskPriority
 {
     TP_EXTREME,

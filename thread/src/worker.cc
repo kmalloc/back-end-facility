@@ -1,6 +1,5 @@
 #include "worker.h"
-
-#include "log.h"
+#include "misc/log.h"
 
 #include <vector>
 #include <queue>

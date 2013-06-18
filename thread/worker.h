@@ -2,9 +2,9 @@
 #define _WORKER_THREAD_H_
 
 #include "thread.h"
-#include "defs.h"
 #include "ITask.h"
-#include "SpinlockQueue.h"
+#include "misc/defs.h"
+#include "misc/SpinlockQueue.h"
 
 #include <semaphore.h>
 

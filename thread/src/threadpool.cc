@@ -1,8 +1,8 @@
 #include "threadpool.h"
 
-#include "log.h"
-#include "atomic_ops.h"
-#include "SpinlockQueue.h"
+#include "misc/log.h"
+#include "misc/atomic_ops.h"
+#include "misc/SpinlockQueue.h"
 
 #include <memory.h>
 
