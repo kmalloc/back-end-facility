@@ -131,7 +131,11 @@ class WorkerManagerBase
         WorkerManagerBase() {}
         virtual ~WorkerManagerBase() {}
 
+    protected:
+
         virtual int SetWorkerNotify(Worker*) = 0;
+
+        friend class Worker;
 };
 
 class Worker:public Thread

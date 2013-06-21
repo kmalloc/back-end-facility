@@ -29,9 +29,10 @@ class ThreadPool: public WorkerManagerBase
         //killing all workers.
         void ForceShutdown();
 
-        virtual int SetWorkerNotify(Worker* worker);
 
     protected:
+
+        virtual int SetWorkerNotify(Worker* worker);
 
         int CalcDefaultThreadNum();
 

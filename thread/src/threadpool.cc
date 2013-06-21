@@ -4,6 +4,7 @@
 #include "misc/atomic_ops.h"
 #include "misc/SpinlockQueue.h"
 
+#include <assert.h>
 #include <memory.h>
 
 
