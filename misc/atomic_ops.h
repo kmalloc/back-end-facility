@@ -1,7 +1,7 @@
 #ifndef _ATMOMIC_H_
 #define _ATMOMIC_H_
 
-#define cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
+#define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 
 inline void atomic_add(volatile int * val, int gap)
 {
@@ -12,7 +12,7 @@ inline void atomic_add(volatile int * val, int gap)
     {
         oldval = *val;
         newval = oldval + gap;
-    } while (!cas(val, oldval, newval));
+    } while (!atomic_cas(val, oldval, newval));
 }
 
 inline void atomic_increment(volatile int * val)
