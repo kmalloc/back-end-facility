@@ -4,8 +4,12 @@
 #include "atomic_ops.h"
 
 //note:
-//to avoid false sharing issue.
-//make sure entry size is aligned to cache line.
+//(a)
+//to ensure efficiency of these structure,
+//better use them to store pointer only
+//(b)
+//if a thread calling pop/push die before the function finishs .
+//later calling to pop/push will be blocking forever
 
 template<class Type>
 class LockFreeStack
@@ -13,7 +17,7 @@ class LockFreeStack
     public:
 
         LockFreeStack(size_t sz)
-            :m_top(0), m_maxSz(sz)
+            :m_top(0), m_popIndex(-1), m_maxSz(sz)
         {
             m_arr = new Type[sz];
         }
@@ -30,23 +34,26 @@ class LockFreeStack
 
         bool Push(const Type& val)
         {
-            size_t old;
+            size_t old_top, old_pop;
 
             do
             {
-                old = m_top;
+                old_top = m_top;
+                old_pop = m_popIndex;
 
-                if (old == m_maxSz) return false;
+                if (old_top == m_maxSz) return false;
 
-            } while(!atomic_cas(&m_top, old, old + 1));
+                if (old_top == old_pop)
+                {
+                    atomic_cas(&m_popIndex, old_pop, old_pop - 1);
+                    continue;
+                }
 
-            //now slot is reserved
-            //but it is not safe to set the entry yet.
-            //the follow code is not correct.
-            //need to find a way to guarantee that:
-            //no pop operation will take place until we finish setting the value.
-            //TODO
+            } while(old_top - 1 != old_pop || !atomic_cas(&m_top, old, old + 1));
+
             m_arr[old] = val;
+
+            atomic_cas(&m_popIndex, old_pop, old_pop + 1);
 
             return true;
         }
@@ -54,18 +61,27 @@ class LockFreeStack
         Type Pop()
         {
             Type ret;
-            size_t old;
+            size_t old_top;
+            size_t old_pop;
 
             do
             {
-                old = m_top;
+                old_top = m_top;
+                old_pop = m_popIndex;
                 
-                if (old == 0) return m_null;
+                if (old_top == 0) return m_null;
 
-                ret = m_arr[old - 1];
+                if (old_top == old_pop)
+                {
+                    atomic_cas(&m_popIndex, old_pop, old_pop - 1);
+                    continue;
+                }
 
-            } while(!atomic_cas(&m_top, old, old - 1));
+                ret = m_arr[old_top - 1];
 
+            } while(old_top - 1 != old_pop || !atomic_cas(&m_top, old_top, old_top - 1));
+
+            atomic_cas(&m_popIndex, old_pop, old_pop - 1);
 
             return ret;
         }
@@ -83,11 +99,11 @@ class LockFreeStack
 
     private:
 
-        size_t m_maxSz;
         Type   m_null;
-        size_t m_top;
-        size_t m_read;
         Type*  m_arr;
+        size_t m_top;
+        size_t m_popIndex;
+        size_t m_maxSz;
 };
 
 
