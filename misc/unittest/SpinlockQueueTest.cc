@@ -61,7 +61,8 @@ void check2(SpinlockQueue<int>& queue)
 {
     while (!queue.IsEmpty())
     {
-        int val = queue.PopFront();
+        int val;
+        if (!queue.PopFront(&val)) return;
         check(val);
     }
 }

@@ -124,7 +124,10 @@ bool Dispatcher::PushTaskToContainer(ITask* task)
 
 ITask* Dispatcher::GetTaskFromContainer()
 {
-    return m_queue.PopFront();
+    ITask* task;
+    if (m_queue.PopFront(&task)) return task;
+
+    return NULL;
 }
 
 int Dispatcher::GetContainerSize() 

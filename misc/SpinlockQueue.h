@@ -113,14 +113,7 @@ class SpinlockQueue
         {
         }
 
-        //set up null value.
-        //this value will be return on when pop on empty queue.
-        void SetNullValue(const Type& val)
-        {
-            m_null = val;
-        }
-
-        Type PopFront()
+        bool PopFront(Type* ret = NULL)
         {
             Type val;
 
@@ -129,14 +122,16 @@ class SpinlockQueue
             if (m_queue.empty())
             {
                 pthread_spin_unlock(&m_lock);
-                return m_null;
+                return false;
             }
 
             val = m_queue.front();
             m_queue.pop();
             pthread_spin_unlock(&m_lock);
 
-            return val;
+            if (ret) *ret = val;
+
+            return true;
         }
 
         bool PushBack(const Type& val)
@@ -187,7 +182,6 @@ class SpinlockQueue
        
     protected:
 
-        Type m_null; //null value, this value will be return if pop on empty queue.
         const size_t m_maxSz;
         volatile pthread_spinlock_t m_lock;
         QUEUE m_queue;

@@ -5,11 +5,19 @@
 
 //note:
 //(a)
-//to ensure efficiency of these structure,
+//to ensure efficiency of manipulating these structure,
 //better use them to store pointer only
 //(b)
 //if a thread calling pop/push die before the function finishs .
 //later calling to pop/push will be blocking forever
+
+//memory model is conceptually not an concern here according to the gnu document:
+//gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/atomic-builtins.html:
+//atomic operations are considerd "full barrier".
+//so we don't even need to set memory barrier explicitly.
+//One thing to note: the following code is targetting for x86/x64 only.
+//I don't even test them on other processor architecture.
+
 
 template<class Type>
 class LockFreeStack
@@ -27,14 +35,9 @@ class LockFreeStack
             delete m_arr;
         }
 
-        void SetNull(Type val)
-        {
-            m_null = val;
-        }
-
         bool Push(const Type& val)
         {
-            size_t old_top, old_pop;
+            size_t old_top;
 
             do
             {
@@ -43,17 +46,17 @@ class LockFreeStack
 
                 if (old_top == m_maxSz) return false;
 
-                if (old_top == old_pop)
+                if (old_pop > old_top) 
                 {
                     atomic_cas(&m_popIndex, old_pop, old_pop - 1);
                     continue;
                 }
 
-            } while(old_top - 1 != old_pop || !atomic_cas(&m_top, old, old + 1));
+            } while (!atomic_cas(&m_top, old_top, old_top + 1));
 
-            m_arr[old] = val;
+            m_arr[old_top] = val;
 
-            atomic_cas(&m_popIndex, old_pop, old_pop + 1);
+            while (!atomic_cas(&m_popIndex, old_top, old_top + 1));
 
             return true;
         }
@@ -71,15 +74,11 @@ class LockFreeStack
                 
                 if (old_top == 0) return m_null;
 
-                if (old_top == old_pop)
-                {
-                    atomic_cas(&m_popIndex, old_pop, old_pop - 1);
-                    continue;
-                }
+                if (old_top != old_pop) continue; 
 
-                ret = m_arr[old_top - 1];
+                ret = m_arr[old_pop - 1];
 
-            } while(old_top - 1 != old_pop || !atomic_cas(&m_top, old_top, old_top - 1));
+            } while (!atomic_cas(&m_top, old_pop, old_pop - 1));
 
             atomic_cas(&m_popIndex, old_pop, old_pop - 1);
 
@@ -96,14 +95,12 @@ class LockFreeStack
             return m_top;
         }
 
-
     private:
 
-        Type   m_null;
         Type*  m_arr;
-        size_t m_top;
-        size_t m_popIndex;
-        size_t m_maxSz;
+        volatile size_t m_top;
+        volatile size_t m_popIndex;
+        const size_t m_maxSz;
 };
 
 
@@ -111,6 +108,84 @@ class LockFreeStack
 template<class Type>
 class LockFreeQueue
 {
+    public:
+
+        LockFreeQueue(int sz)
+            :m_maxSz(sz)
+            ,m_read(0)
+            ,m_write(0)
+            ,m_maxRead(0)
+            ,m_size(0)
+        {
+            m_arr = new Type[sz];
+        }
+
+        ~LockFreeQueue()
+        {
+            delete m_arr;
+        }
+
+        bool Push(Type val)
+        {
+            size_t old_write, old_read;
+
+            do
+            {
+                old_write = m_write;
+                old_read  = m_read;
+
+                if ((old_write + 1)%m_maxSz == old_read) return false;
+
+            } while(!atomic_cas(&m_write, old_write, (old_write + 1)%m_maxSz));
+
+            m_arr[old_write] = val;
+            
+            while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
+
+            return true;
+        }
+
+
+        bool Pop(Type* val)
+        {
+            Type ret;
+
+            size_t old_read;
+            size_t old_write;
+
+            do
+            {
+                old_read = m_read;
+
+                if (old_read == m_maxRead) return false;
+
+                ret = m_arr[old_read];
+
+            } while (!atomic_cas(&m_read, old_read, (old_read + 1)%m_maxSz));
+
+            if (val) *val = ret;
+
+            return true;
+        }
+
+        bool IsEmpty() const
+        {
+            return m_read == m_write;
+        }
+
+        int Size() const
+        {
+            return (m_write + m_maxSz - m_read)%m_maxSz;
+        }
+
+    private:
+
+        Type*  m_arr;
+        const size_t m_maxSz;
+        volatile size_t m_front; // read position
+        volatile size_t m_rear; // write position
+        volatile size_t m_maxRead;
+        volatile size_t m_size;
 };
 
 

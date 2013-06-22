@@ -200,8 +200,8 @@ bool WorkerBodyBase::PushInternalCmd(ITask* task)
 
 ITask* WorkerBodyBase::GetInternalCmd()
 {
-    if (!m_cmd.IsEmpty())
-        return m_cmd.PopFront();
+    ITask* task;
+    if (!m_cmd.IsEmpty() && m_cmd.PopFront(&task)) return task;
 
     return NULL;
 }
@@ -250,7 +250,6 @@ bool WorkerBodyBase::IsRunning() const
 WorkerBody::WorkerBody(Worker*work, int maxMsgSize)
     :WorkerBodyBase(work), m_mailbox(maxMsgSize)
 {
-    m_mailbox.SetNullValue(NULL);
 }
 
 WorkerBody::~WorkerBody()
@@ -260,7 +259,10 @@ WorkerBody::~WorkerBody()
 
 ITask* WorkerBody::GetTaskFromContainer()
 {
-    return m_mailbox.PopFront();
+    ITask* task;
+    if (m_mailbox.PopFront(&task)) return task;
+
+    return NULL;
 }
 
 bool WorkerBody::PushTaskToContainer(ITask* task)
