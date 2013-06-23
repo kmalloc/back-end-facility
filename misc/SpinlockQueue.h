@@ -1,7 +1,7 @@
 #ifndef _SPIN_LOCK_QUEUE_H_
 #define _SPIN_LOCK_QUEUE_H_
 
-#include "defs.h"
+#include "sys/defs.h"
 
 #include <vector>
 #include <queue>

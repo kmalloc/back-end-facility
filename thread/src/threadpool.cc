@@ -1,7 +1,7 @@
 #include "threadpool.h"
 
-#include "misc/log.h"
-#include "misc/atomic_ops.h"
+#include "sys/log.h"
+#include "sys/atomic_ops.h"
 #include "misc/SpinlockQueue.h"
 
 #include <assert.h>

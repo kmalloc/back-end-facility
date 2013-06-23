@@ -76,8 +76,6 @@ TEST(pg,spQueueTest)
     Thread* threads[tsz]; 
     slqTestDummyTask* tasks[tsz];
 
-    queue.SetNullValue(val3);
-
     for (int i = 0; i < tsz; i++)
     {
         tasks[i] = new slqTestDummyTask(queue);

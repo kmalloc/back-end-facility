@@ -3,7 +3,7 @@
 
 #include "thread.h"
 #include "ITask.h"
-#include "misc/defs.h"
+#include "sys/defs.h"
 #include "misc/SpinlockQueue.h"
 
 #include <semaphore.h>
