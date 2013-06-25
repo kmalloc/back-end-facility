@@ -10,6 +10,8 @@
 
 using namespace std;
 
+static void* gs_item = (void*)0x233;
+
 class LockFreeConsumerTask: public ITask
 {
     public:
@@ -44,9 +46,9 @@ class LockFreeConsumerTask: public ITask
         {
             sem_wait(&m_sem);
 
-            void* item;
+            void* item = NULL;
 
-            if (!m_box.Pop(&item) || item == NULL) 
+            if (!m_box.Pop(&item)) 
             {
                 return NULL;
             }
@@ -66,8 +68,15 @@ class LockFreeConsumerTask: public ITask
                     sched_yield();
                     continue;
                 }
+                else if (item == (void*)0x2233)
+                    break;
 
-                assert((size_t)item == 0x233); 
+                if (item != (void*)0x233) 
+                {
+                    fprintf(stdout, "err,%x\n", item);
+                    fflush(stdout);
+                    assert(0);
+                }
 
                 //printf("c(%d)\n", m_count);
                 atomic_increment(&m_count);
@@ -123,7 +132,7 @@ class LockFreeProducerTask: public ITask
             }
 
             printf("q p\n");
-            m_consumer->PostItem(NULL);
+            m_consumer->PostItem((void*)0x2233);
         }
 
     private:

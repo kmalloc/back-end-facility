@@ -2,6 +2,8 @@
 #define __LOCK_FREE_CONTAINER_H_
 
 #include "atomic_ops.h"
+
+#include <assert.h>
 #include <stddef.h>
 
 //note:
@@ -57,7 +59,7 @@ class LockFreeStack
 
             m_arr[old_top] = val;
 
-            while (!atomic_cas(&m_popIndex, old_top, old_top + 1));
+            atomic_increment(&m_popIndex);
 
             return true;
         }
@@ -81,7 +83,7 @@ class LockFreeStack
 
             } while (!atomic_cas(&m_top, old_pop, old_pop - 1));
 
-            atomic_cas(&m_popIndex, old_pop, old_pop - 1);
+            assert(atomic_cas(&m_popIndex, old_pop, old_pop - 1));
 
             if (val) *val = ret;
 
