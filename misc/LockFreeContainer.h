@@ -2,6 +2,7 @@
 #define __LOCK_FREE_CONTAINER_H_
 
 #include "atomic_ops.h"
+#include <stddef.h>
 
 //note:
 //(a)
@@ -25,19 +26,19 @@ class LockFreeStack
     public:
 
         LockFreeStack(size_t sz)
-            :m_top(0), m_popIndex(-1), m_maxSz(sz)
+            :m_top(0), m_popIndex(0), m_maxSz(sz)
         {
             m_arr = new Type[sz];
         }
 
         ~LockFreeStack()
         {
-            delete m_arr;
+            delete[] m_arr;
         }
 
         bool Push(const Type& val)
         {
-            size_t old_top;
+            size_t old_top, old_pop;
 
             do
             {
@@ -61,7 +62,7 @@ class LockFreeStack
             return true;
         }
 
-        Type Pop()
+        bool Pop(Type* val)
         {
             Type ret;
             size_t old_top;
@@ -72,7 +73,7 @@ class LockFreeStack
                 old_top = m_top;
                 old_pop = m_popIndex;
                 
-                if (old_top == 0) return m_null;
+                if (old_top == 0) return false;
 
                 if (old_top != old_pop) continue; 
 
@@ -82,7 +83,9 @@ class LockFreeStack
 
             atomic_cas(&m_popIndex, old_pop, old_pop - 1);
 
-            return ret;
+            if (val) *val = ret;
+
+            return true;
         }
 
         bool IsEmpty() const
@@ -122,7 +125,7 @@ class LockFreeQueue
 
         ~LockFreeQueue()
         {
-            delete m_arr;
+            delete[] m_arr;
         }
 
         bool Push(Type val)
@@ -182,8 +185,8 @@ class LockFreeQueue
 
         Type*  m_arr;
         const size_t m_maxSz;
-        volatile size_t m_front; // read position
-        volatile size_t m_rear; // write position
+        volatile size_t m_read; // read position
+        volatile size_t m_write; // write position
         volatile size_t m_maxRead;
         volatile size_t m_size;
 };
