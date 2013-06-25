@@ -8,3 +8,4 @@ filenametags
 cscope.*
 *.swo
 */unittest
+benchmark/lockfreebenchmark

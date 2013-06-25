@@ -3,6 +3,7 @@
 #include "thread/ITask.h"
 #include "thread/thread.h"
 
+#include <time.h>
 #include <stdio.h>
 #include <assert.h>
 #include <semaphore.h>
@@ -47,7 +48,6 @@ class LockFreeConsumerTask: public ITask
 
             if (!m_box.Pop(&item) || item == NULL) 
             {
-                m_stop = true;
                 return NULL;
             }
 
@@ -60,18 +60,20 @@ class LockFreeConsumerTask: public ITask
             {
                 void* item = GetItem();
 
-                if (NULL != item && (size_t)item != 0x233) 
+                if (item == NULL)
                 {
-                    fprintf(stdout, "%x\n", item);
-                    fflush(stdout);
-                    assert(0);
+                    printf("empty\n");
+                    sched_yield();
+                    continue;
                 }
 
-                printf("c(%d)\n", m_count);
+                assert((size_t)item == 0x233); 
+
+                //printf("c(%d)\n", m_count);
                 atomic_increment(&m_count);
             }
 
-            fprintf(stdout, "c s \n");
+            fprintf(stdout, "q c \n");
             fflush(stdout);
         }
 
@@ -108,17 +110,19 @@ class LockFreeProducerTask: public ITask
             {
                 if (*m_count >= m_max) break;
 
-                printf("p(%d)\n", *m_count);
+                //printf("p(%d)\n", *m_count);
 
                 if (!m_consumer->PostItem()) 
                 {
                     printf("full:%d\n", *m_count);
+                    sched_yield();
                     continue;
                 }
 
                 atomic_increment(m_count);
             }
 
+            printf("q p\n");
             m_consumer->PostItem(NULL);
         }
 
@@ -133,7 +137,7 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 4096;//1 milion
+    const int maxSz = 10000; //1 milion
     const int consumerSz = 2, producerSz = 4;
 
     LockFreeConsumerTask consumer;
@@ -141,6 +145,10 @@ int main()
 
     Thread* consumers[consumerSz];
     Thread* producers[producerSz];
+
+    clock_t s, e;
+
+    s = clock();
 
     for (int i = 0; i < consumerSz; ++i)
     {
@@ -164,6 +172,12 @@ int main()
         consumers[i]->Join();
     }
 
+    e = clock();
+
+    float total = (double)(e - s)/(double)CLOCKS_PER_SEC;
+
+    printf("items:%d, max:%d\n", counter, maxSz);
+    printf("total time :%f(s)\n", total);
     return 0;
 }
 

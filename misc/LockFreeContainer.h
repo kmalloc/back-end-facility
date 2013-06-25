@@ -49,7 +49,7 @@ class LockFreeStack
 
                 if (old_pop > old_top) 
                 {
-                    atomic_cas(&m_popIndex, old_pop, old_pop - 1);
+                    //atomic_cas(&m_popIndex, old_pop, old_pop - 1);
                     continue;
                 }
 
