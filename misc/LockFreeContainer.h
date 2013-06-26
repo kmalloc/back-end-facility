@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <pthread.h>
 
+#include <linux/kernel.h>
+
 //note:
 //(a)
 //to ensure efficiency of manipulating these structure,
@@ -49,33 +51,29 @@ class LockFreeStack
                 old_top = m_top;
                 old_pop = m_popIndex;
 
-                __asm__ __volatile__("": : :"memory"); 
-
                 if (old_top == m_maxSz) return false;
 
-                if (old_pop > old_top) 
+                if (old_pop != old_top) 
                 {
-                    sched_yield();
+                    //sched_yield();
                     continue;
                 }
 
-                if(__sync_bool_compare_and_swap(&m_top, old_top, old_top + 1)) 
+                if(__sync_bool_compare_and_swap(&m_top, *(&m_popIndex), *(&m_popIndex) + 1)) 
                     break;
             } 
 
-            m_arr[old_top] = val;
+            //printf("i:%d\n", m_top - 1);
 
-            assert(old_top >= old_pop);
-            //assert(m_top > m_popIndex);
-
-            __asm__ __volatile__("": : :"memory"); 
-
-            do
+            if (*(&m_top) - 1 != *(&m_popIndex))
             {
-                old_pop = m_popIndex;
+                fprintf(stdout, "i t:%d,p:%d\n", m_top, m_popIndex);
+                fflush(stdout);
+            }
 
-            } while (!__sync_bool_compare_and_swap(&m_popIndex, old_pop, old_pop + 1));
+            m_arr[m_top - 1] = val;
 
+            assert(__sync_bool_compare_and_swap(&m_popIndex, *(&m_top) - 1, *(&m_top)));
 
             return true;
         }
@@ -91,19 +89,25 @@ class LockFreeStack
                 old_top = m_top;
                 old_pop = m_popIndex;
                 
-                __asm__ __volatile__("": : :"memory"); 
                 if (old_top == 0) return false;
 
                 if (old_top != old_pop) continue; 
 
-                ret = m_arr[old_pop - 1];
-
-                if (__sync_bool_compare_and_swap(&m_top, old_pop, old_pop - 1))
+                if (__sync_bool_compare_and_swap(&m_top, *(&m_popIndex), *(&m_popIndex) - 1))
                     break;
             }  
 
-            //assert(m_top < m_popIndex);
-            assert(__sync_bool_compare_and_swap(&m_popIndex, old_pop, old_pop - 1));
+            //printf("o:%d\n", m_top);
+
+            if (m_top + 1 != m_popIndex)
+            {
+                fprintf(stdout, "o t:%d,p:%d\n", m_top, m_popIndex);
+                fflush(stdout);
+            }
+
+            ret = m_arr[m_top];
+
+            assert(__sync_bool_compare_and_swap(&m_popIndex, *(&m_top) + 1, *(&m_top)));
 
             if (val) *val = ret;
 
