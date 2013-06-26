@@ -71,7 +71,11 @@ class LockFreeConsumerTask: public ITask
                 else if (item == (void*)0x2233)
                     break;
 
-                if (item != (void*)0x233) 
+                if (item != (void*)0x233
+                   && item != (void*)(0x233 + 1) 
+                   && item != (void*)(0x233 + 2) 
+                   && item != (void*)(0x233 + 3) 
+                   && item != (void*)(0x233 + 4)) 
                 {
                     fprintf(stdout, "err,%x\n", item);
                     fflush(stdout);
@@ -115,19 +119,19 @@ class LockFreeProducerTask: public ITask
 
         virtual void Run()
         {
+            int k = 0;
             while (!m_stop)
             {
                 if (*m_count >= m_max) break;
 
-                //printf("p(%d)\n", *m_count);
-
-                if (!m_consumer->PostItem()) 
+                if (!m_consumer->PostItem((void*)(0x233+k))) 
                 {
                     printf("full:%d\n", *m_count);
                     sched_yield();
                     continue;
                 }
 
+                k = (k + 1)%5;
                 atomic_increment(m_count);
             }
 
@@ -146,8 +150,8 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 10000; //1 milion
-    const int consumerSz = 2, producerSz = 4;
+    const int maxSz = 1000000; //1 milion
+    const int consumerSz = 2, producerSz = 2;
 
     LockFreeConsumerTask consumer;
     LockFreeProducerTask prod(&consumer, &counter, maxSz - producerSz - 1);

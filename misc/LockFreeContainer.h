@@ -42,22 +42,19 @@ class LockFreeStack
         {
             size_t old_top, old_pop;
 
-            do
+            while (1)
             {
                 old_top = m_top;
                 old_pop = m_popIndex;
 
                 if (old_top == m_maxSz) return false;
 
-                if (old_pop > old_top) 
-                {
-                    //atomic_cas(&m_popIndex, old_pop, old_pop - 1);
-                    continue;
-                }
+                if (old_pop != old_top) continue;
 
-            } while (!atomic_cas(&m_top, old_top, old_top + 1));
+                if (atomic_cas(&m_top, old_pop, old_pop + 1)) break; //aba issue still there, to be fixed.
+            }  
 
-            m_arr[old_top] = val;
+            m_arr[m_top - 1] = val;
 
             atomic_increment(&m_popIndex);
 
@@ -70,7 +67,7 @@ class LockFreeStack
             size_t old_top;
             size_t old_pop;
 
-            do
+            while (1) 
             {
                 old_top = m_top;
                 old_pop = m_popIndex;
@@ -79,11 +76,13 @@ class LockFreeStack
 
                 if (old_top != old_pop) continue; 
 
-                ret = m_arr[old_pop - 1];
+                if (atomic_cas(&m_top, old_pop, old_pop - 1)) break;
+            } 
 
-            } while (!atomic_cas(&m_top, old_pop, old_pop - 1));
+            ret = m_arr[old_pop - 1];
+            m_arr[old_pop - 1] = (Type)0xcc;//for test, catch aba issue
 
-            assert(atomic_cas(&m_popIndex, old_pop, old_pop - 1));
+            atomic_decrement(&m_popIndex);
 
             if (val) *val = ret;
 
