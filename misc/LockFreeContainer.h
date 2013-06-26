@@ -3,8 +3,10 @@
 
 #include "atomic_ops.h"
 
+#include <stdio.h>
 #include <assert.h>
 #include <stddef.h>
+#include <pthread.h>
 
 //note:
 //(a)
@@ -42,24 +44,38 @@ class LockFreeStack
         {
             size_t old_top, old_pop;
 
-            do
+            while(1)
             {
                 old_top = m_top;
                 old_pop = m_popIndex;
+
+                __asm__ __volatile__("": : :"memory"); 
 
                 if (old_top == m_maxSz) return false;
 
                 if (old_pop > old_top) 
                 {
-                    //atomic_cas(&m_popIndex, old_pop, old_pop - 1);
+                    sched_yield();
                     continue;
                 }
 
-            } while (!atomic_cas(&m_top, old_top, old_top + 1));
+                if(__sync_bool_compare_and_swap(&m_top, old_top, old_top + 1)) 
+                    break;
+            } 
 
             m_arr[old_top] = val;
 
-            atomic_increment(&m_popIndex);
+            assert(old_top >= old_pop);
+            //assert(m_top > m_popIndex);
+
+            __asm__ __volatile__("": : :"memory"); 
+
+            do
+            {
+                old_pop = m_popIndex;
+
+            } while (!__sync_bool_compare_and_swap(&m_popIndex, old_pop, old_pop + 1));
+
 
             return true;
         }
@@ -70,20 +86,24 @@ class LockFreeStack
             size_t old_top;
             size_t old_pop;
 
-            do
+            while(1) 
             {
                 old_top = m_top;
                 old_pop = m_popIndex;
                 
+                __asm__ __volatile__("": : :"memory"); 
                 if (old_top == 0) return false;
 
                 if (old_top != old_pop) continue; 
 
                 ret = m_arr[old_pop - 1];
 
-            } while (!atomic_cas(&m_top, old_pop, old_pop - 1));
+                if (__sync_bool_compare_and_swap(&m_top, old_pop, old_pop - 1))
+                    break;
+            }  
 
-            assert(atomic_cas(&m_popIndex, old_pop, old_pop - 1));
+            //assert(m_top < m_popIndex);
+            assert(__sync_bool_compare_and_swap(&m_popIndex, old_pop, old_pop - 1));
 
             if (val) *val = ret;
 
@@ -141,11 +161,11 @@ class LockFreeQueue
 
                 if ((old_write + 1)%m_maxSz == old_read) return false;
 
-            } while(!atomic_cas(&m_write, old_write, (old_write + 1)%m_maxSz));
+            } while(!__sync_bool_compare_and_swap(&m_write, old_write, (old_write + 1)%m_maxSz));
 
             m_arr[old_write] = val;
             
-            while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
+            while (!__sync_bool_compare_and_swap(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
 
             return true;
         }
@@ -166,7 +186,7 @@ class LockFreeQueue
 
                 ret = m_arr[old_read];
 
-            } while (!atomic_cas(&m_read, old_read, (old_read + 1)%m_maxSz));
+            } while (!__sync_bool_compare_and_swap(&m_read, old_read, (old_read + 1)%m_maxSz));
 
             if (val) *val = ret;
 
