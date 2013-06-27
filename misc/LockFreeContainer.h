@@ -29,6 +29,8 @@ class LockFreeStack
 
         LockFreeStack(size_t sz)
             :m_top(0), m_popIndex(0), m_maxSz(sz)
+            ,m_readMask(0x01 << (8 * sizeof(size_t) - 1))
+            ,m_writeMask(m_readMask >> 1)
         {
             m_arr = new Type[sz];
         }
@@ -85,13 +87,15 @@ class LockFreeStack
 
                 if (old_top != old_pop) continue; 
 
-                if (atomic_cas(&m_top, old_pop, old_pop - 1)) break;
+                if (atomic_cas(&m_top, old_pop, m_readMask | (old_pop - 1))) break;
             } 
 
             ret = m_arr[old_pop - 1];
             m_arr[old_pop - 1] = (Type)0xcdcd;//for test, catch aba issue
 
-            atomic_decrement(&m_popIndex);
+            assert(atomic_cas(&m_popIndex, (~m_readMask)&(m_top + 1), (~m_readMask)&m_top));
+
+            m_top = m_top & (~m_readMask);
 
             if (val) *val = ret;
 
@@ -114,6 +118,8 @@ class LockFreeStack
         volatile size_t m_top;
         volatile size_t m_popIndex;
         const size_t m_maxSz;
+        const size_t m_readMask;
+        const size_t m_writeMask;
 };
 
 

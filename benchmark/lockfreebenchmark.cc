@@ -150,8 +150,8 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 1000000; //1 milion
-    const int consumerSz = 2, producerSz = 2;
+    const int maxSz = 100000000; //1 milion
+    const int consumerSz = 2, producerSz = 4;
 
     LockFreeConsumerTask consumer;
     LockFreeProducerTask prod(&consumer, &counter, maxSz - producerSz - 1);
