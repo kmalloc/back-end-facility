@@ -52,6 +52,15 @@ class LockFreeStack
                 if (old_pop != old_top) continue;
 
                 if (atomic_cas(&m_top, old_pop, old_pop + 1)) break; //aba issue still there, to be fixed.
+
+                //solution: 
+                //put a constraint that size of the stack is no larger then 0xffff for 32 bit version.
+                //then use upper two bytes of m_top to set flag.
+                //set up flag to indicate that writing/reading is being process.
+                //
+                //atomic_cas(&m_top, old_pop&0x0001ffff, 0xffff0000|(old_pop + 1))
+                //
+             
             }  
 
             m_arr[m_top - 1] = val;
@@ -80,7 +89,7 @@ class LockFreeStack
             } 
 
             ret = m_arr[old_pop - 1];
-            m_arr[old_pop - 1] = (Type)0xcc;//for test, catch aba issue
+            m_arr[old_pop - 1] = (Type)0xcdcd;//for test, catch aba issue
 
             atomic_decrement(&m_popIndex);
 
