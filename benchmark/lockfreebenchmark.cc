@@ -1,4 +1,5 @@
 #include "sys/atomic_ops.h"
+#include "misc/SpinlockQueue.h"
 #include "misc/LockFreeContainer.h"
 #include "thread/ITask.h"
 #include "thread/thread.h"
@@ -8,6 +9,7 @@
 #include <assert.h>
 #include <semaphore.h>
 
+#include <iostream>
 using namespace std;
 
 static void* gs_item = (void*)0x233;
@@ -16,10 +18,12 @@ class LockFreeConsumerTask: public ITask
 {
     public:
 
-        LockFreeConsumerTask()
-             :m_stop(false)
+        LockFreeConsumerTask(bool lock = false)
+             :m_lock(lock)
+             ,m_stop(false)
              ,m_count(0)
              ,m_box(4096)
+             ,m_lock_queue(4096)
         {
             sem_init(&m_sem, 0, 0);
         }
@@ -28,7 +32,7 @@ class LockFreeConsumerTask: public ITask
 
         bool PostItem(void* item = (void*)0x233)
         {
-            bool ret = m_box.Push(item);
+            bool ret = m_lock?m_lock_queue.PushBack(item):m_box.Push(item);
 
             if (ret) sem_post(&m_sem);
 
@@ -48,10 +52,9 @@ class LockFreeConsumerTask: public ITask
 
             void* item = NULL;
 
-            if (!m_box.Pop(&item)) 
-            {
-                return NULL;
-            }
+            bool ret = (!m_lock)?m_box.Pop(&item):m_lock_queue.PopFront(&item);
+            
+            if (!ret) return NULL;
 
             return item;
         }
@@ -71,7 +74,11 @@ class LockFreeConsumerTask: public ITask
                 else if (item == (void*)0x2233)
                     break;
 
-                if (item != (void*)0x233) 
+                if (item != (void*)0x233 
+                   && item != (void*)(0x233 + 1)
+                   && item != (void*)(0x233 + 2)
+                   && item != (void*)(0x233 + 3)
+                   && item != (void*)(0x233 + 4)) 
                 {
                     fprintf(stdout, "err,%x\n", item);
                     fflush(stdout);
@@ -88,10 +95,12 @@ class LockFreeConsumerTask: public ITask
 
     private:
 
+        const bool           m_lock;
         volatile bool        m_stop;
         volatile int         m_count;
         sem_t                m_sem;
-        LockFreeStack<void*> m_box;
+        LockFreeQueue<void*> m_box;
+        SpinlockQueue<void*> m_lock_queue;
 
 };
 
@@ -115,24 +124,26 @@ class LockFreeProducerTask: public ITask
 
         virtual void Run()
         {
+            int k = 0;
             while (!m_stop)
             {
                 if (*m_count >= m_max) break;
 
-                //printf("p(%d)\n", *m_count);
-
-                if (!m_consumer->PostItem()) 
+                if (!m_consumer->PostItem((void*)(k+0x233))) 
                 {
                     printf("full:%d\n", *m_count);
                     sched_yield();
                     continue;
                 }
 
+                k = (k+1)%5;
                 atomic_increment(m_count);
             }
 
+            while (!m_consumer->PostItem((void*)0x2233))
+                sched_yield();
+
             printf("q p\n");
-            m_consumer->PostItem((void*)0x2233);
         }
 
     private:
@@ -146,10 +157,15 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 10000; //1 milion
+    const int maxSz = 1000000000; //1 milion
     const int consumerSz = 2, producerSz = 4;
 
-    LockFreeConsumerTask consumer;
+    //string input;
+    //cout << "lock queue?(y/n):";
+    //cin >> input; 
+    //bool lock = (input == "y");
+
+    LockFreeConsumerTask consumer(false);
     LockFreeProducerTask prod(&consumer, &counter, maxSz - producerSz - 1);
 
     Thread* consumers[consumerSz];

@@ -32,10 +32,16 @@ class LockFreeStack
     public:
 
         LockFreeStack(size_t sz)
-            :m_top(0), m_popIndex(0), m_maxSz(sz)
+            :m_top(0)
+            ,m_maxSz(sz)
+            ,m_mask(0)
+            ,m_readMask(0xffff)
+            ,m_writeMask(m_readMask << 16)
+            ,m_maxConcurrentRead(0xff)
+            ,m_maxConcurrntWrite(0xff)
         {
             m_arr = new Type[sz];
-        }
+        } 
 
         ~LockFreeStack()
         {
@@ -44,74 +50,99 @@ class LockFreeStack
 
         bool Push(const Type& val)
         {
-            size_t old_top, old_pop;
+            size_t old_mask, append;
+            size_t old_top;
+            bool   ret = true;
 
-            while(1)
+            append = ((0x01) << 16);
+
+            while (1)
             {
-                old_top = m_top;
-                old_pop = m_popIndex;
+                old_mask = m_mask & (~m_readMask);
 
-                if (old_top == m_maxSz) return false;
+                if ((old_mask >> 16) >= (m_maxConcurrntWrite)) continue;
 
-                if (old_pop != old_top) 
-                {
-                    //sched_yield();
-                    continue;
-                }
-
-                if(__sync_bool_compare_and_swap(&m_top, *(&m_popIndex), *(&m_popIndex) + 1)) 
-                    break;
+                if(atomic_cas(&m_mask, old_mask, old_mask + 1)) break;
             } 
 
-            //printf("i:%d\n", m_top - 1);
+            //now the calling thread acquired 'write-lock'.
 
-            if (*(&m_top) - 1 != *(&m_popIndex))
+            //reserve a slog in stack.
+            while (1)
             {
-                fprintf(stdout, "i t:%d,p:%d\n", m_top, m_popIndex);
-                fflush(stdout);
+                old_top = m_top;
+
+                if (old_top == m_maxSz) 
+                {
+                    ret = false;
+                    break;
+                }
+
+                if (atomic_cas(&m_top, old_top, old_top + 1)) break;
             }
 
-            m_arr[m_top - 1] = val;
+            if (ret) m_arr[old_top] = val;
 
-            assert(__sync_bool_compare_and_swap(&m_popIndex, *(&m_top) - 1, *(&m_top)));
+            assert(m_mask & (~m_writeMask) == 0);
 
-            return true;
+            //release 'write-lock'
+            while (1)
+            {
+                old_mask = m_mask;
+
+                if (atomic_cas(&m_mask, old_mask, old_mask - append))
+                    break;
+            }
+
+            return ret;
         }
 
         bool Pop(Type* val)
         {
             Type ret;
+            bool   suc = true;
             size_t old_top;
-            size_t old_pop;
+            size_t old_mask, append = 0x01;
 
             while(1) 
             {
-                old_top = m_top;
-                old_pop = m_popIndex;
-                
-                if (old_top == 0) return false;
+                old_mask = m_mask & (~m_writeMask);
 
-                if (old_top != old_pop) continue; 
+                if (old_mask >= m_maxConcurrentRead) continue;
 
-                if (__sync_bool_compare_and_swap(&m_top, *(&m_popIndex), *(&m_popIndex) - 1))
-                    break;
+                if (atomic_cas(&m_mask, old_mask, old_mask + 1)) break;
             }  
 
-            //printf("o:%d\n", m_top);
-
-            if (m_top + 1 != m_popIndex)
+            while (1)
             {
-                fprintf(stdout, "o t:%d,p:%d\n", m_top, m_popIndex);
-                fflush(stdout);
+                old_top = m_top;
+
+                if (old_top == 0)
+                {
+                    suc = false;
+                    break;
+                }
+
+                if (atomic_cas(&m_top, old_top, old_top - 1)) break;
             }
 
-            ret = m_arr[m_top];
+            if (suc)
+            {
+                ret = m_arr[m_top];
+                m_arr[m_top] = (Type)0xcdcd; //to detech corruption.
+            }
+            
+            assert((m_mask & (~m_readMask)) == 0);
 
-            assert(__sync_bool_compare_and_swap(&m_popIndex, *(&m_top) + 1, *(&m_top)));
+            while (1)
+            {
+                old_mask = m_mask;
+                if (atomic_cas(&m_mask, old_mask, old_mask - append)) break;
+            }
 
             if (val) *val = ret;
 
-            return true;
+            return suc;
         }
 
         bool IsEmpty() const
@@ -128,8 +159,12 @@ class LockFreeStack
 
         Type*  m_arr;
         volatile size_t m_top;
-        volatile size_t m_popIndex;
         const size_t m_maxSz;
+        volatile size_t m_mask;
+        const size_t m_readMask;
+        const size_t m_writeMask;
+        const size_t m_maxConcurrentRead;
+        const size_t m_maxConcurrntWrite;
 };
 
 
@@ -165,11 +200,14 @@ class LockFreeQueue
 
                 if ((old_write + 1)%m_maxSz == old_read) return false;
 
-            } while(!__sync_bool_compare_and_swap(&m_write, old_write, (old_write + 1)%m_maxSz));
+            } while(!atomic_cas(&m_write, old_write, (old_write + 1)%m_maxSz));
 
             m_arr[old_write] = val;
             
-            while (!__sync_bool_compare_and_swap(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
+            //if calling thread dies or exits here, this queue will be in a abnormal state:
+            //subsequent read or write to it will make the calling thread hang forever.
+            //so, technically this lock free structure is not that true "lock free".
+            while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
 
             return true;
         }
@@ -190,7 +228,7 @@ class LockFreeQueue
 
                 ret = m_arr[old_read];
 
-            } while (!__sync_bool_compare_and_swap(&m_read, old_read, (old_read + 1)%m_maxSz));
+            } while (!atomic_cas(&m_read, old_read, (old_read + 1)%m_maxSz));
 
             if (val) *val = ret;
 
