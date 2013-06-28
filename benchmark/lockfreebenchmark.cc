@@ -14,16 +14,26 @@ using namespace std;
 
 static void* gs_item = (void*)0x233;
 
+template <class T>
+class LockQueue:public SpinlockQueue<T>
+{
+    public:
+        LockQueue(int sz = 2048): SpinlockQueue<T>(sz) {}
+
+        bool Push(const T& val) { return SpinlockQueue<T>::PushBack(val); }
+        bool Pop(T* val) { return SpinlockQueue<T>::PopFront(val); }
+};
+
+
+template <class CON>
 class LockFreeConsumerTask: public ITask
 {
     public:
 
-        LockFreeConsumerTask(bool lock = false)
-             :m_lock(lock)
-             ,m_stop(false)
+        LockFreeConsumerTask()
+             :m_stop(false)
              ,m_count(0)
-             ,m_box(4096)
-             ,m_lock_queue(4096)
+             ,m_queue(4096)
         {
             sem_init(&m_sem, 0, 0);
         }
@@ -39,7 +49,7 @@ class LockFreeConsumerTask: public ITask
 
         bool PostItem(void* item = (void*)0x233)
         {
-            bool ret = m_lock?m_lock_queue.PushBack(item):m_box.Push(item);
+            bool ret = m_queue.Push(item);
 
             //if (ret) assert(0 == sem_post(&m_sem));
 
@@ -52,7 +62,7 @@ class LockFreeConsumerTask: public ITask
 
             void* item = NULL;
 
-            bool ret = (!m_lock)?m_box.Pop(&item):m_lock_queue.PopFront(&item);
+            bool ret = m_queue.Pop(&item);
             
             if (!ret) return NULL;
 
@@ -80,7 +90,7 @@ class LockFreeConsumerTask: public ITask
                         && item != (void*)(0x233 + 3) 
                         && item != (void*)(0x233 + 4)) 
                 {
-                    fprintf(stdout, "err,%x\n", item);
+                    fprintf(stdout, "err,c:%d,v:%x\n", m_count, item);
                     fflush(stdout);
                     assert(0);
                 }
@@ -95,21 +105,19 @@ class LockFreeConsumerTask: public ITask
 
     private:
 
-        const bool           m_lock;
         volatile bool        m_stop;
         volatile int         m_count;
         sem_t                m_sem;
-        LockFreeQueue<void*> m_box;
-        SpinlockQueue<void*> m_lock_queue;
+        CON                  m_queue;
 
 };
 
-
+template<class CON>
 class LockFreeProducerTask: public ITask
 {
     public:
 
-        LockFreeProducerTask(LockFreeConsumerTask* consumer, volatile int* counter, volatile int max)
+        LockFreeProducerTask(LockFreeConsumerTask<CON>* consumer, volatile int* counter, volatile int max)
             :m_stop(false), m_count(counter), m_max(max), m_consumer(consumer) 
         {
         }
@@ -151,25 +159,56 @@ class LockFreeProducerTask: public ITask
         volatile bool       m_stop;
         volatile int*       m_count;
         volatile int        m_max;
-        LockFreeConsumerTask* m_consumer;
+        LockFreeConsumerTask<CON>* m_consumer;
 };
 
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 100000000; //1 milion
+    const int maxSz = 1000000; //1 milion
     const int consumerSz = 2, producerSz = 4;
 
-    //string input;
-    //cout << "lock queue?(y/n):";
-    //cin >> input; 
-    //bool lock = (input == "y");
+    
+    LockFreeConsumerTask<LockQueue<void*> > consumer_lock;
+    LockFreeConsumerTask<LockFreeStack<void*> > consumer_lf_stack;
+    LockFreeConsumerTask<LockFreeQueue<void*> > consumer_lf_queue;
 
-    LockFreeConsumerTask consumer(false);
-    LockFreeProducerTask prod(&consumer, &counter, maxSz - producerSz - 1);
+    LockFreeProducerTask<LockQueue<void*> > prod_lock(&consumer_lock, &counter, maxSz - producerSz - 1);
+    LockFreeProducerTask<LockFreeQueue<void*> > prod_lf_queue(&consumer_lf_queue, &counter, maxSz - producerSz - 1);
+    LockFreeProducerTask<LockFreeStack<void*> > prod_lf_stack(&consumer_lf_stack, &counter, maxSz - producerSz - 1);
 
     Thread* consumers[consumerSz];
     Thread* producers[producerSz];
+
+    int input;
+    cout << "select container:" << endl;
+    cout << "1. spin lock queue" << endl;
+    cout << "2. lock free queue" << endl;
+    cout << "3. lock free stack" << endl;
+
+    cout << "please input your choice:(1/2/3)" << endl;
+    cin >> input; 
+
+
+    ITask* consumer, *prod;  
+
+    switch (input)
+    {
+        case 1:
+            consumer = & consumer_lock;
+            prod     = & prod_lock;
+            break;
+        case 2:
+            consumer = &consumer_lf_queue;
+            prod     = &prod_lf_queue;
+            break;
+        case 3:
+            consumer = &consumer_lf_stack;
+            prod     = &prod_lf_stack;
+            break;
+        default:
+            assert(0);
+    }
 
     clock_t s, e;
 
@@ -177,13 +216,13 @@ int main()
 
     for (int i = 0; i < consumerSz; ++i)
     {
-        consumers[i] = new Thread(&consumer);
+        consumers[i] = new Thread(consumer);
         consumers[i]->Start();
     }
 
     for (int i = 0; i < producerSz; ++i)
     {
-        producers[i] = new Thread(&prod);
+        producers[i] = new Thread(prod);
         producers[i]->Start();
     }
 

@@ -58,11 +58,11 @@ class LockFreeStack
 
             while (1)
             {
-                old_mask = m_mask & (~m_readMask);
+                old_mask = (m_mask & (~m_readMask));
 
                 if ((old_mask >> 16) >= (m_maxConcurrntWrite)) continue;
 
-                if(atomic_cas(&m_mask, old_mask, old_mask + 1)) break;
+                if(atomic_cas(&m_mask, old_mask, old_mask + append)) break;
             } 
 
             //now the calling thread acquired 'write-lock'.
@@ -83,7 +83,7 @@ class LockFreeStack
 
             if (ret) m_arr[old_top] = val;
 
-            assert(m_mask & (~m_writeMask) == 0);
+            assert((m_mask & (~m_writeMask)) == 0);
 
             //release 'write-lock'
             while (1)
@@ -106,11 +106,11 @@ class LockFreeStack
 
             while(1) 
             {
-                old_mask = m_mask & (~m_writeMask);
+                old_mask = (m_mask & (~m_writeMask));
 
                 if (old_mask >= m_maxConcurrentRead) continue;
 
-                if (atomic_cas(&m_mask, old_mask, old_mask + 1)) break;
+                if (atomic_cas(&m_mask, old_mask, old_mask + append)) break;
             }  
 
             while (1)
@@ -128,8 +128,8 @@ class LockFreeStack
 
             if (suc)
             {
-                ret = m_arr[m_top];
-                m_arr[m_top] = (Type)0xcdcd; //to detech corruption.
+                ret = m_arr[old_top - 1];
+                m_arr[old_top - 1] = (Type)0xcdcd; //to detech corruption.
             }
             
             assert((m_mask & (~m_readMask)) == 0);
@@ -207,7 +207,8 @@ class LockFreeQueue
             //if calling thread dies or exits here, this queue will be in an abnormal state:
             //subsequent read or write to it will make the calling thread hang forever.
             //so, technically this lock free structure is not that true "lock free".
-            while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz));
+            while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz))
+                sched_yield();
 
             return true;
         }
