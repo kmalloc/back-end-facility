@@ -67,7 +67,7 @@ class LockFreeStack
 
             //now the calling thread acquired 'write-lock'.
 
-            //reserve a slog in stack.
+            //reserve a slot in stack.
             while (1)
             {
                 old_top = m_top;
@@ -204,7 +204,7 @@ class LockFreeQueue
 
             m_arr[old_write] = val;
             
-            //if calling thread dies or exits here, this queue will be in a abnormal state:
+            //if calling thread dies or exits here, this queue will be in an abnormal state:
             //subsequent read or write to it will make the calling thread hang forever.
             //so, technically this lock free structure is not that true "lock free".
             while (!atomic_cas(&m_maxRead, old_write, (old_write + 1)%m_maxSz));

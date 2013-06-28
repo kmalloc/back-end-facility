@@ -30,15 +30,6 @@ class LockFreeConsumerTask: public ITask
 
         ~LockFreeConsumerTask() {}
 
-        bool PostItem(void* item = (void*)0x233)
-        {
-            bool ret = m_lock?m_lock_queue.PushBack(item):m_box.Push(item);
-
-            if (ret) sem_post(&m_sem);
-
-            return ret;
-        }
-
         void StopRun()
         {
             if (!m_stop) m_stop = true;
@@ -46,9 +37,18 @@ class LockFreeConsumerTask: public ITask
             PostItem(NULL);
         }
 
+        bool PostItem(void* item = (void*)0x233)
+        {
+            bool ret = m_lock?m_lock_queue.PushBack(item):m_box.Push(item);
+
+            //if (ret) assert(0 == sem_post(&m_sem));
+
+            return ret;
+        }
+
         void* GetItem()
         {
-            sem_wait(&m_sem);
+            //sem_wait(&m_sem);
 
             void* item = NULL;
 
@@ -67,18 +67,18 @@ class LockFreeConsumerTask: public ITask
 
                 if (item == NULL)
                 {
-                    printf("empty\n");
+                    printf("emp\n");
                     sched_yield();
                     continue;
                 }
                 else if (item == (void*)0x2233)
                     break;
 
-                if (item != (void*)0x233 
-                   && item != (void*)(0x233 + 1)
-                   && item != (void*)(0x233 + 2)
-                   && item != (void*)(0x233 + 3)
-                   && item != (void*)(0x233 + 4)) 
+                if (item != (void*)0x233
+                        && item != (void*)(0x233 + 1) 
+                        && item != (void*)(0x233 + 2) 
+                        && item != (void*)(0x233 + 3) 
+                        && item != (void*)(0x233 + 4)) 
                 {
                     fprintf(stdout, "err,%x\n", item);
                     fflush(stdout);
@@ -131,12 +131,12 @@ class LockFreeProducerTask: public ITask
 
                 if (!m_consumer->PostItem((void*)(k+0x233))) 
                 {
-                    printf("full:%d\n", *m_count);
+                    printf("fu:%d\n", *m_count);
                     sched_yield();
                     continue;
                 }
 
-                k = (k+1)%5;
+                k = (k + 1)%5;
                 atomic_increment(m_count);
             }
 
@@ -157,7 +157,7 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 1000000000; //1 milion
+    const int maxSz = 100000000; //1 milion
     const int consumerSz = 2, producerSz = 4;
 
     //string input;

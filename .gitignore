@@ -10,3 +10,4 @@ cscope.*
 */unittest
 benchmark/lockfreebenchmark
 */core.*
+*/*.s
