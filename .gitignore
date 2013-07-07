@@ -3,11 +3,10 @@
 *.a
 *.o
 test*
-unittest/unittest
+*/unittest/unittest
 filenametags
 cscope.*
 *.swo
-*/unittest
 benchmark/lockfreebenchmark
 */core.*
 */*.s

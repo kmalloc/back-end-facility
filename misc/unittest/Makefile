@@ -26,7 +26,14 @@ thread.o : $(SRC_DIR)/thread/src/thread.cc
 SpinlockQueueTest.o : $(CUR_DIR)/SpinlockQueueTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = SpinlockQueueTest.o thread.o
+PerThreadMemory.o : $(SRC_DIR)/misc/PerThreadMemory.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/PerThreadMemory.cc $(SRC_HEAD) -I$(SRC_DIR)/misc
+
+PerThreadMemoryTest.o : $(CUR_DIR)/PerThreadMemoryTest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/PerThreadMemoryTest.cc $(GTEST_HEADERS) $(SRC_HEAD) -I$(SRC_DIR)/thread
+
+
+OBJS = SpinlockQueueTest.o thread.o PerThreadMemory.o PerThreadMemoryTest.o
 
 unittest : $(OBJS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lpthread -lrt -lgtest_main -o $(TESTS)
