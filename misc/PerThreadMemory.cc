@@ -16,6 +16,11 @@ struct NodeHead
     Node* next;
     void* buf;
     int   size;
+
+    const int m_population;
+    const int m_granularity;
+
+    NodeHead(int population, int granularity):m_population(population), m_granularity(granularity) {}
 };
 
 //TODO more advance padding.
@@ -63,7 +68,7 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     if (buf == NULL) return NULL;
 
-    NodeHead* pHead = new NodeHead;
+    NodeHead* pHead = new NodeHead(m_population, m_granularity);
 
     pHead->next = (Node*)buf;
     pHead->size = m_population;
@@ -115,6 +120,9 @@ void PerThreadMemoryAlloc::Cleaner(void* val)
 {
     NodeHead* pHead = (NodeHead*)val;
 
+    //make sure all buffers are released when cleaning up.
+    assert(pHead->size == pHead->m_population);
+    
     free(pHead->buf);
 
     delete pHead;
