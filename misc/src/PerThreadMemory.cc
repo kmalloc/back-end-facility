@@ -18,8 +18,8 @@ struct NodeHead
     Node* next;
     void* dummy;
 
-    void* buf;
-    int   size;
+    void* mem_frame;
+    int   node_number;
 
     const int m_population;
     const int m_granularity;
@@ -78,8 +78,8 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     NodeHead* pHead = new NodeHead(m_population, m_granularity);
 
     pHead->next = (Node*)buf;
-    pHead->size = m_population + 1;
-    pHead->buf  = buf;
+    pHead->node_number = m_population + 1;
+    pHead->mem_frame   = buf;
     
     Node* cur  = (Node*)buf;
 
@@ -105,11 +105,24 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 {
     if (pHead == NULL || pHead->next == NULL) return NULL;
 
-    Node* node = pHead->next;
-    void* buf  = node->data;
+    Node* node;
+    void* buf;
 
-    pHead->next = node->next;
-    pHead->size -= 1;
+    do
+    {
+        node = pHead->next;
+
+        //keep in mind, only owner thread will call this function.
+        //this is the foundamental prerequisite that the following line will not suffer from aba problem.
+        if (atomic_cas(&pHead->next, node, node->next))
+            break;
+
+    } while(1);
+
+    buf = node->data;
+    atomic_decrement(&pHead->node_number);
+
+    assert(pHead->node_number >= 0);
     return buf;
 }
 
@@ -130,7 +143,11 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     do
     {
         old_head = pHead->next;
-        old_size = pHead->size;
+        old_size = pHead->node_number;
+
+        //make current node points to the old head node.
+        //this should be done before cas.
+        node->next = old_head;
 
         // this is an enqueue operation, aba problem is not an issue.
         // and since only owner thread is allowed to dequeue(calling AllocBuffer()),
@@ -140,14 +157,13 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 
     } while(1);
 
-    node->next = old_head;
     if (old_size == population)
     {
         Cleaner(pHead);
         return;
     }
 
-    atomic_increment(&pHead->size);
+    atomic_increment(&pHead->node_number);
 }
 
 /*
@@ -170,9 +186,9 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     NodeHead* pHead = val;
 
     //make sure all buffers are released when cleaning up.
-    assert(pHead->size == pHead->m_population);
+    assert(pHead->node_number == pHead->m_population);
     
-    free(pHead->buf);
+    free(pHead->mem_frame);
 
     delete pHead;
 }
@@ -180,10 +196,9 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
 bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 {
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
-    if (pHead == NULL || pHead->size < m_population) return false;
+    if (pHead == NULL || pHead->node_number < m_population) return false;
 
-    Cleaner(pHead);
-
+    DoReleaseBuffer(pHead->dummy);
     pthread_setspecific(m_key, NULL);
 }
 
@@ -192,6 +207,6 @@ int PerThreadMemoryAlloc::Size() const
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     if (pHead == NULL) return 0;
 
-    return pHead->size;
+    return pHead->node_number;
 }
 
