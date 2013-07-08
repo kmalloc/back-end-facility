@@ -17,7 +17,6 @@ struct NodeHead
 {
     Node* next;
     void* dummy;
-    PerThreadMemoryAlloc* alloc;
 
     void* buf;
     int   size;
@@ -44,7 +43,8 @@ inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
 }
 
 PerThreadMemoryAlloc::PerThreadMemoryAlloc(int granularity, int population)
-    :m_granularity(granularity + sizeof(int) - granularity%sizeof(int)), m_population(population), m_key(0)
+    :m_granularity(granularity + sizeof(int) - granularity%sizeof(int))
+    ,m_population(population), m_key(0)
 {
     Init();
 }
@@ -58,6 +58,9 @@ void PerThreadMemoryAlloc::Init()
     pthread_key_create(&m_key, &PerThreadMemoryAlloc::OnThreadExit);
 }
 
+/*
+ *this function will be called from the owner thread only, so it is safe.
+ */
 void* PerThreadMemoryAlloc::AllocBuffer()
 {
     NodeHead* pHead = NULL;
@@ -74,7 +77,6 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     NodeHead* pHead = new NodeHead(m_population, m_granularity);
 
-    pHead->alloc = this;
     pHead->next = (Node*)buf;
     pHead->size = m_population + 1;
     pHead->buf  = buf;
@@ -129,6 +131,10 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     {
         old_head = pHead->next;
         old_size = pHead->size;
+
+        // this is an enqueue operation, aba problem is not an issue.
+        // and since only owner thread is allowed to dequeue(calling AllocBuffer()),
+        // there is no chance to have aba problem.
         if (atomic_cas(&pHead->next, old_head, node))
             break;
 
@@ -144,6 +150,10 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     atomic_increment(&pHead->size);
 }
 
+/*
+ *this function will be called across different threads.
+ *so need to apply extra care to make it work as expected.
+ */
 void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
 {
     DoReleaseBuffer(buf);
