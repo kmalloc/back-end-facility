@@ -32,15 +32,14 @@ class PerThreadMemoryAlloc
         void  ReleaseBuffer(void*);
         int   Size() const; 
         int   Granularity() const { return m_granularity; }
-        void  FreeCurThreadMemory();
-
-        static void OnThreadExit(void*);
+        bool  FreeCurThreadMemory();
 
         pthread_key_t GetPerThreadKey() const { return m_key; }
 
     private:
 
         void Init();
+        static void OnThreadExit(void*);
         static void DoReleaseBuffer(void*);
         static void Cleaner(NodeHead*);
         

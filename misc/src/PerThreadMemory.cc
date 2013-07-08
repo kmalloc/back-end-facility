@@ -177,10 +177,10 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     delete pHead;
 }
 
-void PerThreadMemoryAlloc::FreeCurThreadMemory()
+bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 {
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
-    if (pHead == NULL) return;
+    if (pHead == NULL || pHead->size < m_population) return false;
 
     Cleaner(pHead);
 
