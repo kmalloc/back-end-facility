@@ -26,8 +26,8 @@ thread.o : $(SRC_DIR)/thread/src/thread.cc
 SpinlockQueueTest.o : $(CUR_DIR)/SpinlockQueueTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-PerThreadMemory.o : $(SRC_DIR)/misc/PerThreadMemory.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/PerThreadMemory.cc $(SRC_HEAD) -I$(SRC_DIR)/misc
+PerThreadMemory.o : $(SRC_DIR)/misc/src/PerThreadMemory.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/src/PerThreadMemory.cc $(SRC_HEAD) -I$(SRC_DIR)/misc
 
 PerThreadMemoryTest.o : $(CUR_DIR)/PerThreadMemoryTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/PerThreadMemoryTest.cc $(GTEST_HEADERS) $(SRC_HEAD) -I$(SRC_DIR)/thread
