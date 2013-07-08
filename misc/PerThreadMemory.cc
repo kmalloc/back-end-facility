@@ -1,4 +1,5 @@
 #include "PerThreadMemory.h"
+#include "sys/atomic_ops.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 struct Node
 {
     Node*  next;
+    NodeHead* head;
     unsigned char padding[sizeof(void*)];
     char   data[0];
 };
@@ -14,6 +16,9 @@ struct Node
 struct NodeHead
 {
     Node* next;
+    void* dummy;
+    PerThreadMemoryAlloc* alloc;
+
     void* buf;
     int   size;
 
@@ -35,7 +40,6 @@ inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
     {
         if (buf[i] != 0xcd) return true;
     }
-
     return false;
 }
 
@@ -51,7 +55,7 @@ PerThreadMemoryAlloc::~PerThreadMemoryAlloc()
 
 void PerThreadMemoryAlloc::Init()
 {
-    pthread_key_create(&m_key, &PerThreadMemoryAlloc::Cleaner);
+    pthread_key_create(&m_key, &PerThreadMemoryAlloc::OnThreadExit);
 }
 
 void* PerThreadMemoryAlloc::AllocBuffer()
@@ -70,23 +74,28 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     NodeHead* pHead = new NodeHead(m_population, m_granularity);
 
+    pHead->alloc = this;
     pHead->next = (Node*)buf;
-    pHead->size = m_population;
+    pHead->size = m_population + 1;
     pHead->buf  = buf;
     
     Node* cur  = (Node*)buf;
 
-    for (int i = 0; i < m_population - 1; ++i)
+    for (int i = 0; i < m_population; ++i)
     {
+        cur->head = pHead;
         cur->next = (Node*)((char*)cur + sizeof(Node) + m_granularity);
         FillPadding(cur->padding, sizeof(void*));
         cur = cur->next;
     }
 
     cur->next = NULL;
+    cur->head = pHead;
     FillPadding(cur->padding, sizeof(void*));
 
     pthread_setspecific(m_key, pHead);
+
+    pHead->dummy = GetFreeBufferFromList(pHead);
     return pHead;
 }
 
@@ -102,23 +111,53 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
     return buf;
 }
 
-void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
+void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
 
     if (node == NULL || IsPaddingCorrupt((unsigned char*)buf - sizeof(void*), sizeof(void*))) assert(0);
     
-    NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
+    //NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
+    NodeHead* pHead = node->head;
     if (pHead == NULL) return;
 
-    node->next = pHead->next;
-    pHead->next = node;
-    pHead->size += 1;
+    int   population = pHead->m_population;
+    int   old_size;
+    Node* old_head;
+
+    do
+    {
+        old_head = pHead->next;
+        old_size = pHead->size;
+        if (atomic_cas(&pHead->next, old_head, node))
+            break;
+
+    } while(1);
+
+    node->next = old_head;
+    if (old_size == population)
+    {
+        Cleaner(pHead);
+        return;
+    }
+
+    atomic_increment(&pHead->size);
 }
 
-void PerThreadMemoryAlloc::Cleaner(void* val)
+void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
+{
+    DoReleaseBuffer(buf);
+}
+
+void PerThreadMemoryAlloc::OnThreadExit(void* val)
 {
     NodeHead* pHead = (NodeHead*)val;
+    DoReleaseBuffer(pHead->dummy);
+}
+
+void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
+{
+    NodeHead* pHead = val;
 
     //make sure all buffers are released when cleaning up.
     assert(pHead->size == pHead->m_population);

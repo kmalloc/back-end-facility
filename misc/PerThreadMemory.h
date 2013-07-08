@@ -6,11 +6,19 @@
 class NodeHead;
 
 /*
- * due to short cut design, please be aware:
- *a) all buffers will be free on thread exit, 
-     so please be sure to release buffer you allocated from this class.
-  b) Call FreeCurThreadMemory() to release all Per thread memory owned 
-     by ucrrent thread if you want to release some resource.
+ * usage:
+ * a)call AllocBuffer() to get buffer.
+ * b)call ReleaseBuffer() to release buffer.
+ * buffer can be accessed accoss multiple thread, it is safe to do that.
+ *
+ * buffers will be free only when:
+ * a) thread exits AND all buffers are released.
+ * b) last buffer released and the owner thread is exited.
+ * c) thread that creates the buffer owns the buffer. 
+ *    when buffer is released, it will be put into list of the owner.
+ *
+ * dummy buffer in NodeHead will be release only when current thread exits, ensuring that
+ * when the last buffer is released by other thread, all buffers will be free.
  */
 
 class PerThreadMemoryAlloc
@@ -26,13 +34,15 @@ class PerThreadMemoryAlloc
         int   Granularity() const { return m_granularity; }
         void  FreeCurThreadMemory();
 
-        static void Cleaner(void*);
+        static void OnThreadExit(void*);
 
         pthread_key_t GetPerThreadKey() const { return m_key; }
 
     private:
 
         void Init();
+        static void DoReleaseBuffer(void*);
+        static void Cleaner(NodeHead*);
         
         NodeHead* InitPerThreadList();
         void* GetFreeBufferFromList(NodeHead*);        
