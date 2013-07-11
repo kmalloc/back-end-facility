@@ -13,6 +13,10 @@ struct Node
     char   data[0];
 };
 
+/*
+ * dummy buffer in NodeHead will be released only when current thread exits, ensuring that
+ * when the last buffer is released by other thread, all buffers will be free.
+ */
 struct NodeHead
 {
     Node* next;
@@ -59,7 +63,7 @@ void PerThreadMemoryAlloc::Init()
 }
 
 /*
- *this function will be called from the owner thread only, so it is safe.
+ * thread calling this function will access the list for its own.
  */
 void* PerThreadMemoryAlloc::AllocBuffer()
 {
@@ -101,6 +105,9 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     return pHead;
 }
 
+// note:
+// pHead is different from thread to thread.
+// for each list, only the owner thread will have permission to dequeue.
 void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 {
     if (pHead == NULL || pHead->next == NULL) return NULL;
@@ -112,7 +119,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
     {
         node = pHead->next;
 
-        //keep in mind, only owner thread will call this function.
+        //keep in mind, only owner thread will dequeue the list.
         //this is the foundamental prerequisite that the following line will not suffer from aba problem.
         if (atomic_cas(&pHead->next, node, node->next))
             break;
@@ -126,6 +133,9 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
     return buf;
 }
 
+// put the buffer back to the list.
+// note:
+// buffer is allowed to share among threads.
 void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
@@ -185,7 +195,7 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
 {
     NodeHead* pHead = val;
 
-    //make sure all buffers are released when cleaning up.
+    // make sure all buffers are released when cleaning up.
     assert(pHead->node_number == pHead->m_population);
     
     free(pHead->mem_frame);
@@ -193,6 +203,9 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     delete pHead;
 }
 
+/*
+ * free the memory if no buffer is allocated.
+ */
 bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 {
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
@@ -200,8 +213,11 @@ bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 
     DoReleaseBuffer(pHead->dummy);
     pthread_setspecific(m_key, NULL);
+
+    return true;
 }
 
+// buffers that are available at the moment.
 int PerThreadMemoryAlloc::Size() const
 {
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
