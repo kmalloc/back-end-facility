@@ -5,8 +5,8 @@
 
 struct ListNode
 {
-    ListNode* next;
     void* data;
+    ListNode* next;
 };
 
 ListQueue::ListQueue()
@@ -18,11 +18,13 @@ ListQueue::ListQueue()
 
 ListQueue::~ListQueue()
 {
-    // TODO pop all nodes.
-    // must do that, otherwise per thread memory is never going to be released.
-   delete m_in; 
-}
+    // Pop out all data, must do that,
+    // otherwise per thread memory is never going to be released.
+    void* data;
+    while (Pop(&data));
 
+    delete m_in; 
+}
 
 ListNode* ListQueue::AllocNode()
 {
@@ -42,7 +44,7 @@ bool ListQueue::Push(void* data)
     
     node->data = data;
 
-    ListNode* in, *next;
+    ListNode* in, * next;
 
     while (1)
     {
@@ -77,6 +79,8 @@ bool ListQueue::Pop(void*& data)
 
         if (in == out) atomic_cas(&m_in, in, next);
 
+        // next may have been released, but it is ok to read.
+        // but do not write to it.
         data = next->data;
 
         if (atomic_cas(&m_out, out, next)) break;
