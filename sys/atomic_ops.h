@@ -9,16 +9,21 @@
 #define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
 
 #if defined(__x86_64__)
+#include <stdint.h>
 
 struct atomic_uint128
 {
-    unsigned uint64_t lo;
-    unsigned uint64_t hi;
+    uint64_t lo;
+    uint64_t hi;
 } __attribute__((aligned(16)));
-
 
 inline bool atomic_cas_16(volatile atomic_uint128* src, atomic_uint128 oldVal, atomic_uint128 newVal)
 {
+    // intel ia32-64 developer manual, vol.2a 3-149.
+    // cmpxchg16b m128.
+    // compare rdx:rax with m128, if equal , set zf, and 
+    // load rcx:rbx into m128,
+    // else, clear zf and, load m128 into rdx:rax
     bool result;
     __asm__ __volatile__
         (
