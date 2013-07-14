@@ -10,11 +10,14 @@ class ListQueue
 {
     public:
 
-        ListQueue();
+        ListQueue(size_t capacity = 0);
         ~ListQueue();
 
         bool Push(void* data);
         bool Pop(void*& data);
+        bool Pop(void** data);
+        size_t Size() const { return m_no; }
+        bool IsEmpty() const { return m_no == 0; }
 
     private:
 
@@ -22,6 +25,8 @@ class ListQueue
         void ReleaseNode(ListNode*);
 
         size_t    m_id;
+        size_t    m_no;
+        const size_t m_max;
         DoublePointer m_in;
         DoublePointer m_out;
 

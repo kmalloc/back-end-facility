@@ -16,7 +16,7 @@ CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 EXE = lockfreebenchmark
 
-OBJECTS = $(OUT)/lockfreebenchmark.o
+OBJECTS = $(OUT)/lockfreebenchmark.o $(OUT)/lock-free-list.o $(OUT)/PerThreadMemory.o
 
 all : $(EXE)
 
@@ -25,6 +25,11 @@ $(OBJECTS): | $(OUT)
 $(OUT):
 	mkdir -p $(OUT)
 
+$(OUT)/lock-free-list.o : $(SRC_DIR)/misc/src/lock-free-list.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/src/lock-free-list.cc $(HEADER) -o $(OUT)/lock-free-list.o
+
+$(OUT)/PerThreadMemory.o : $(SRC_DIR)/misc/src/PerThreadMemory.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/src/PerThreadMemory.cc $(HEADER) -o $(OUT)/PerThreadMemory.o
 $(OUT)/lockfreebenchmark.o : lockfreebenchmark.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c lockfreebenchmark.cc $(HEADER) -o $(OUT)/lockfreebenchmark.o
 

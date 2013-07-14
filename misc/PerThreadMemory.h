@@ -58,7 +58,7 @@ class PerThreadMemoryAlloc
 
         const int m_granularity;
         const int m_population;
-
+        
         pthread_key_t m_key;
 };
 

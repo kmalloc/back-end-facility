@@ -7,12 +7,14 @@ struct ListNode
     DoublePointer next;
 };
 
-ListQueue::ListQueue()
+ListQueue::ListQueue(size_t capacity)
     :m_alloc(sizeof(ListNode), 1024)
     ,m_id(0)
+    ,m_no(0)
+    ,m_max(capacity)
 {
-    ListNode* tmp = new ListNode();
-
+    ListNode* tmp = AllocNode();
+    assert(tmp);
     SetDoublePointer(m_in, (void*)m_id, tmp);
     m_id = 1;
     m_out = m_in;
@@ -69,6 +71,8 @@ bool ListQueue::Push(void* data)
 
     atomic_cas2(&m_in, in, new_node);
     
+    assert(new_node.hi);
+
     return true;
 }
 
@@ -95,5 +99,11 @@ bool ListQueue::Pop(void*& data)
 
     ReleaseNode((ListNode*)(out.hi));
     return true;
+}
+bool ListQueue::Pop(void** data)
+{
+    if (data == NULL) return false;
+
+    return Pop(*data);
 }
 

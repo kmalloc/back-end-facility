@@ -1,6 +1,7 @@
 #include "sys/atomic_ops.h"
 #include "misc/SpinlockQueue.h"
 #include "misc/LockFreeContainer.h"
+#include "misc/lock-free-list.h"
 #include "thread/ITask.h"
 #include "thread/thread.h"
 
@@ -172,10 +173,13 @@ int main()
     LockFreeConsumerTask<LockQueue<void*> > consumer_lock;
     LockFreeConsumerTask<LockFreeStack<void*> > consumer_lf_stack;
     LockFreeConsumerTask<LockFreeQueue<void*> > consumer_lf_queue;
+    LockFreeConsumerTask<ListQueue> consumer_lf_list_queue;
 
     LockFreeProducerTask<LockQueue<void*> > prod_lock(&consumer_lock, &counter, maxSz - producerSz - 1);
     LockFreeProducerTask<LockFreeQueue<void*> > prod_lf_queue(&consumer_lf_queue, &counter, maxSz - producerSz - 1);
     LockFreeProducerTask<LockFreeStack<void*> > prod_lf_stack(&consumer_lf_stack, &counter, maxSz - producerSz - 1);
+
+    LockFreeProducerTask<ListQueue> prod_lf_list_queue(&consumer_lf_list_queue, &counter, maxSz - producerSz - 1);
 
     Thread* consumers[consumerSz];
     Thread* producers[producerSz];
@@ -185,8 +189,9 @@ int main()
     cout << "1. spin lock queue" << endl;
     cout << "2. lock free queue" << endl;
     cout << "3. lock free stack" << endl;
+    cout << "4. list based lock free queue" << endl;
 
-    cout << "please input your choice:(1/2/3)" << endl;
+    cout << "please input your choice:(1/2/3/4)" << endl;
     cin >> input; 
 
 
@@ -205,6 +210,10 @@ int main()
         case 3:
             consumer = &consumer_lf_stack;
             prod     = &prod_lf_stack;
+            break;
+        case 4:
+            consumer = &consumer_lf_list_queue;
+            prod     = &prod_lf_list_queue;
             break;
         default:
             assert(0);

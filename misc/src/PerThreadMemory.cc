@@ -182,6 +182,15 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
  */
 void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
 {
+    // support free operation from other thread.
+    // the following check code is not going work.
+    /*
+    NodeHead* head = (NodeHead*)pthread_getspecific(m_key);
+    if (head == NULL) return;
+
+    assert(buf > head->mem_frame && buf < head->mem_frame + head->m_granularity * head->m_population);
+    */
+
     DoReleaseBuffer(buf);
 }
 
