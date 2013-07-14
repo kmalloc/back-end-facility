@@ -8,16 +8,20 @@
 #define atomic_increment(ptr)    __sync_fetch_and_add(ptr, 1)
 #define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
 
-#if defined(__x86_64__)
+
 #include <stdint.h>
 
-struct atomic_uint128
+#if defined(__x86_64__)
+
+struct DoublePointer
 {
-    uint64_t lo;
-    uint64_t hi;
+    void* lo;
+    void* hi;
 } __attribute__((aligned(16)));
 
-inline bool atomic_cas_16(volatile atomic_uint128* src, atomic_uint128 oldVal, atomic_uint128 newVal)
+typedef DoublePointer atomic_uint128;
+
+inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, DoublePointer newVal)
 {
     // intel ia32-64 developer manual, vol.2a 3-149.
     // cmpxchg16b m128.
@@ -40,7 +44,42 @@ inline bool atomic_cas_16(volatile atomic_uint128* src, atomic_uint128 oldVal, a
     return result;
 }
 
+#define atomic_cas2(ptr, oldVal, newVal)   atomic_cas_16(ptr, oldVal, newVal)
+
+#else
+
+struct DoublePointer
+{
+    void* lo;
+    void* hi;
+    operator uint64_t() { return *(uint64_t*)this; }
+} __attribute__((aligned(8)));
+
+#define atomic_cas2(ptr, oldVal, newVal)  atomic_cas(((uint64_t*)ptr), ((uint64_t)oldVal), ((uint64_t)newVal))
+
 #endif // x86-64
+
+inline void InitDoublePointer(DoublePointer& dp)
+{
+    dp.lo = (void*)0;
+    dp.hi = (void*)0;
+}
+
+inline bool IsDoublePointerNull(const DoublePointer& dp)
+{
+    return (dp.lo == (void*)0 && dp.hi == (void*)0);
+}
+
+inline bool IsDoublePointerEqual(const DoublePointer& dp1, const DoublePointer& dp2)
+{
+    return ((dp1.lo == dp2.lo) && (dp1.hi == dp2.hi));
+}
+
+inline void SetDoublePointer(DoublePointer& dp, void* lo, void* hi)
+{
+    dp.lo = lo;
+    dp.hi = hi;
+}
 
 #endif //_ATMOMIC_H_
 

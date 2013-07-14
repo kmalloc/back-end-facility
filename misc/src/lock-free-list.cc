@@ -1,18 +1,20 @@
 #include "lock-free-list.h"
-#include "sys/atomic_ops.h"
-
 #include <assert.h>
 
 struct ListNode
 {
     void* data;
-    ListNode* next;
+    DoublePointer next;
 };
 
 ListQueue::ListQueue()
-    :m_no(0), m_alloc(sizeof(ListNode), 1024)
+    :m_alloc(sizeof(ListNode), 1024)
+    ,m_id(0)
 {
-    m_in = new ListNode();
+    ListNode* tmp = new ListNode();
+
+    SetDoublePointer(m_in, (void*)m_id, tmp);
+    m_id = 1;
     m_out = m_in;
 }
 
@@ -21,9 +23,9 @@ ListQueue::~ListQueue()
     // Pop out all data, must do that,
     // otherwise per thread memory is never going to be released.
     void* data;
-    while (Pop(&data));
+    while (Pop(data));
 
-    delete m_in; 
+    delete (ListNode*)m_in.hi; 
 }
 
 ListNode* ListQueue::AllocNode()
@@ -43,53 +45,55 @@ bool ListQueue::Push(void* data)
     if (node == NULL) return false;
     
     node->data = data;
+    InitDoublePointer(node->next);
 
-    ListNode* in, * next;
+    DoublePointer in, next;
+    DoublePointer new_node;
+
+    size_t id = atomic_increment(&m_id);
+    SetDoublePointer(new_node, (void*)id, node);
 
     while (1)
     {
         in = m_in;
-        next = in->next;
+        next = ((ListNode*)(in.hi))->next;
 
-        if (next != NULL) 
+        if (!IsDoublePointerNull(next)) 
         {
-            atomic_cas(&m_in, in, next);
+            atomic_cas2(&m_in, in, next);
             continue;
         }
 
-        if (&atomic_cas(&in->next, NULL, node)) break;
+        if (atomic_cas2(&(((ListNode*)(in.hi))->next), 0, new_node)) break;
     }
 
-    atomic_cas(&m_in, in, node);
+    atomic_cas2(&m_in, in, new_node);
     
     return true;
 }
 
 bool ListQueue::Pop(void*& data)
 {
-    ListNode* out, * next;
+    DoublePointer out, in, next;
 
     while (1)
     {
         out  = m_out;
         in   = m_in;
-        next = out->next;
+        next = ((ListNode*)(out.hi))->next;
         
-        if (next == NULL) return false;
+        if (IsDoublePointerNull(next)) return false;
 
-        if (in == out) atomic_cas(&m_in, in, next);
+        if (IsDoublePointerEqual(in, out)) atomic_cas2(&m_in, in, next);
 
-        // next may have been released, but it is ok to read.
+        // next node may have been released, but it is ok to read.
         // but do not write to it.
-        data = next->data;
+        data = ((ListNode*)(next.hi))->data;
 
-        if (atomic_cas(&m_out, out, next)) break;
+        if (atomic_cas2(&m_out, out, next)) break;
     }
 
-    // ABA problem still there.
-    // TODO: fix it.
-    ReleaseNode(out);
+    ReleaseNode((ListNode*)(out.hi));
     return true;
 }
-
 
