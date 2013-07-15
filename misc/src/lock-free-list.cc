@@ -30,7 +30,7 @@ ListQueue::~ListQueue()
     void* data;
     while (Pop(data));
 
-    delete (ListNode*)m_in.hi; 
+    ReleaseNode((ListNode*)(m_in.hi)); 
 }
 
 ListNode* ListQueue::AllocNode()

@@ -24,7 +24,7 @@ class ListQueue
         ListNode* AllocNode();
         void ReleaseNode(ListNode*);
 
-        volatile size_t    m_id;
+        volatile size_t m_id;
         size_t    m_no;
         const size_t m_max;
         DoublePointer m_in;

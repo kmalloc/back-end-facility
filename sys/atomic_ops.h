@@ -1,12 +1,73 @@
 #ifndef _ATMOMIC_H_
 #define _ATMOMIC_H_
 
+#define ENABLE_GCC_PRIMITIVE 0
+
 #define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
+
+#if ENABLE_GCC_PRIMITIVE
 
 #define atomic_add(ptr, margin)  __sync_fetch_and_add(ptr, margin)
 #define atomic_sub(ptr, margin)  __sync_fetch_and_sub(ptr, margin)
 #define atomic_increment(ptr)    __sync_fetch_and_add(ptr, 1)
 #define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
+
+#else
+
+#include <stdlib.h>
+inline int atomic_add(volatile int * val, int gap)
+{
+    int oldval;
+    int newval;
+
+    do
+    {
+        oldval = *val;
+        newval = oldval + gap;
+    } while (!atomic_cas(val, oldval, newval));
+
+    return oldval;
+}
+
+inline int atomic_increment(volatile int * val)
+{
+    return atomic_add(val, 1);
+}
+
+inline int atomic_decrement(volatile int * val)
+{
+    return atomic_add(val, -1);
+}
+
+inline size_t atomic_increment(volatile size_t* val)
+{
+    size_t old_val;
+    size_t new_val;
+
+    do
+    {
+        old_val = *val;
+        new_val = old_val + 1;
+    } while (!atomic_cas(val, old_val, new_val));
+
+    return old_val;
+}
+
+inline size_t atomic_decrement(volatile size_t* val)
+{
+    size_t old_val;
+    size_t new_val;
+
+    do
+    {
+        old_val = *val;
+        new_val = old_val - 1;
+    } while (!atomic_cas(val, old_val, new_val));
+
+    return old_val;
+}
+
+#endif //  ENABLE_GCC_PRIMITIVE
 
 
 #include <stdint.h>
