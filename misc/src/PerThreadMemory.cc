@@ -5,11 +5,14 @@
 #include <stdlib.h>
 #include <assert.h>
 
+static const size_t gs_padding_sz = 8;
+static const unsigned char gs_padding_char[2] = { 0x32, 0x23 };
+
 struct Node
 {
     Node* volatile next;
     NodeHead* volatile head;
-    unsigned char padding[sizeof(void*)];
+    unsigned char padding[gs_padding_sz];
     char   data[0];
 };
 
@@ -31,20 +34,25 @@ struct NodeHead
     NodeHead(int population, int granularity):m_population(population), m_granularity(granularity) {}
 };
 
-static const unsigned char gs_padding_char = 0x23;
-
 //TODO more advance padding.
-inline void FillPadding(void* buf, int sz)
+static inline void FillPadding(void* buf, int sz)
 {
-    memset(buf, gs_padding_char, sz);
+    memset(buf, gs_padding_char[0], sz/2);
+    memset(buf + sz/2, gs_padding_char[1], sz/2);
 }
 
-inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
+static inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
 {
-    for (int i = 0; i < sz; ++i)
+    for (int i = 0; i < sz/2; ++i)
     {
-        if (buf[i] != gs_padding_char) return true;
+        if (buf[i] != gs_padding_char[0]) return true;
     }
+
+    for (int i = sz/2; i < sz; ++i)
+    {
+        if (buf[i] != gs_padding_char[1]) return true;
+    }
+
     return false;
 }
 
@@ -77,7 +85,7 @@ void* PerThreadMemoryAlloc::AllocBuffer()
 
 NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 {
-    size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
+    const size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
 
     char* buf = (char*)malloc(sz);
     char* end_buf = buf + sz;
@@ -96,7 +104,7 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     {
         cur->head = pHead;
         cur->next = (Node*)((char*)cur + sizeof(Node) + m_granularity);
-        FillPadding(cur->padding, sizeof(void*));
+        FillPadding(cur->padding, gs_padding_sz);
         cur = cur->next;
     }
     
@@ -104,7 +112,7 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     cur->next = NULL;
     cur->head = pHead;
-    FillPadding(cur->padding, sizeof(void*));
+    FillPadding(cur->padding, gs_padding_sz);
 
     pthread_setspecific(m_key, pHead);
 
@@ -140,7 +148,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 
     buf = node->data;
 
-    //int no = atomic_decrement(&pHead->node_number);
+    int no = atomic_decrement(&pHead->node_number);
     //assert(no > 0);
 
     return buf;
@@ -153,7 +161,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
 
-    if (node == NULL || IsPaddingCorrupt((unsigned char*)buf - sizeof(void*), sizeof(void*))) assert(0);
+    if (node == NULL || IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz)) assert(0);
     
     // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     NodeHead* pHead = node->head;
