@@ -78,7 +78,7 @@ class LockFreeConsumerTask: public ITask
 
                 if (item == NULL)
                 {
-                    printf("emp\n");
+                   // printf("emp\n");
                     sched_yield();
                     continue;
                 }
@@ -140,7 +140,7 @@ class LockFreeProducerTask: public ITask
 
                 if (!m_consumer->PostItem((void*)(k+0x233))) 
                 {
-                    printf("fu:%d\n", *m_count);
+                   // printf("fu:%d\n", *m_count);
                     sched_yield();
                     continue;
                 }

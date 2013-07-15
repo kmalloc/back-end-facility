@@ -7,8 +7,8 @@
 
 struct Node
 {
-    Node*  next;
-    NodeHead* head;
+    Node* volatile next;
+    NodeHead* volatile head;
     unsigned char padding[sizeof(void*)];
     char   data[0];
 };
@@ -19,11 +19,11 @@ struct Node
  */
 struct NodeHead
 {
-    Node* next;
+    Node* volatile next;
     void* dummy;
 
     void* mem_frame;
-    int   node_number;
+    volatile int node_number;
 
     const int m_population;
     const int m_granularity;
@@ -31,17 +31,19 @@ struct NodeHead
     NodeHead(int population, int granularity):m_population(population), m_granularity(granularity) {}
 };
 
+static const unsigned char gs_padding_char = 0x23;
+
 //TODO more advance padding.
 inline void FillPadding(void* buf, int sz)
 {
-    memset(buf, 0xcd, sz);
+    memset(buf, gs_padding_char, sz);
 }
 
 inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
 {
     for (int i = 0; i < sz; ++i)
     {
-        if (buf[i] != 0xcd) return true;
+        if (buf[i] != gs_padding_char) return true;
     }
     return false;
 }
@@ -75,7 +77,10 @@ void* PerThreadMemoryAlloc::AllocBuffer()
 
 NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 {
-    void* buf = (Node*)malloc((sizeof(Node) + m_granularity) * (m_population + 1));
+    size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
+
+    char* buf = (char*)malloc(sz);
+    char* end_buf = buf + sz;
 
     if (buf == NULL) return NULL;
 
@@ -94,6 +99,8 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
         FillPadding(cur->padding, sizeof(void*));
         cur = cur->next;
     }
+    
+    assert((char*)cur + sizeof(Node) + m_granularity == end_buf);
 
     cur->next = NULL;
     cur->head = pHead;
@@ -110,7 +117,9 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 // for each list, only the owner thread will have permission to dequeue.
 void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 {
-    if (pHead == NULL || pHead->next == NULL) return NULL;
+    assert(pHead);
+
+    if (pHead->next == NULL) return NULL;
 
     Node* node;
     void* buf;
@@ -119,17 +128,21 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
     {
         node = pHead->next;
 
-        //keep in mind, only owner thread will dequeue the list.
-        //this is the foundamental prerequisite that the following line will not suffer from aba problem.
+        // accessed from current thread only, node should not be NULL.
+        assert(node);
+
+        // keep in mind, only owner thread will dequeue the list.
+        // this is the foundamental prerequisite that the following line will not suffer from aba problem.
         if (atomic_cas(&pHead->next, node, node->next))
             break;
 
     } while(1);
 
     buf = node->data;
-    atomic_decrement(&pHead->node_number);
 
-    assert(pHead->node_number >= 0);
+    //int no = atomic_decrement(&pHead->node_number);
+    //assert(no > 0);
+
     return buf;
 }
 
@@ -142,18 +155,18 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 
     if (node == NULL || IsPaddingCorrupt((unsigned char*)buf - sizeof(void*), sizeof(void*))) assert(0);
     
-    //NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
+    // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     NodeHead* pHead = node->head;
-    if (pHead == NULL) return;
+    if (pHead == NULL) assert(pHead);
+
+    assert(pHead->node_number >= 0);
 
     int   population = pHead->m_population;
-    int   old_size;
     Node* old_head;
 
     do
     {
         old_head = pHead->next;
-        old_size = pHead->node_number;
 
         //make current node points to the old head node.
         //this should be done before cas.
@@ -167,13 +180,14 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 
     } while(1);
 
-    if (old_size == population)
+    atomic_increment(&pHead->node_number);
+    assert(pHead->node_number <= pHead->m_population + 1);
+
+    if (pHead->node_number == pHead->m_population + 1)
     {
         Cleaner(pHead);
         return;
     }
-
-    atomic_increment(&pHead->node_number);
 }
 
 /*
