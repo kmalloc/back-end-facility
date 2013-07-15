@@ -47,7 +47,7 @@ inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
 }
 
 PerThreadMemoryAlloc::PerThreadMemoryAlloc(int granularity, int population)
-    :m_granularity(granularity + sizeof(int) - granularity%sizeof(int))
+    :m_granularity(granularity%4?granularity + sizeof(int) - granularity%sizeof(int):0)
     ,m_population(population), m_key(0)
 {
     Init();

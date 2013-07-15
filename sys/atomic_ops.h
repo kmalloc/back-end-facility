@@ -34,10 +34,7 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
         (
          "lock cmpxchg16b %1\n\t"
          "setz %0"
-         : "=q" (result)
-         , "+m" (*src)
-         , "+d" (oldVal.hi)
-         , "+a" (oldVal.lo)
+         : "=q"(result), "+m"(*src), "+d"(oldVal.hi), "+a"(oldVal.lo)
          : "c"  (newVal.hi)
          , "b"  (newVal.lo)
          : "cc"
@@ -61,7 +58,7 @@ struct DoublePointer
 
 #endif // x86-64
 
-inline void InitDoublePointer(DoublePointer& dp)
+inline void InitDoublePointer(volatile DoublePointer& dp)
 {
     dp.lo = (void*)0;
     dp.hi = (void*)0;
@@ -77,7 +74,7 @@ inline bool IsDoublePointerEqual(const DoublePointer& dp1, const DoublePointer& 
     return ((dp1.lo == dp2.lo) && (dp1.hi == dp2.hi));
 }
 
-inline void SetDoublePointer(DoublePointer& dp, void* lo, void* hi)
+inline void SetDoublePointer(volatile DoublePointer& dp, void* lo, void* hi)
 {
     dp.lo = lo;
     dp.hi = hi;
