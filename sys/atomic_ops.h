@@ -1,55 +1,84 @@
 #ifndef _ATMOMIC_H_
 #define _ATMOMIC_H_
 
-#include <stddef.h>
-
-
 #define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 
-inline void atomic_add(volatile int * val, int gap)
-{
-    int oldval;
-    int newval;
+#define atomic_add(ptr, margin)  __sync_fetch_and_add(ptr, margin)
+#define atomic_sub(ptr, margin)  __sync_fetch_and_sub(ptr, margin)
+#define atomic_increment(ptr)    __sync_fetch_and_add(ptr, 1)
+#define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
 
-    do
-    {
-        oldval = *val;
-        newval = oldval + gap;
-    } while (!atomic_cas(val, oldval, newval));
+
+#include <stdint.h>
+
+#if defined(__x86_64__)
+
+struct DoublePointer
+{
+    void* lo;
+    void* hi;
+} __attribute__((aligned(16)));
+
+typedef DoublePointer atomic_uint128;
+
+inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, DoublePointer newVal)
+{
+    // intel ia32-64 developer manual, vol.2a 3-149.
+    // cmpxchg16b m128.
+    // compare rdx:rax with m128, if equal , set zf, and 
+    // load rcx:rbx into m128,
+    // else, clear zf and, load m128 into rdx:rax
+    bool result;
+    __asm__ __volatile__
+        (
+         "lock cmpxchg16b oword ptr %1\n\t"
+         "setz %0"
+         : "=q" (result)
+         , "+m" (*src)
+         , "+d" (oldVal.hi)
+         , "+a" (oldVal.lo)
+         : "c"  (newVal.hi)
+         , "b"  (newVal.lo)
+         : "cc"
+        );
+    return result;
 }
 
-inline void atomic_increment(volatile int * val)
+#define atomic_cas2(ptr, oldVal, newVal)   atomic_cas_16(ptr, oldVal, newVal)
+
+#else
+
+struct DoublePointer
 {
-    atomic_add(val, 1);
+    void* lo;
+    void* hi;
+    operator uint64_t() { return *(uint64_t*)this; }
+} __attribute__((aligned(8)));
+
+#define atomic_cas2(ptr, oldVal, newVal)  atomic_cas(((uint64_t*)ptr), ((uint64_t)oldVal), ((uint64_t)newVal))
+
+#endif // x86-64
+
+inline void InitDoublePointer(DoublePointer& dp)
+{
+    dp.lo = (void*)0;
+    dp.hi = (void*)0;
 }
 
-inline void atomic_decrement(volatile int * val)
+inline bool IsDoublePointerNull(const DoublePointer& dp)
 {
-    atomic_add(val, -1);
+    return (dp.lo == (void*)0 && dp.hi == (void*)0);
 }
 
-inline void atomic_increment(volatile size_t* val)
+inline bool IsDoublePointerEqual(const DoublePointer& dp1, const DoublePointer& dp2)
 {
-    size_t old_val;
-    size_t new_val;
-
-    do
-    {
-        old_val = *val;
-        new_val = old_val + 1;
-    } while (!atomic_cas(val, old_val, new_val));
+    return ((dp1.lo == dp2.lo) && (dp1.hi == dp2.hi));
 }
 
-inline void atomic_decrement(volatile size_t* val)
+inline void SetDoublePointer(DoublePointer& dp, void* lo, void* hi)
 {
-    size_t old_val;
-    size_t new_val;
-
-    do
-    {
-        old_val = *val;
-        new_val = old_val - 1;
-    } while (!atomic_cas(val, old_val, new_val));
+    dp.lo = lo;
+    dp.hi = hi;
 }
 
 #endif //_ATMOMIC_H_
