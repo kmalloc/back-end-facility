@@ -17,6 +17,7 @@ struct DoublePointer
 {
     void* lo;
     void* hi;
+    DoublePointer() { lo = (void*)0; hi = (void*)0; }
 } __attribute__((aligned(16)));
 
 typedef DoublePointer atomic_uint128;
@@ -31,7 +32,7 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
     bool result;
     __asm__ __volatile__
         (
-         "lock cmpxchg16b oword ptr %1\n\t"
+         "lock cmpxchg16b %1\n\t"
          "setz %0"
          : "=q" (result)
          , "+m" (*src)
@@ -52,6 +53,7 @@ struct DoublePointer
 {
     void* lo;
     void* hi;
+    DoublePointer() { lo = (void*)0; hi = (void*)0; }
     operator uint64_t() { return *(uint64_t*)this; }
 } __attribute__((aligned(8)));
 

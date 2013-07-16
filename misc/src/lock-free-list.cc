@@ -1,6 +1,8 @@
 #include "lock-free-list.h"
 #include <assert.h>
 
+static const DoublePointer DNULL;
+
 struct ListNode
 {
     void* data;
@@ -47,7 +49,7 @@ bool ListQueue::Push(void* data)
     if (node == NULL) return false;
     
     node->data = data;
-    InitDoublePointer(node->next);
+    node->next = DNULL;
 
     DoublePointer in, next;
     DoublePointer new_node;
@@ -66,7 +68,7 @@ bool ListQueue::Push(void* data)
             continue;
         }
 
-        if (atomic_cas2(&(((ListNode*)(in.hi))->next), 0, new_node)) break;
+        if (atomic_cas2(&(((ListNode*)(in.hi))->next), DNULL, new_node)) break;
     }
 
     atomic_cas2(&m_in, in, new_node);
