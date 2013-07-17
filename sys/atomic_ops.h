@@ -35,9 +35,8 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
          "lock cmpxchg16b %1\n\t"
          "setz %0"
          : "=q"(result), "+m"(*src), "+d"(oldVal.hi), "+a"(oldVal.lo)
-         : "c"  (newVal.hi)
-         , "b"  (newVal.lo)
-         : "cc"
+         : "c"(newVal.hi), "b"(newVal.lo)
+         : "cc","memory"
         );
     return result;
 }
