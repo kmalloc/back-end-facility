@@ -1,13 +1,75 @@
 #ifndef _ATMOMIC_H_
 #define _ATMOMIC_H_
 
+#define ENABLE_GCC_PRIMITIVE 1
+
 #define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
+
+#if ENABLE_GCC_PRIMITIVE
 
 #define atomic_add(ptr, margin)  __sync_fetch_and_add(ptr, margin)
 #define atomic_sub(ptr, margin)  __sync_fetch_and_sub(ptr, margin)
 #define atomic_increment(ptr)    __sync_fetch_and_add(ptr, 1)
 #define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
 
+#else
+
+#include <stdlib.h>
+inline int atomic_add(volatile int * val, int gap)
+{
+    int oldval;
+    int newval;
+
+    do
+    {
+        oldval = *val;
+        newval = oldval + gap;
+    } while (!atomic_cas(val, oldval, newval));
+
+    return oldval;
+}
+
+inline int atomic_increment(volatile int * val)
+{
+    return atomic_add(val, 1);
+}
+
+inline int atomic_decrement(volatile int * val)
+{
+    return atomic_add(val, -1);
+}
+
+inline size_t atomic_increment(volatile size_t* val)
+{
+    size_t old_val;
+    size_t new_val;
+
+    do
+    {
+        old_val = *val;
+        new_val = old_val + 1;
+    } while (!atomic_cas(val, old_val, new_val));
+
+    return old_val;
+}
+
+inline size_t atomic_decrement(volatile size_t* val)
+{
+    size_t old_val;
+    size_t new_val;
+
+    do
+    {
+        old_val = *val;
+        new_val = old_val - 1;
+    } while (!atomic_cas(val, old_val, new_val));
+
+    return old_val;
+}
+
+#endif //  ENABLE_GCC_PRIMITIVE
+
+/////////////////////////setting up cas /////////////////////////////
 
 #include <stdint.h>
 
@@ -15,8 +77,8 @@
 
 struct DoublePointer
 {
-    void* lo;
-    void* hi;
+    void* volatile lo;
+    void* volatile hi;
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
 } __attribute__((aligned(16)));
 
@@ -47,13 +109,16 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
 
 struct DoublePointer
 {
-    void* lo;
-    void* hi;
+    void* volatile lo;
+    void* volatile hi;
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
+    DoublePointer(const DoublePointer& dp) { lo = dp.lo; hi = dp.hi; }
+    DoublePointer(uint64_t val) { lo = val & 0x00000000ffffffff; hi = (val & 0xffffffff00000000) >> (8 * 4); }
     operator uint64_t() { return *(uint64_t*)this; }
 } __attribute__((aligned(8)));
 
-#define atomic_cas2(ptr, oldVal, newVal)  atomic_cas(((uint64_t*)ptr), ((uint64_t)oldVal), ((uint64_t)newVal))
+#define atomic_cas2(ptr, oldVal, newVal)  atomic_cas((uint64_t*)ptr, oldVal, newVal)
+#define atomic_read_double(ptr)  __sync_fetch_and_add((uint64_t*)ptr, 0)
 
 #endif // x86-64
 

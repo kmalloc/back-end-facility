@@ -6,7 +6,7 @@ static const DoublePointer DNULL;
 
 struct ListNode
 {
-    void* data;
+    void* volatile data;
     DoublePointer next;
 };
 
@@ -30,7 +30,7 @@ ListQueue::~ListQueue()
     void* data;
     while (Pop(data));
 
-    delete (ListNode*)m_in.hi; 
+    ReleaseNode((ListNode*)(m_in.hi)); 
 }
 
 ListNode* ListQueue::AllocNode()
@@ -60,31 +60,37 @@ bool ListQueue::Push(void* data)
 
     DoublePointer in, next;
     DoublePointer new_node;
+    DoublePointer NullVal;
 
     size_t id = atomic_increment(&m_id);
     SetDoublePointer(new_node, (void*)id, node);
 
-    assert(new_node.lo);
+    assert(new_node.hi);
 
     while (1)
     {
-        DoublePointer NullVal;
-        in = m_in;
-        next = ((ListNode*)(in.hi))->next;
+        // just a reminder:
+        // DoublePointer1 = DoublePointer2;
+        // is not an atomic operation.
+
+        ListNode* node_tail = (ListNode*)(in.hi);
+
+        in   = atomic_read_double(&m_in);
+
+        next = atomic_read_double(&node_tail->next);
 
         if (!IsDoublePointerNull(next)) 
         {
             atomic_cas2((&m_in), in, next);
-            assert(m_in.lo);
             continue;
         }
 
         if (atomic_cas2((&(((ListNode*)(in.hi))->next)), NullVal, new_node)) break;
     }
 
-    //this line may fail, but doesn't matter, line 72 will fix it up.
-    atomic_cas2((&m_in), in, new_node);
-    assert(m_in.lo);
+    //this line may fail, but doesn't matter, line 77 will fix it up.
+    bool ret = atomic_cas2((&m_in), in, new_node);
+
     return true;
 }
 
@@ -94,16 +100,17 @@ bool ListQueue::Pop(void*& data)
 
     while (1)
     {
-        out  = m_out;
-        in   = m_in;
-        next = ((ListNode*)(out.hi))->next;
+        ListNode* node_head = (ListNode*)(out.hi);
+
+        out  = atomic_read_double(&m_out);
+        in   = atomic_read_double(&m_in);
+        next = atomic_read_double(&node_head->next);
         
         if (IsDoublePointerNull(next)) return false;
 
         if (IsDoublePointerEqual(in, out)) 
         {
             atomic_cas2((&m_in), in, next);
-            assert(m_in.lo);
             continue;
         }
 

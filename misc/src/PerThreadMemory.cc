@@ -25,7 +25,7 @@ struct NodeHead
     Node* volatile next;
     void* dummy;
 
-    void* mem_frame;
+    void* volatile mem_frame;
     volatile int node_number;
 
     const int m_population;
@@ -85,7 +85,7 @@ void* PerThreadMemoryAlloc::AllocBuffer()
 
 NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 {
-    size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
+    const size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
 
     char* buf = (char*)malloc(sz);
     char* end_buf = buf + sz;
@@ -148,8 +148,9 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 
     buf = node->data;
 
-    //int no = atomic_decrement(&pHead->node_number);
-    //assert(no > 0);
+    // no might be less than 0
+    // thread that is releasing buffer may not update node_number in time.
+    int no = atomic_decrement(&pHead->node_number);
 
     return buf;
 }
@@ -161,23 +162,19 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
 
-    if (node == NULL || IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz)) assert(0);
+    if (IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz)) assert(0);
     
     // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     NodeHead* pHead = node->head;
-    if (pHead == NULL) assert(pHead);
 
-    assert(pHead->node_number >= 0);
-
-    int   population = pHead->m_population;
     Node* old_head;
 
     do
     {
         old_head = pHead->next;
 
-        //make current node points to the old head node.
-        //this should be done before cas.
+        // make current node points to the old head node.
+        // this should be done before cas.
         node->next = old_head;
 
         // this is an enqueue operation, aba problem is not an issue.
@@ -227,7 +224,7 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     NodeHead* pHead = val;
 
     // make sure all buffers are released when cleaning up.
-    assert(pHead->node_number == pHead->m_population);
+    assert(pHead->node_number == pHead->m_population + 1);
     
     free(pHead->mem_frame);
 
