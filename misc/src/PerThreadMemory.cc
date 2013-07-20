@@ -186,7 +186,10 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     } while(1);
 
     atomic_increment(&pHead->node_number);
-    assert(pHead->node_number <= pHead->m_population + 1);
+
+    // this node_number might greater than m_population as well.
+    // decrement & increment node_number is not sync.
+    // assert(pHead->node_number <= pHead->m_population + 1);
 
     if (pHead->node_number == pHead->m_population + 1)
     {

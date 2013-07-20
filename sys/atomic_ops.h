@@ -53,7 +53,7 @@ struct DoublePointer
     void* volatile hi;
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
     DoublePointer(const DoublePointer& dp) { lo = dp.lo; hi = dp.hi; }
-    DoublePointer(uint64_t val) { lo = val & 0x00000000ffffffff; hi = (val & 0xffffffff00000000) >> (8 * 4); }
+    DoublePointer(uint64_t val) { lo = (void*)(val & 0x00000000ffffffff); hi = (void*)((val & 0xffffffff00000000) >> (8 * 4)); }
     operator uint64_t() { return *(uint64_t*)this; }
 } __attribute__((aligned(8)));
 

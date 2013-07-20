@@ -73,7 +73,7 @@ bool ListQueue::Push(void* data)
         // DoublePointer1 = DoublePointer2;
         // is not an atomic operation.
 
-        ListNode* node_tail = (ListNode*)(in.hi);
+        ListNode* node_tail = (ListNode*)(m_in.hi);
 
         in   = atomic_read_double(&m_in);
 
@@ -100,7 +100,7 @@ bool ListQueue::Pop(void*& data)
 
     while (1)
     {
-        ListNode* node_head = (ListNode*)(out.hi);
+        ListNode* node_head = (ListNode*)(m_out.hi);
 
         out  = atomic_read_double(&m_out);
         in   = atomic_read_double(&m_in);
