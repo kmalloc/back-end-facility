@@ -130,7 +130,6 @@ class LockFreeProducerTask: public ITask
             m_stop = true;
         }
 
-
         virtual void Run()
         {
             int k = 0;
@@ -166,7 +165,7 @@ class LockFreeProducerTask: public ITask
 int main()
 {
     volatile int counter = 0;
-    const int maxSz = 1000000; //1 milion
+    const int maxSz = 10000000; //1 milion
     const int consumerSz = 2, producerSz = 4;
 
     

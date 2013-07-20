@@ -12,6 +12,7 @@ struct Node
 {
     Node* volatile next;
     NodeHead* volatile head;
+    volatile size_t id;
     unsigned char padding[gs_padding_sz];
     char   data[0];
 };
@@ -23,13 +24,18 @@ struct Node
 struct NodeHead
 {
     Node* volatile next;
-    void* dummy;
+    void* volatile dummy;
 
     void* volatile mem_frame;
     volatile int node_number;
 
     const int m_population;
     const int m_granularity;
+
+    // thread id
+    pthread_t m_thread;
+
+    unsigned char padding[gs_padding_sz];
 
     NodeHead(int population, int granularity):m_population(population), m_granularity(granularity) {}
 };
@@ -80,6 +86,9 @@ void* PerThreadMemoryAlloc::AllocBuffer()
     NodeHead* pHead = NULL;
     if ((pHead = (NodeHead*)pthread_getspecific(m_key)) == NULL) pHead = InitPerThreadList();
 
+    // a little detection.
+    assert(!IsPaddingCorrupt(pHead->padding, gs_padding_sz));
+
     return GetFreeBufferFromList(pHead);
 }
 
@@ -94,14 +103,17 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     NodeHead* pHead = new NodeHead(m_population, m_granularity);
 
+    pHead->m_thread = pthread_self();
     pHead->next = (Node*)buf;
     pHead->node_number = m_population + 1;
     pHead->mem_frame   = buf;
+    FillPadding(pHead->padding, gs_padding_sz);
     
     Node* cur  = (Node*)buf;
 
     for (int i = 0; i < m_population; ++i)
     {
+        cur->id   = i;
         cur->head = pHead;
         cur->next = (Node*)((char*)cur + sizeof(Node) + m_granularity);
         FillPadding(cur->padding, gs_padding_sz);
@@ -110,6 +122,7 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     
     assert((char*)cur + sizeof(Node) + m_granularity == end_buf);
 
+    cur->id   = m_population;
     cur->next = NULL;
     cur->head = pHead;
     FillPadding(cur->padding, gs_padding_sz);
@@ -125,12 +138,14 @@ NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 // for each list, only the owner thread will have permission to dequeue.
 void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 {
-    assert(pHead);
-
     if (pHead->next == NULL) return NULL;
 
     Node* node;
     void* buf;
+
+    int no = atomic_decrement(&pHead->node_number);
+
+    assert(no);
 
     do
     {
@@ -146,11 +161,8 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
 
     } while(1);
 
+    node->next = NULL;
     buf = node->data;
-
-    // no might be less than 0
-    // thread that is releasing buffer may not update node_number in time.
-    int no = atomic_decrement(&pHead->node_number);
 
     return buf;
 }
@@ -162,12 +174,18 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
 
-    if (IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz)) assert(0);
-    
+    assert(!IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz));
+    assert(node->next == NULL);
+
     // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     NodeHead* pHead = node->head;
 
+    assert(!IsPaddingCorrupt(pHead->padding, gs_padding_sz));
+
     Node* old_head;
+
+    const int sz = atomic_increment(&pHead->node_number);
+    assert(sz <= pHead->m_population + 1);
 
     do
     {
@@ -185,13 +203,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 
     } while(1);
 
-    atomic_increment(&pHead->node_number);
-
-    // this node_number might greater than m_population as well.
-    // decrement & increment node_number is not sync.
-    // assert(pHead->node_number <= pHead->m_population + 1);
-
-    if (pHead->node_number == pHead->m_population + 1)
+    if (sz == pHead->m_population + 1)
     {
         Cleaner(pHead);
         return;
@@ -225,12 +237,23 @@ void PerThreadMemoryAlloc::OnThreadExit(void* val)
 void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
 {
     NodeHead* pHead = val;
+    Node*     cur   = pHead->next;
+    int       co    = 0;
 
     // make sure all buffers are released when cleaning up.
     assert(pHead->node_number == pHead->m_population + 1);
     
-    free(pHead->mem_frame);
+    while (cur) 
+    {
+        cur = cur->next;
+        ++co;
+    }
 
+    assert(co == pHead->m_population + 1);
+
+    memset(pHead->padding, 0, gs_padding_sz);
+
+    free(pHead->mem_frame);
     delete pHead;
 }
 

@@ -1,6 +1,7 @@
 #include "lock-free-list.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <iostream>
 
 static const DoublePointer DNULL;
 
@@ -10,8 +11,24 @@ struct ListNode
     DoublePointer next;
 };
 
+static void PrintList(ListNode* head)
+{
+    using namespace std;
+
+    int co = 0;
+
+    while (head)
+    {
+        cout << "addr:" << hex << head << ", data:" << hex << head->data << ", id:" << hex << head->next.lo << endl;
+        head = (ListNode*)(head->next.hi);
+        ++co;
+    }
+
+    cout << "total:" << co << endl;
+}
+
 ListQueue::ListQueue(size_t capacity)
-    :m_alloc(sizeof(ListNode), 1024)
+    :m_alloc(sizeof(ListNode), capacity) 
     ,m_id(0)
     ,m_no(0)
     ,m_max(capacity)
@@ -121,7 +138,10 @@ bool ListQueue::Pop(void*& data)
         if (atomic_cas2((&m_out), out, next)) break;
     }
 
-    ReleaseNode((ListNode*)(out.hi));
+    ListNode* cur = (ListNode*)(out.hi);
+    cur->next = DNULL;
+    ReleaseNode(cur);
+
     return true;
 }
 bool ListQueue::Pop(void** data)
