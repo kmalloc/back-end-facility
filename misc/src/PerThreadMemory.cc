@@ -8,7 +8,7 @@
 static const size_t gs_padding_sz = 8;
 static const unsigned char gs_padding_char[2] = { 0x32, 0x23 };
 
-struct Node
+struct PerThreadMemoryAlloc::Node
 {
     Node* volatile next;
     NodeHead* volatile head;
@@ -21,7 +21,7 @@ struct Node
  * dummy buffer in NodeHead will be released only when current thread exits, ensuring that
  * when the last buffer is released by other thread, all buffers will be free.
  */
-struct NodeHead
+struct PerThreadMemoryAlloc::NodeHead
 {
     Node* volatile next;
     void* volatile dummy;
@@ -75,7 +75,7 @@ PerThreadMemoryAlloc::~PerThreadMemoryAlloc()
 
 void PerThreadMemoryAlloc::Init()
 {
-    pthread_key_create(&m_key, &PerThreadMemoryAlloc::OnThreadExit);
+    pthread_key_create((pthread_key_t*)&m_key, &PerThreadMemoryAlloc::OnThreadExit);
 }
 
 /*
@@ -92,7 +92,7 @@ void* PerThreadMemoryAlloc::AllocBuffer()
     return GetFreeBufferFromList(pHead);
 }
 
-NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
+PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 {
     const size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
 
@@ -181,6 +181,8 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     NodeHead* pHead = node->head;
 
     assert(!IsPaddingCorrupt(pHead->padding, gs_padding_sz));
+
+    memset(buf, 0, pHead->m_granularity);
 
     Node* old_head;
 

@@ -3,7 +3,6 @@
 
 #include <pthread.h>
 
-class NodeHead;
 
 /*
  * Note:
@@ -48,6 +47,9 @@ class PerThreadMemoryAlloc
 
     private:
 
+        struct Node;
+        struct NodeHead;
+
         void Init();
         static void OnThreadExit(void*);
         static void DoReleaseBuffer(void*);
@@ -59,7 +61,7 @@ class PerThreadMemoryAlloc
         const int m_granularity;
         const int m_population;
         
-        pthread_key_t m_key;
+        volatile pthread_key_t m_key;
 };
 
 #endif

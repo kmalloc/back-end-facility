@@ -4,7 +4,6 @@
 #include "sys/atomic_ops.h"
 #include "misc/PerThreadMemory.h"
 
-struct ListNode;
 
 class ListQueue
 {
@@ -21,8 +20,10 @@ class ListQueue
 
     private:
 
-        ListNode* AllocNode();
-        void ReleaseNode(ListNode*);
+        struct LockFreeListNode;
+
+        LockFreeListNode* AllocNode();
+        void ReleaseNode(LockFreeListNode*);
 
         volatile size_t m_id;
         size_t    m_no;
