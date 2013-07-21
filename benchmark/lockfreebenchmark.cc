@@ -172,13 +172,13 @@ int main()
     LockFreeConsumerTask<LockQueue<void*> > consumer_lock;
     LockFreeConsumerTask<LockFreeStack<void*> > consumer_lf_stack;
     LockFreeConsumerTask<LockFreeQueue<void*> > consumer_lf_queue;
-    LockFreeConsumerTask<ListQueue> consumer_lf_list_queue;
+    LockFreeConsumerTask<LockFreeListQueue> consumer_lf_list_queue;
 
     LockFreeProducerTask<LockQueue<void*> > prod_lock(&consumer_lock, &counter, maxSz - producerSz - 1);
     LockFreeProducerTask<LockFreeQueue<void*> > prod_lf_queue(&consumer_lf_queue, &counter, maxSz - producerSz - 1);
     LockFreeProducerTask<LockFreeStack<void*> > prod_lf_stack(&consumer_lf_stack, &counter, maxSz - producerSz - 1);
 
-    LockFreeProducerTask<ListQueue> prod_lf_list_queue(&consumer_lf_list_queue, &counter, maxSz - producerSz - 1);
+    LockFreeProducerTask<LockFreeListQueue> prod_lf_list_queue(&consumer_lf_list_queue, &counter, maxSz - producerSz - 1);
 
     Thread* consumers[consumerSz];
     Thread* producers[producerSz];

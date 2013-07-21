@@ -5,12 +5,12 @@
 #include "misc/PerThreadMemory.h"
 
 
-class ListQueue
+class LockFreeListQueue
 {
     public:
 
-        ListQueue(size_t capacity = 0);
-        ~ListQueue();
+        LockFreeListQueue(size_t capacity = 0);
+        ~LockFreeListQueue();
 
         bool Push(void* data);
         bool Pop(void*& data);

@@ -5,16 +5,15 @@
 
 static const DoublePointer DNULL;
 
-struct ListQueue::LockFreeListNode
+struct LockFreeListQueue::LockFreeListNode
 {
     void* volatile data;
     DoublePointer next;
-    friend void PrintList(ListQueue::LockFreeListNode*);
 
-    static void PrintList(ListQueue::LockFreeListNode*);
+    static void PrintList(LockFreeListQueue::LockFreeListNode*);
 };
 
-void ListQueue::LockFreeListNode::PrintList(ListQueue::LockFreeListNode* head)
+void LockFreeListQueue::LockFreeListNode::PrintList(LockFreeListQueue::LockFreeListNode* head)
 {
     using namespace std;
 
@@ -32,8 +31,8 @@ void ListQueue::LockFreeListNode::PrintList(ListQueue::LockFreeListNode* head)
     cout << "total:" << co << endl;
 }
 
-ListQueue::ListQueue(size_t capacity)
-    :m_alloc(sizeof(ListQueue::LockFreeListNode), capacity) 
+LockFreeListQueue::LockFreeListQueue(size_t capacity)
+    :m_alloc(sizeof(LockFreeListQueue::LockFreeListNode), capacity) 
     ,m_id(0)
     ,m_no(0)
     ,m_max(capacity)
@@ -45,7 +44,7 @@ ListQueue::ListQueue(size_t capacity)
     m_out = m_in;
 }
 
-ListQueue::~ListQueue()
+LockFreeListQueue::~LockFreeListQueue()
 {
     // Pop out all data, must do that,
     // otherwise per thread memory is never going to be released.
@@ -55,23 +54,23 @@ ListQueue::~ListQueue()
     ReleaseNode((LockFreeListNode*)(m_in.hi)); 
 }
 
-ListQueue::LockFreeListNode* ListQueue::AllocNode()
+LockFreeListQueue::LockFreeListNode* LockFreeListQueue::AllocNode()
 {
     LockFreeListNode* tmp = (LockFreeListNode*)m_alloc.AllocBuffer();
 
-    // must initialize it, we have constructor to call.
-    // maybe I should have a placement constructor for it.
+    // must initialize node manually, we don't have constructor to call.
+    // maybe I should have provided a placement constructor for it.
     if (tmp) tmp->next = DNULL;
 
     return tmp;
 }
 
-void ListQueue::ReleaseNode(LockFreeListNode* node)
+void LockFreeListQueue::ReleaseNode(LockFreeListNode* node)
 {
     m_alloc.ReleaseBuffer(node);
 }
 
-bool ListQueue::Push(void* data)
+bool LockFreeListQueue::Push(void* data)
 {
     LockFreeListNode* node = AllocNode();
 
@@ -108,19 +107,18 @@ bool ListQueue::Push(void* data)
         if (atomic_cas2((&(((LockFreeListNode*)(in.hi))->next)), 0, new_node)) break;
     }
 
-    //this line may fail, but doesn't matter, line 77 will fix it up.
+    //this line may fail, but doesn't matter, line 104 will fix it up.
     bool ret = atomic_cas2((&m_in), in, new_node);
 
     return true;
 }
 
-bool ListQueue::Pop(void*& data)
+bool LockFreeListQueue::Pop(void*& data)
 {
     DoublePointer out, in, next;
 
     while (1)
     {
-
         out  = atomic_read_double(&m_out);
         in   = atomic_read_double(&m_in);
 
@@ -147,7 +145,7 @@ bool ListQueue::Pop(void*& data)
 
     return true;
 }
-bool ListQueue::Pop(void** data)
+bool LockFreeListQueue::Pop(void** data)
 {
     if (data == NULL) return false;
 
