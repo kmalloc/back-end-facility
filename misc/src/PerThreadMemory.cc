@@ -12,7 +12,6 @@ struct PerThreadMemoryAlloc::Node
 {
     Node* volatile next;
     NodeHead* volatile head;
-    volatile size_t id;
     unsigned char padding[gs_padding_sz];
     char   data[0];
 };
@@ -113,7 +112,6 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 
     for (int i = 0; i < m_population; ++i)
     {
-        cur->id   = i;
         cur->head = pHead;
         cur->next = (Node*)((char*)cur + sizeof(Node) + m_granularity);
         FillPadding(cur->padding, gs_padding_sz);
@@ -122,7 +120,6 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     
     assert((char*)cur + sizeof(Node) + m_granularity == end_buf);
 
-    cur->id   = m_population;
     cur->next = NULL;
     cur->head = pHead;
     FillPadding(cur->padding, gs_padding_sz);
