@@ -106,6 +106,7 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
 }
 
 #define atomic_cas2(ptr, oldVal, newVal)   atomic_cas_16(ptr, oldVal, newVal)
+#define atomic_read_double(ptr)  __sync_fetch_and_add((uint64_t*)ptr, 0)
 
 #else
 
@@ -115,7 +116,7 @@ struct DoublePointer
     void* volatile hi;
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
     DoublePointer(const DoublePointer& dp) { lo = dp.lo; hi = dp.hi; }
-    DoublePointer(uint64_t val) { lo = (void*)(val & 0x00000000ffffffff); hi = (void*)((val & 0xffffffff00000000) >> (8 * 4)); }
+    DoublePointer(uint64_t val) { lo = (void*)(val & (uint64_t)0x00000000ffffffff); hi = (void*)(val >> (8 * sizeof(void*))); }
     operator uint64_t() { return *(uint64_t*)this; }
 } __attribute__((aligned(8)));
 
