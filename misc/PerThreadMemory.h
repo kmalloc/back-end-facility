@@ -37,8 +37,8 @@ class PerThreadMemoryAlloc
         PerThreadMemoryAlloc(int granularity, int population);
         ~PerThreadMemoryAlloc();
 
-        void* AllocBuffer();
-        void  ReleaseBuffer(void*);
+        void* AllocBuffer() const;
+        void  ReleaseBuffer(void*) const;
         int   Size() const; 
         int   Granularity() const { return m_granularity; }
         bool  FreeCurThreadMemory();
@@ -55,8 +55,8 @@ class PerThreadMemoryAlloc
         static void DoReleaseBuffer(void*);
         static void Cleaner(NodeHead*);
         
-        NodeHead* InitPerThreadList();
-        void* GetFreeBufferFromList(NodeHead*);        
+        NodeHead* InitPerThreadList() const;
+        void* GetFreeBufferFromList(NodeHead*) const;        
 
         const int m_granularity;
         const int m_population;

@@ -107,7 +107,7 @@ bool LockFreeListQueue::Push(void* data)
         if (atomic_cas2((&(((LockFreeListNode*)(in.hi))->next)), DNULL, new_node)) break;
     }
 
-    //this line may fail, but doesn't matter, line 104 will fix it up.
+    // this line may fail, but doesn't matter, line 104 will fix it up.
     bool ret = atomic_cas2((&m_in), in, new_node);
 
     return true;

@@ -80,7 +80,7 @@ void PerThreadMemoryAlloc::Init()
 /*
  * thread calling this function will access the list for its own.
  */
-void* PerThreadMemoryAlloc::AllocBuffer()
+void* PerThreadMemoryAlloc::AllocBuffer() const
 {
     NodeHead* pHead = NULL;
     if ((pHead = (NodeHead*)pthread_getspecific(m_key)) == NULL) pHead = InitPerThreadList();
@@ -91,7 +91,7 @@ void* PerThreadMemoryAlloc::AllocBuffer()
     return GetFreeBufferFromList(pHead);
 }
 
-PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
+PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 {
     const size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
 
@@ -133,7 +133,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 // note:
 // pHead is different from thread to thread.
 // for each list, only the owner thread will have permission to dequeue.
-void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
+void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
 {
     if (pHead->next == NULL) return NULL;
 
@@ -213,7 +213,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
  *this function will be called across different threads.
  *so need to apply extra care to make it work as expected.
  */
-void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
+void PerThreadMemoryAlloc::ReleaseBuffer(void* buf) const
 {
     // support free operation from other thread.
     // the following check code is not going work.

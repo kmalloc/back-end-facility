@@ -77,23 +77,29 @@ inline size_t atomic_decrement(volatile size_t* val)
 
 #if defined(__x86_64__)
 
+
+
 struct DoublePointer
 {
     void* volatile lo;
     void* volatile hi;
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
+    DoublePointer(const DoublePointer& val) { lo = val.lo; hi = val.hi; }
 } __attribute__((aligned(16)));
 
 typedef DoublePointer atomic_uint128;
 
 inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, DoublePointer newVal)
 {
-    // intel ia32-64 developer manual, vol.2a 3-149.
+    // from intel ia32-64 developer manual, vol.2a 3-149,
+    // instruction "cmpxchg16b" takes the follow format:
     // cmpxchg16b m128.
+    // meaning:
     // compare rdx:rax with m128, if equal , set zf, and 
     // load rcx:rbx into m128,
     // else, clear zf and, load m128 into rdx:rax
     bool result;
+
     __asm__ __volatile__
         (
          "lock cmpxchg16b %1\n\t"
@@ -102,11 +108,27 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
          : "c"(newVal.hi), "b"(newVal.lo)
          : "cc","memory"
         );
+
     return result;
 }
 
 #define atomic_cas2(ptr, oldVal, newVal)   atomic_cas_16(ptr, oldVal, newVal)
-#define atomic_read_double(ptr)  __sync_fetch_and_add((uint64_t*)ptr, 0)
+
+inline DoublePointer atomic_read_double(DoublePointer* val)
+{
+    DoublePointer old = *val;
+
+    do 
+    {
+        old = *val;
+        if (atomic_cas2(val, old, old))
+            break;
+
+    } while (1);
+
+    return old;
+}
+
 
 #else
 
