@@ -77,19 +77,34 @@ inline size_t atomic_decrement(volatile size_t* val)
 
 #if defined(__x86_64__)
 
+typedef __int128_t  __int128;
 
-
-struct DoublePointer
+/*
+struct DoublePointe2
 {
     void* volatile lo;
     void* volatile hi;
+
     DoublePointer() { lo = (void*)0; hi = (void*)0; }
     DoublePointer(const DoublePointer& val) { lo = val.lo; hi = val.hi; }
+    DoublePointer(__int128_t val) { DoublePointer* vp = (DoublePointer*)&val; lo =  vp->lo; hi = vp->hi; }
+    DoublePointer(volatile const DoublePointer* val) { lo = val->lo; hi = val->hi; }
+    operator __int128_t() const { return *(__int128_t*)this; }
+    operator __int128_t*() { return (__int128_t*)this; }
+    DoublePointer& operator=(const DoublePointer& val) { lo = val.lo; hi = val.hi; return *this; }
 } __attribute__((aligned(16)));
+*/
 
-typedef DoublePointer atomic_uint128;
+union DoublePointer 
+{
+    void* vals[2];
+    volatile __int128_t val;
 
-inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, DoublePointer newVal)
+    DoublePointer() { val = 0; }
+    DoublePointer(const __int128_t& value) { val = value; }
+};
+
+inline bool atomic_cas_16(volatile DoublePointer* src, const DoublePointer& oldVal, const DoublePointer& newVal)
 {
     // from intel ia32-64 developer manual, vol.2a 3-149,
     // instruction "cmpxchg16b" takes the follow format:
@@ -102,25 +117,25 @@ inline bool atomic_cas_16(volatile DoublePointer* src, DoublePointer oldVal, Dou
 
     __asm__ __volatile__
         (
-         "lock cmpxchg16b %1\n\t"
-         "setz %0"
-         : "=q"(result), "+m"(*src), "+d"(oldVal.hi), "+a"(oldVal.lo)
-         : "c"(newVal.hi), "b"(newVal.lo)
-         : "cc","memory"
+         "lock cmpxchg16b %1;\n"
+         "setz %0;\n"
+         : "=A"(result), "+m"(*src)
+         : "d"(oldVal.vals[1]), "a"(oldVal.vals[0]), "c"(newVal.vals[1]), "b"(newVal.vals[0])
+         //: "cc","memory"
         );
 
     return result;
 }
 
-#define atomic_cas2(ptr, oldVal, newVal)   atomic_cas_16(ptr, oldVal, newVal)
+#define atomic_cas2(ptr, oldVal, newVal)   __sync_bool_compare_and_swap((volatile __int128_t*)ptr, oldVal, newVal)
 
-inline DoublePointer atomic_read_double(DoublePointer* val)
+inline DoublePointer atomic_read_double(volatile DoublePointer* val)
 {
-    DoublePointer old = *val;
+    __int128_t old = val->val;
 
     do 
     {
-        old = *val;
+        old = val->val;
         if (atomic_cas2(val, old, old))
             break;
 
@@ -149,24 +164,23 @@ struct DoublePointer
 
 inline void InitDoublePointer(volatile DoublePointer& dp)
 {
-    dp.lo = (void*)0;
-    dp.hi = (void*)0;
+    dp.val = 0;
 }
 
 inline bool IsDoublePointerNull(const DoublePointer& dp)
 {
-    return (dp.lo == (void*)0 && dp.hi == (void*)0);
+    return dp.val == 0;
 }
 
 inline bool IsDoublePointerEqual(const DoublePointer& dp1, const DoublePointer& dp2)
 {
-    return ((dp1.lo == dp2.lo) && (dp1.hi == dp2.hi));
+    return dp1.val == dp2.val;
 }
 
 inline void SetDoublePointer(volatile DoublePointer& dp, void* lo, void* hi)
 {
-    dp.lo = lo;
-    dp.hi = hi;
+    dp.vals[0] = lo;
+    dp.vals[1] = hi;
 }
 
 #endif //_ATMOMIC_H_

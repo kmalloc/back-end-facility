@@ -3,12 +3,11 @@
 #include <stdlib.h>
 #include <iostream>
 
-static const DoublePointer DNULL;
 
 struct LockFreeListQueue::LockFreeListNode
 {
-    void* volatile data;
     DoublePointer next;
+    void* volatile data;
 
     static void PrintList(LockFreeListQueue::LockFreeListNode*);
 };
@@ -22,9 +21,9 @@ void LockFreeListQueue::LockFreeListNode::PrintList(LockFreeListQueue::LockFreeL
     while (head)
     {
         cout << "addr:" << hex << head << ", data:" << hex << head->data
-             << ", id:" << hex << head->next.lo << endl;
+             << ", id:" << hex << head->next.vals[0] << endl;
 
-        head = (LockFreeListNode*)(head->next.hi);
+        head = (LockFreeListNode*)(head->next.vals[1]);
         ++co;
     }
 
@@ -51,7 +50,7 @@ LockFreeListQueue::~LockFreeListQueue()
     void* data;
     while (Pop(data));
 
-    ReleaseNode((LockFreeListNode*)(m_in.hi)); 
+    ReleaseNode((LockFreeListNode*)(m_in.vals[1])); 
 }
 
 LockFreeListQueue::LockFreeListNode* LockFreeListQueue::AllocNode()
@@ -60,7 +59,7 @@ LockFreeListQueue::LockFreeListNode* LockFreeListQueue::AllocNode()
 
     // must initialize node manually, we don't have constructor to call.
     // maybe I should have provided a placement constructor for it.
-    if (tmp) tmp->next = DNULL;
+    if (tmp) tmp->next = 0;
 
     return tmp;
 }
@@ -77,7 +76,7 @@ bool LockFreeListQueue::Push(void* data)
     if (node == NULL) return false;
     
     node->data = data;
-    node->next = DNULL;
+    node->next = 0;
 
     DoublePointer in, next;
     DoublePointer new_node;
@@ -92,7 +91,7 @@ bool LockFreeListQueue::Push(void* data)
         // DoublePointer1 = DoublePointer2;
         // is not an atomic operation.
 
-        LockFreeListNode* node_tail = (LockFreeListNode*)(m_in.hi);
+        LockFreeListNode* node_tail = (LockFreeListNode*)(m_in.vals[1]);
 
         in   = atomic_read_double(&m_in);
 
@@ -100,15 +99,15 @@ bool LockFreeListQueue::Push(void* data)
 
         if (!IsDoublePointerNull(next)) 
         {
-            atomic_cas2((&m_in), in, next);
+            atomic_cas2(&(m_in.val), in.val, next.val);
             continue;
         }
 
-        if (atomic_cas2((&(((LockFreeListNode*)(in.hi))->next)), DNULL, new_node)) break;
+        if (atomic_cas2((&(((LockFreeListNode*)(in.vals[1]))->next.val)), 0, new_node.val)) break;
     }
 
     // this line may fail, but doesn't matter, line 104 will fix it up.
-    bool ret = atomic_cas2((&m_in), in, new_node);
+    bool ret = atomic_cas2((&m_in.val), in.val, new_node.val);
 
     return true;
 }
@@ -122,25 +121,25 @@ bool LockFreeListQueue::Pop(void*& data)
         out  = atomic_read_double(&m_out);
         in   = atomic_read_double(&m_in);
 
-        LockFreeListNode* node_head = (LockFreeListNode*)(out.hi);
+        LockFreeListNode* node_head = (LockFreeListNode*)(out.vals[1]);
         next = atomic_read_double(&node_head->next);
         
         if (IsDoublePointerNull(next)) return false;
 
         if (IsDoublePointerEqual(in, out)) 
         {
-            atomic_cas2((&m_in), in, next);
+            atomic_cas2((&m_in.val), in.val, next.val);
             continue;
         }
 
         // next node may have been released, but it is ok to read.
         // but do not write to it.
-        data = ((LockFreeListNode*)(next.hi))->data;
+        data = ((LockFreeListNode*)(next.vals[1]))->data;
 
-        if (atomic_cas2((&m_out), out, next)) break;
+        if (atomic_cas2((&m_out.val), out.val, next.val)) break;
     }
 
-    LockFreeListNode* cur = (LockFreeListNode*)(out.hi);
+    LockFreeListNode* cur = (LockFreeListNode*)(out.vals[1]);
     ReleaseNode(cur);
 
     return true;
