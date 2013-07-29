@@ -34,7 +34,7 @@ class PerThreadMemoryAlloc
 {
     public:
 
-        PerThreadMemoryAlloc(int granularity, int population);
+        PerThreadMemoryAlloc(int granularity, int population, int align = sizeof(void*));
         ~PerThreadMemoryAlloc();
 
         void* AllocBuffer() const;
@@ -58,8 +58,10 @@ class PerThreadMemoryAlloc
         NodeHead* InitPerThreadList() const;
         void* GetFreeBufferFromList(NodeHead*) const;        
 
-        const int m_granularity;
-        const int m_population;
+        const int m_align; // buffer alignment
+        const int m_granularity; // sizeof per buffer
+        const int m_offset; //
+        const int m_population; // total number of buffer
         
         volatile pthread_key_t m_key;
 };

@@ -31,7 +31,7 @@ void LockFreeListQueue::LockFreeListNode::PrintList(LockFreeListQueue::LockFreeL
 }
 
 LockFreeListQueue::LockFreeListQueue(size_t capacity)
-    :m_alloc(sizeof(LockFreeListQueue::LockFreeListNode), capacity) 
+    :m_alloc(sizeof(LockFreeListQueue::LockFreeListNode), capacity, 2*sizeof(void*)) 
     ,m_id(0)
     ,m_no(0)
     ,m_max(capacity)
