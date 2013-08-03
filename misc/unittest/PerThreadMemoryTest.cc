@@ -61,6 +61,8 @@ static void VerifyBuff(void* buf)
     EXPECT_EQ(0xcd, node->c);
 }
 
+#include <iostream>
+using namespace std;
 class DummyPoolTaskForPerThreadMemTest: public ITask
 {
     public:
@@ -72,10 +74,13 @@ class DummyPoolTaskForPerThreadMemTest: public ITask
 
         virtual void Run()
         {
+            cout << "re " << hex << m_perThreadBuf << endl;
             EXPECT_TRUE(m_perThreadBuf != NULL);
             VerifyBuff(m_perThreadBuf);
 
             alloc.ReleaseBuffer(m_perThreadBuf);
+
+            sched_yield();
 
             void* buff = alloc.AllocBuffer();
             
@@ -83,6 +88,10 @@ class DummyPoolTaskForPerThreadMemTest: public ITask
             {
                 SetBuff(buff);
                 m_pool->PostTask(new DummyPoolTaskForPerThreadMemTest(m_pool, buff));
+            }
+            else
+            {
+                cout << "run out of PerThread buff" << endl;
             }
         }
 
