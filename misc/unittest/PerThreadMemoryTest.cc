@@ -1,6 +1,7 @@
 #include "PerThreadMemory.h"
 #include "ITask.h"
 #include "thread.h"
+#include "threadpool.h"
 
 #include "gtest.h"
 
@@ -40,14 +41,59 @@ class DummyThreadForPerThreadMemoryTest:public ITask
         void Stop() { m_stop = true; }
 
         volatile bool m_stop;
-
 };
 
+static void SetBuff(void* buf)
+{
+    perThreadTestNode* node = (perThreadTestNode*)buf;
+   
+    node->a = 0x23;
+    node->b = 0x32;
+    node->c = 0xcd;
+}
+
+static void VerifyBuff(void* buf)
+{
+    perThreadTestNode* node = (perThreadTestNode*)buf;
+
+    EXPECT_EQ(0x23, node->a);
+    EXPECT_EQ(0x32, node->b);
+    EXPECT_EQ(0xcd, node->c);
+}
+
+class DummyPoolTaskForPerThreadMemTest: public ITask
+{
+    public:
+
+        DummyPoolTaskForPerThreadMemTest(ThreadPool* pool, void* buff)
+            :m_pool(pool), m_perThreadBuf(buff)
+        {
+        }
+
+        virtual void Run()
+        {
+            EXPECT_TRUE(m_perThreadBuf != NULL);
+            VerifyBuff(m_perThreadBuf);
+
+            alloc.ReleaseBuffer(m_perThreadBuf);
+
+            void* buff = alloc.AllocBuffer();
+            
+            if (buff)
+            {
+                SetBuff(buff);
+                m_pool->PostTask(new DummyPoolTaskForPerThreadMemTest(m_pool, buff));
+            }
+        }
+
+        ThreadPool* m_pool;
+        void* m_perThreadBuf;
+};
 
 static void TestProc()
 {
-
     void* buf = alloc.AllocBuffer();
+
     EXPECT_EQ(gs_population - 1, alloc.Size());
 
     alloc.ReleaseBuffer(buf);
@@ -112,6 +158,7 @@ TEST(PerThreadMemoryAllocTest, PTMAT)
     thread1.Start();
     thread2.Start();
 
+    // main thread
     EXPECT_EQ(0, alloc.Size());
     TestProc();
 
@@ -121,5 +168,21 @@ TEST(PerThreadMemoryAllocTest, PTMAT)
     thread1.Join(); 
     test_cs2.Stop();
     thread2.Join(); 
+
+
+    //sharing buffer among threads.
+    ThreadPool pool(4);
+
+    pool.StartPooling();
+
+    void* buff = alloc.AllocBuffer();
+    EXPECT_TRUE(buff != NULL);
+
+    SetBuff(buff);
+    pool.PostTask(new DummyPoolTaskForPerThreadMemTest(&pool, buff));
+
+    sleep(9);
+
+    pool.StopPooling();
 }
 

@@ -11,7 +11,7 @@ static inline size_t AlignTo(size_t size, size_t align)
     return size%align?size - size%align + align:size;
 }
 
-static const size_t gs_padding_sz = 2*sizeof(void*);
+static const size_t gs_padding_sz = sizeof(void*);
 static const unsigned char gs_padding_char[2] = { 0x32, 0x23 };
 
 // make sure data is aligned to m_granularity
