@@ -5,9 +5,17 @@
 #include <stdlib.h>
 #include <assert.h>
 
-static const size_t gs_padding_sz = 8;
+
+static inline size_t AlignTo(size_t size, size_t align)
+{
+    return size%align?size - size%align + align:size;
+}
+
+static const size_t gs_padding_sz = sizeof(void*);
 static const unsigned char gs_padding_char[2] = { 0x32, 0x23 };
 
+// make sure data is aligned to m_granularity
+// some application relys on that.
 struct PerThreadMemoryAlloc::Node
 {
     Node* volatile next;
@@ -28,6 +36,7 @@ struct PerThreadMemoryAlloc::NodeHead
     void* volatile mem_frame;
     volatile int node_number;
 
+    const int m_offset;
     const int m_population;
     const int m_granularity;
 
@@ -36,7 +45,7 @@ struct PerThreadMemoryAlloc::NodeHead
 
     unsigned char padding[gs_padding_sz];
 
-    NodeHead(int population, int granularity):m_population(population), m_granularity(granularity) {}
+    NodeHead(int population, int granularity, int offset):m_population(population), m_granularity(granularity), m_offset(offset) {}
 };
 
 //TODO more advance padding.
@@ -61,8 +70,10 @@ static inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
     return false;
 }
 
-PerThreadMemoryAlloc::PerThreadMemoryAlloc(int granularity, int population)
-    :m_granularity(granularity%sizeof(int)?granularity + sizeof(int) - granularity%sizeof(int):granularity)
+PerThreadMemoryAlloc::PerThreadMemoryAlloc(int granularity, int population, int align)
+    :m_align(AlignTo(align, sizeof(void*)))
+    ,m_granularity(AlignTo(granularity, m_align))
+    ,m_offset(m_granularity - sizeof(Node)%m_granularity)
     ,m_population(population), m_key(0)
 {
     Init();
@@ -80,7 +91,7 @@ void PerThreadMemoryAlloc::Init()
 /*
  * thread calling this function will access the list for its own.
  */
-void* PerThreadMemoryAlloc::AllocBuffer()
+void* PerThreadMemoryAlloc::AllocBuffer() const
 {
     NodeHead* pHead = NULL;
     if ((pHead = (NodeHead*)pthread_getspecific(m_key)) == NULL) pHead = InitPerThreadList();
@@ -91,16 +102,16 @@ void* PerThreadMemoryAlloc::AllocBuffer()
     return GetFreeBufferFromList(pHead);
 }
 
-PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
+PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 {
-    const size_t sz = (sizeof(Node) + m_granularity) * (m_population + 1);
+    const size_t sz = (sizeof(Node) + m_offset + m_granularity) * (m_population + 1);
 
     char* buf = (char*)malloc(sz);
     char* end_buf = buf + sz;
 
     if (buf == NULL) return NULL;
 
-    NodeHead* pHead = new NodeHead(m_population, m_granularity);
+    NodeHead* pHead = new NodeHead(m_population, m_granularity, m_offset);
 
     pHead->m_thread = pthread_self();
     pHead->next = (Node*)buf;
@@ -113,12 +124,12 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
     for (int i = 0; i < m_population; ++i)
     {
         cur->head = pHead;
-        cur->next = (Node*)((char*)cur + sizeof(Node) + m_granularity);
+        cur->next = (Node*)((char*)cur + sizeof(Node) + m_offset + m_granularity);
         FillPadding(cur->padding, gs_padding_sz);
         cur = cur->next;
     }
     
-    assert((char*)cur + sizeof(Node) + m_granularity == end_buf);
+    assert((char*)cur + sizeof(Node) + m_offset + m_granularity == end_buf);
 
     cur->next = NULL;
     cur->head = pHead;
@@ -133,7 +144,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList()
 // note:
 // pHead is different from thread to thread.
 // for each list, only the owner thread will have permission to dequeue.
-void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
+void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
 {
     if (pHead->next == NULL) return NULL;
 
@@ -159,7 +170,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead)
     } while(1);
 
     node->next = NULL;
-    buf = node->data;
+    buf = node->data + m_offset;
 
     return buf;
 }
@@ -171,7 +182,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     Node* node = (Node*)((char*)buf - sizeof(Node));
 
-    assert(!IsPaddingCorrupt((unsigned char*)buf - gs_padding_sz, gs_padding_sz));
+    assert(!IsPaddingCorrupt((unsigned char*)node->padding, gs_padding_sz));
     assert(node->next == NULL);
 
     // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
@@ -213,10 +224,10 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
  *this function will be called across different threads.
  *so need to apply extra care to make it work as expected.
  */
-void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
+void PerThreadMemoryAlloc::ReleaseBuffer(void* buf) const
 {
-    // support free operation from other thread.
-    // the following check code is not going work.
+    // To support free operation from other thread,
+    // the following check code must be disable. It is not going to work.
     /*
     NodeHead* head = (NodeHead*)pthread_getspecific(m_key);
     if (head == NULL) return;
@@ -224,13 +235,13 @@ void PerThreadMemoryAlloc::ReleaseBuffer(void* buf)
     assert(buf > head->mem_frame && buf < head->mem_frame + head->m_granularity * head->m_population);
     */
 
-    DoReleaseBuffer(buf);
+    DoReleaseBuffer(buf - m_offset);
 }
 
 void PerThreadMemoryAlloc::OnThreadExit(void* val)
 {
     NodeHead* pHead = (NodeHead*)val;
-    DoReleaseBuffer(pHead->dummy);
+    DoReleaseBuffer(pHead->dummy - pHead->m_offset);
 }
 
 void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
@@ -264,7 +275,7 @@ bool PerThreadMemoryAlloc::FreeCurThreadMemory()
     NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
     if (pHead == NULL || pHead->node_number < m_population) return false;
 
-    DoReleaseBuffer(pHead->dummy);
+    DoReleaseBuffer(pHead->dummy - m_offset);
     pthread_setspecific(m_key, NULL);
 
     return true;

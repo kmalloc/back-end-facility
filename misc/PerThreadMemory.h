@@ -34,11 +34,11 @@ class PerThreadMemoryAlloc
 {
     public:
 
-        PerThreadMemoryAlloc(int granularity, int population);
+        PerThreadMemoryAlloc(int granularity, int population, int align = sizeof(void*));
         ~PerThreadMemoryAlloc();
 
-        void* AllocBuffer();
-        void  ReleaseBuffer(void*);
+        void* AllocBuffer() const;
+        void  ReleaseBuffer(void*) const;
         int   Size() const; 
         int   Granularity() const { return m_granularity; }
         bool  FreeCurThreadMemory();
@@ -55,11 +55,13 @@ class PerThreadMemoryAlloc
         static void DoReleaseBuffer(void*);
         static void Cleaner(NodeHead*);
         
-        NodeHead* InitPerThreadList();
-        void* GetFreeBufferFromList(NodeHead*);        
+        NodeHead* InitPerThreadList() const;
+        void* GetFreeBufferFromList(NodeHead*) const;        
 
-        const int m_granularity;
-        const int m_population;
+        const int m_align; // buffer alignment
+        const int m_granularity; // sizeof per buffer
+        const int m_offset; //
+        const int m_population; // total number of buffer
         
         volatile pthread_key_t m_key;
 };

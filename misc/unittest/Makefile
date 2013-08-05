@@ -20,9 +20,6 @@ GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 
 all : $(TESTS)
 
-thread.o : $(SRC_DIR)/thread/src/thread.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/thread/src/thread.cc $(SRC_HEAD) -I$(SRC_DIR)/thread
-
 SpinlockQueueTest.o : $(CUR_DIR)/SpinlockQueueTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
@@ -33,10 +30,10 @@ PerThreadMemoryTest.o : $(CUR_DIR)/PerThreadMemoryTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/PerThreadMemoryTest.cc $(GTEST_HEADERS) $(SRC_HEAD) -I$(SRC_DIR)/thread
 
 
-OBJS = SpinlockQueueTest.o thread.o PerThreadMemory.o PerThreadMemoryTest.o
+OBJS = SpinlockQueueTest.o PerThreadMemory.o PerThreadMemoryTest.o
 
 unittest : $(OBJS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lpthread -lrt -lgtest_main -o $(TESTS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lxthread -lpthread -lrt -lgtest_main -o $(TESTS)
 
 clean :
 	rm -f $(TESTS) *.o
