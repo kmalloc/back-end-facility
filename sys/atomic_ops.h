@@ -87,8 +87,8 @@ typedef int64_t atomic_longlong;
 
 
 
-
 #define atomic_cas2(ptr, oldVal, newVal)   __sync_bool_compare_and_swap((volatile atomic_longlong*)ptr, oldVal, newVal)
+#define atomic_read(ptr)  __sync_fetch_and_add(ptr, 0)
 #define atomic_read_double(ptr)  __sync_fetch_and_add((volatile atomic_longlong*)ptr, 0)
 
 union DoublePointer 

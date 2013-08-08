@@ -9,7 +9,7 @@ class LockFreeListQueue
 {
     public:
 
-        LockFreeListQueue(size_t capacity = 0);
+        LockFreeListQueue(size_t capacity = 2048);
         ~LockFreeListQueue();
 
         bool Push(void* data);
@@ -24,6 +24,7 @@ class LockFreeListQueue
 
         LockFreeListNode* AllocNode();
         void ReleaseNode(LockFreeListNode*);
+        void InitInternalNodeList();
 
         volatile size_t m_id;
         size_t    m_no;
@@ -31,7 +32,9 @@ class LockFreeListQueue
         DoublePointer m_in;
         DoublePointer m_out;
 
-        PerThreadMemoryAlloc m_alloc;
+        volatile size_t m_id2;
+        DoublePointer m_head;
+        LockFreeListNode* m_freeList; //internal node list
 };
 
 
