@@ -92,7 +92,7 @@ bool WorkerBodyBase::GetRunTask(ITask*& msg)
 {
     int req = 0;
 
-    while(1)
+    while (1)
     {
         if (!m_notify || req > m_reqThreshold)
         {
@@ -106,10 +106,7 @@ bool WorkerBodyBase::GetRunTask(ITask*& msg)
             Notify();
             req++;
 
-            if (SignalConsumeTimeout(m_timeout))
-            {
-                break;
-            }
+            if (SignalConsumeTimeout(m_timeout)) break;
         }
     }
     
@@ -246,7 +243,7 @@ bool WorkerBodyBase::IsRunning() const
 /*
  * WorkerBody
  */
- 
+
 WorkerBody::WorkerBody(Worker*work, int maxMsgSize)
     :WorkerBodyBase(work), m_mailbox(maxMsgSize)
 {
@@ -325,7 +322,7 @@ int Worker::Notify()
 
 bool Worker::StopWorking(bool join)
 {
-    bool ret =  m_WorkerBody->StopRunning(); 
+    bool ret =  m_WorkerBody->StopRunning();
 
     if (join && ret) ret = Join();
 
