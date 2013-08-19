@@ -8,12 +8,13 @@ class Logger
         Logger(size_t buffer);
         ~Logger();
 
-        Log(const char* msg);
-        Log(const string& msg);
-        Log(const char* format,...);
+        bool Log(const char* msg);
+        bool Log(const string& msg);
+        bool Log(const char* format,...);
 
     private:
 
+        void Init();
         char* m_buff;
 };
 
