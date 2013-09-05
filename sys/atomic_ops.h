@@ -124,5 +124,10 @@ inline void SetDoublePointer(volatile DoublePointer& dp, void* lo, void* hi)
     dp.vals[1] = hi;
 }
 
+inline size_t AlignTo(size_t size, size_t align)
+{
+    return size%align?size - size%align + align:size;
+}
+
 #endif //_ATMOMIC_H_
 

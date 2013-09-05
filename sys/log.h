@@ -1,21 +1,30 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
+class LockFreeListQueue;
+class Worker;
+class LockFreeBuffer;
+
 class Logger
 {
     public:
 
-        Logger(size_t buffer);
+        Logger(size_t size, size_t granularity);
         ~Logger();
 
         bool Log(const char* msg);
-        bool Log(const string& msg);
+        bool Log(const std::string& msg);
         bool Log(const char* format,...);
 
     private:
 
         void Init();
-        char* m_buff;
+
+        size_t m_sz; // total piece of buffers.
+        size_t m_granularity; // size of per buffer.
+
+        LockFreeBuffer m_buffer;
+        LockFreeListQueue m_pendingMsg;
 };
 
 

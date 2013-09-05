@@ -1,24 +1,31 @@
 #ifndef __LOCK_FREE_BUFFER_H_
 #define __LOCK_FREE_BUFFER_H_
 
-#include "LockFreeContainer.h"
+#include "sys/atomic_ops.h"
+
+class BufferNode;
 
 class LockFreeBuffer
 {
     public:
 
-        LockFreeBuffer(int bufsz, int poolsz);
+        LockFreeBuffer(size_t size, size_t granularity);
         ~LockFreeBuffer();
+
+        char* AllocBuffer();
+        void  ReleaseBuffer();
 
     private:
 
-        volatile int m_free;
+        void InitList();
 
-        const int m_bufSz;
-        const int m_poolSz;
+        const int m_size; // total number of buffer.
+        const int m_granularity;
 
-        LockFreeStack<void*> m_free;
-        LockFreeStack<void*> m_used;
+        size_t m_id;
+        char* m_rawBuff;
+        DoublePointer m_head;
+        BufferNode* m_freeList;
 };
 
 #endif
