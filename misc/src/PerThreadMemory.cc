@@ -29,7 +29,7 @@ struct PerThreadMemoryAlloc::Node
 struct PerThreadMemoryAlloc::NodeHead
 {
     Node* volatile next;
-    void* volatile dummy;
+    char* volatile dummy;
 
     void* volatile mem_frame;
     volatile int node_number;
@@ -50,7 +50,7 @@ struct PerThreadMemoryAlloc::NodeHead
 static inline void FillPadding(void* buf, int sz)
 {
     memset(buf, gs_padding_char[0], sz/2);
-    memset(buf + sz/2, gs_padding_char[1], sz/2);
+    memset((char*)buf + sz/2, gs_padding_char[1], sz/2);
 }
 
 static inline bool IsPaddingCorrupt(const unsigned char* buf, int sz)
@@ -135,7 +135,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 
     pthread_setspecific(m_key, pHead);
 
-    pHead->dummy = GetFreeBufferFromList(pHead);
+    pHead->dummy = (char*)GetFreeBufferFromList(pHead);
     return pHead;
 }
 
@@ -234,7 +234,7 @@ void PerThreadMemoryAlloc::ReleaseBuffer(void* buf) const
     assert(buf > head->mem_frame && buf < head->mem_frame + head->m_granularity * head->m_population);
     */
 
-    DoReleaseBuffer(buf - m_offset);
+    DoReleaseBuffer((char*)buf - m_offset);
 }
 
 void PerThreadMemoryAlloc::OnThreadExit(void* val)

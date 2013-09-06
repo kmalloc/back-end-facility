@@ -1,8 +1,14 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
-class LockFreeListQueue;
+#include <stdlib.h>
+#include <string>
+
+#include "misc/LockFreeBuffer.h"
+#include "misc/lock-free-list.h"
+
 class Worker;
+class LockFreeListQueue;
 class LockFreeBuffer;
 
 class Logger
@@ -12,15 +18,15 @@ class Logger
         Logger(size_t size, size_t granularity);
         ~Logger();
 
-        bool Log(const char* msg);
-        bool Log(const std::string& msg);
-        bool Log(const char* format,...);
+        size_t Log(const char* msg);
+        size_t Log(const std::string& msg);
+        size_t Log(const char* format,...);
 
     private:
 
         void Init();
 
-        size_t m_sz; // total piece of buffers.
+        size_t m_size; // total piece of buffers.
         size_t m_granularity; // size of per buffer.
 
         LockFreeBuffer m_buffer;

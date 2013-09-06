@@ -2,12 +2,13 @@
 
 #include "sys/defs.h"
 
+#include <assert.h>
+
 struct BufferNode
 {
     DoublePointer m_next;
-    char* m_buffer[0];
+    char m_buffer[0];
 };
-
 
 LockFreeBuffer::LockFreeBuffer(size_t size, size_t granularity)
     :m_size(size), m_granularity(AlignTo(granularity, sizeof(DoublePointer)))
@@ -35,10 +36,10 @@ void LockFreeBuffer::InitList()
     size_t i, off_set = 0;
     const size_t sz = sizeof(BufferNode) + m_granularity;
 
-    for (i = 0; i < m_size, ++i)
+    for (i = 0; i < m_size; ++i)
     {
         off_set = i * sz;
-        m_freeList[i] = m_rawBuff + off_set;
+        m_freeList[i] = (BufferNode*)(m_rawBuff + off_set);
     }
 
     for (i = 0; i < m_size - 1; ++i)
@@ -68,7 +69,7 @@ char* LockFreeBuffer::AllocBuffer()
 
     } while (1);
     
-    LockFreeListNode* ret = (LockFreeListNode*)old_head.vals[1];
+    BufferNode* ret = (BufferNode*)old_head.vals[1];
 
     ret->m_next = 0;
 
@@ -79,7 +80,7 @@ void LockFreeBuffer::ReleaseBuffer(void* buffer)
 {
     BufferNode* node = container_of(buffer, BufferNode, m_buffer);
 
-    assert(node >= m_freeList && node < m_freeList + m_size);
+    assert(node >= m_freeList[0] && node <= m_freeList[m_size - 1]);
 
     DoublePointer old_head, new_node;
 
@@ -89,7 +90,7 @@ void LockFreeBuffer::ReleaseBuffer(void* buffer)
     do
     {
         old_head = atomic_read_double(&m_head);
-        node->next = old_head;
+        node->m_next = old_head;
 
         if (atomic_cas2(&m_head.val, old_head.val, new_node.val)) break;
 

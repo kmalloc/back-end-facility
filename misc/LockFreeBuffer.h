@@ -3,11 +3,6 @@
 
 #include "sys/atomic_ops.h"
 
-
-/*
- *
- */
-
 class BufferNode;
 
 class LockFreeBuffer
@@ -30,7 +25,7 @@ class LockFreeBuffer
         size_t m_id;
         char* m_rawBuff;
         DoublePointer m_head;
-        BufferNode* m_freeList;
+        BufferNode** m_freeList;
 };
 
 #endif

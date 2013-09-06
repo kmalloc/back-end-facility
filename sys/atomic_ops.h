@@ -1,13 +1,23 @@
 #ifndef _ATMOMIC_H_
 #define _ATMOMIC_H_
 
-#define USING_CAS_TO_DO_INCREASE 1
+#include <stdlib.h>
+
+
+#if !defined(__GNUC__) || (__GNUC__ < 4)
+
+#warning "CAS operation is not supported by your compiler"
+
+#endif
+
+
+
+#define USING_CAS_TO_DO_INCREASE 0
 
 #define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 
 #if USING_CAS_TO_DO_INCREASE
 
-#include <stdlib.h>
 
 inline int atomic_add(volatile int* val, int gap)
 {
@@ -84,7 +94,6 @@ typedef __int128_t atomic_longlong;
 typedef int64_t atomic_longlong;
 
 #endif // x86-64
-
 
 
 #define atomic_cas2(ptr, oldVal, newVal)   __sync_bool_compare_and_swap((volatile atomic_longlong*)ptr, oldVal, newVal)
