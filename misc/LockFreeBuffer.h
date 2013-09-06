@@ -3,6 +3,11 @@
 
 #include "sys/atomic_ops.h"
 
+
+/*
+ *
+ */
+
 class BufferNode;
 
 class LockFreeBuffer
@@ -13,7 +18,7 @@ class LockFreeBuffer
         ~LockFreeBuffer();
 
         char* AllocBuffer();
-        void  ReleaseBuffer();
+        void  ReleaseBuffer(void* buffer);
 
     private:
 
