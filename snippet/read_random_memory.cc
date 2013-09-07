@@ -135,8 +135,40 @@ int main2()
     return 0;
 }
 
+std::string GetString()
+{
+    return std::string("abc");
+}
+
+
+class RetCs
+{
+    public:
+
+        RetCs(int id): m_id(id) {}
+
+        RetCs& operator=(const RetCs& ref)
+        {
+            cout << "RetCs operator= invoked, left:" << m_id << ",right:" << ref.m_id << endl;
+        }
+
+    private:
+
+        int m_id;
+};
+
+
+RetCs GetRet()
+{
+    return RetCs(3);
+}
+
 int main()
 {
+    GetRet() = RetCs(4);
+
+    GetString() = std::string("efe");
+
     RefCs tmp = TempRefCs();
 
     cout << "starting..." << endl;

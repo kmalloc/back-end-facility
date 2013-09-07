@@ -1,4 +1,5 @@
 ./daemon
+./snippet/read
 .*.swp
 *.a
 *.o
