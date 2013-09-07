@@ -22,7 +22,7 @@ class LockFreeBuffer
         const int m_size; // total number of buffer.
         const int m_granularity;
 
-        size_t m_id;
+        volatile size_t m_id;
         char* m_rawBuff;
         DoublePointer m_head;
         BufferNode** m_freeList;

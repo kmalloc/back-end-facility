@@ -6,7 +6,7 @@
 #include <errno.h>
 
 
-Thread::Thread(ITask* task,bool detachable)
+Thread::Thread(ITask* task, bool detachable)
 :m_task(task)
 ,m_tid(0)
 ,m_busy(false)
@@ -55,17 +55,17 @@ bool Thread::Start()
 
     m_busy = true;
 
-    status = pthread_create(&m_tid,&attr,Thread::Run,static_cast<void*>(this));
+    status = pthread_create(&m_tid,&attr, Thread::RunTask, static_cast<void*>(this));
 
     pthread_attr_destroy(&attr);
 
-    if (status) slog("error:%d %s\n",status,strerror(status));
+    if (status) slog("error:%d %s\n", status, strerror(status));
 
     return status == 0;
 }
 
 
-void* Thread::Run(void*arg)
+void* Thread::RunTask(void*arg)
 {
     Thread* thread  = static_cast<Thread*>(arg);
     ITask * task    = thread->m_task;
@@ -95,11 +95,22 @@ bool Thread::Cancel()
 
 bool Thread::SetDetachable(bool enable)
 {
-    if (m_busy)return false;
+    if (m_busy) return false;
 
     m_detachable = enable;
     return true;
 }
 
+///thread base
+//
 
+ThreadBase::ThreadBase(bool detachable /* = false*/)
+    :Thread(NULL, detachable), m_task(this)
+{
+    Thread::SetTask(&m_task);
+}
+
+ThreadBase::~ThreadBase()
+{
+}
 

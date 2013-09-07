@@ -8,6 +8,7 @@ GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 
 XLIB_PATH = -L../../lib
 XLIB    = -lxthread
+XLIB    += -lmisc
 
 CXX = g++
 CXXFLAGS = -g -Wall -Wextra
@@ -23,17 +24,16 @@ all : $(TESTS)
 SpinlockQueueTest.o : $(CUR_DIR)/SpinlockQueueTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SpinlockQueueTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-PerThreadMemory.o : $(SRC_DIR)/misc/src/PerThreadMemory.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/misc/src/PerThreadMemory.cc $(SRC_HEAD) -I$(SRC_DIR)/misc
-
 PerThreadMemoryTest.o : $(CUR_DIR)/PerThreadMemoryTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/PerThreadMemoryTest.cc $(GTEST_HEADERS) $(SRC_HEAD) -I$(SRC_DIR)/thread
 
+LockFreeBufferTest.o: $(CUR_DIR)/LockFreeBufferTest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/LockFreeBufferTest.cc $(GTEST_HEADERS) $(SRC_HEAD)  -I$(SRC_DIR)/misc
 
-OBJS = SpinlockQueueTest.o PerThreadMemory.o PerThreadMemoryTest.o
+OBJS = SpinlockQueueTest.o PerThreadMemoryTest.o LockFreeBufferTest.o
 
 unittest : $(OBJS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lxthread -lpthread -lrt -lgtest_main -o $(TESTS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lxthread -lmisc -lpthread -lrt -lgtest_main -o $(TESTS)
 
 clean :
 	rm -f $(TESTS) *.o

@@ -31,8 +31,6 @@ LockFreeBuffer::~LockFreeBuffer()
 
 void LockFreeBuffer::InitList()
 {
-    assert(!m_freeList);
-
     size_t i, off_set = 0;
     const size_t sz = sizeof(BufferNode) + m_granularity;
 
@@ -45,7 +43,7 @@ void LockFreeBuffer::InitList()
     for (i = 0; i < m_size - 1; ++i)
     {
         m_freeList[i]->m_next.vals[0] = (void*)(i + 1);
-        m_freeList[i]->m_next.vals[1] = &m_freeList[i + 1];
+        m_freeList[i]->m_next.vals[1] = m_freeList[i + 1];
     }
 
     m_freeList[i]->m_next = 0;
@@ -57,7 +55,6 @@ void LockFreeBuffer::InitList()
 
 char* LockFreeBuffer::AllocBuffer()
 {
-    //
     DoublePointer old_head;
     do
     {
