@@ -37,9 +37,9 @@ class Logger: public ThreadBase
 
         volatile bool m_stopWorker;
 
-        std::string m_logFile;
-        size_t m_size; // total piece of buffers.
-        size_t m_granularity; // size of per buffer.
+        const size_t m_size; // total piece of buffers.
+        const size_t m_granularity; // size of per buffer.
+        const std::string m_logFile;
 
         LockFreeBuffer m_buffer;
         LockFreeListQueue m_pendingMsg;

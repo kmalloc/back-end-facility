@@ -33,7 +33,7 @@ LockFreeBufferTest.o: $(CUR_DIR)/LockFreeBufferTest.cc
 OBJS = SpinlockQueueTest.o PerThreadMemoryTest.o LockFreeBufferTest.o
 
 unittest : $(OBJS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(XLIB_PATH) $(XLIB) $(OBJS) -lxthread -lmisc -lpthread -lrt -lgtest_main -o $(TESTS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(OBJS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
 
 clean :
 	rm -f $(TESTS) *.o
