@@ -24,7 +24,7 @@ void Logger::Run()
 {
     while (!m_stopWorker)
     {
-       sem_wait(&m_sig); 
+        sem_wait(&m_sig); 
 
         void* buffer;
 
