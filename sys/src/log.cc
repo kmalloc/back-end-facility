@@ -1,7 +1,8 @@
 #include "log.h"
-#include <string>
+#include <string.h>
 #include <fstream>
 #include <assert.h>
+#include <stdarg.h>
 
 using namespace std;
 
@@ -24,7 +25,7 @@ void Logger::Run()
 {
     while (!m_stopWorker)
     {
-       sem_wait(&m_sig); 
+        sem_wait(&m_sig); 
 
         void* buffer;
 
@@ -50,22 +51,48 @@ void Logger::StopLogging()
     sem_post(&m_sig);
 }
 
-size_t Logger::Log(const char* msg)
+size_t Logger::Log(const char* msg, size_t sz /* = -1 */)
 {
-    // TODO
-    return 0;
+    if (sz == 0 || sz >= m_granularity) sz = m_granularity - 1;
+
+    char* buffer = (char*)m_buffer.AllocBuffer();
+
+    if (buffer == NULL) return 0;
+
+    strncpy(buffer, msg, sz);
+    buffer[sz] = 0;
+
+    bool ret;
+    do
+    {
+        ret = m_pendingMsg.Push(buffer);
+
+        if (ret == false)
+        {
+            sem_post(&m_sig);
+            sched_yield();
+        }
+
+    } while (ret == false);
+
+    return m_granularity - 1;
 }
 
 size_t Logger::Log(const std::string& msg)
 {
-    // TODO
-    return 0;
+    return Log(msg.c_str(), msg.size());
 }
 
-size_t Log(const char* format,...)
+size_t Logger::Log(const char* format,...)
 {
-    // TODO
-    return 0;
+    va_list args;
+    char buffer[m_granularity]; // variable lenght array
+
+    va_start(args, format);
+    vsnprintf(buffer, m_granularity - 1, format, args);
+    va_end(args);
+
+    return Log(buffer, m_granularity - 1);
 }
 
 

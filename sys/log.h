@@ -19,7 +19,7 @@ class Logger: public ThreadBase
         Logger(const char* file, size_t size = 2048, size_t granularity = 512);
         ~Logger();
 
-        size_t Log(const char* msg);
+        size_t Log(const char* msg, size_t sz = 0);
         size_t Log(const std::string& msg);
         size_t Log(const char* format,...);
 
@@ -30,7 +30,7 @@ class Logger: public ThreadBase
 
     private:
 
-        volatile bool   m_stopWorker;
+        volatile bool m_stopWorker;
 
         std::string m_logFile;
         size_t m_size; // total piece of buffers.
