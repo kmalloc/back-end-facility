@@ -28,8 +28,12 @@ $(OUT):
 $(RES):
 	mkdir -p $(RES)
 
+
 $(OUT)/log.o : $(SRC_DIR)/src/log.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/log.cc $(HEADER) -o $(OUT)/log.o
+
+$(OUT)/daemon.o : $(SRC_DIR)/src/daemon.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc $(HEADER) -o $(OUT)/daemon.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(RES)/$(LIBNAME) $(OBJECTS)

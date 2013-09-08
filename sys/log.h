@@ -3,34 +3,42 @@
 
 #include <stdlib.h>
 #include <string>
+#include <pthread.h>
 
+#include "thread/thread.h"
 #include "misc/LockFreeBuffer.h"
 #include "misc/lock-free-list.h"
 
-class Worker;
 class LockFreeListQueue;
 class LockFreeBuffer;
 
-class Logger
+class Logger: public ThreadBase
 {
     public:
 
-        Logger(size_t size, size_t granularity);
+        Logger(const char* file, size_t size = 2048, size_t granularity = 512);
         ~Logger();
 
         size_t Log(const char* msg);
         size_t Log(const std::string& msg);
         size_t Log(const char* format,...);
 
+    protected:
+        
+        virtual void Run();
+
     private:
 
-        void Init();
+        volatile bool   m_stopWorker;
 
+        std::string m_logFile;
         size_t m_size; // total piece of buffers.
         size_t m_granularity; // size of per buffer.
 
         LockFreeBuffer m_buffer;
         LockFreeListQueue m_pendingMsg;
+
+        sem_t m_sig;
 };
 
 
