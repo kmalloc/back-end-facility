@@ -1,6 +1,7 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
+#include <iostream>
 #include <stdlib.h>
 #include <string>
 #include <semaphore.h>
@@ -19,14 +20,18 @@ class Logger: public ThreadBase
         Logger(const char* file, size_t size = 2048, size_t granularity = 512);
         ~Logger();
 
-        size_t Log(const char* msg, size_t sz = 0);
         size_t Log(const std::string& msg);
         size_t Log(const char* format,...);
 
+        void DoFlush(std::ostream& fout);
+        void Flush();
+
+        void StopLogging();
+
     protected:
         
-        void StopLogging();
         virtual void Run();
+        size_t DoLog(void* buffer);
 
     private:
 

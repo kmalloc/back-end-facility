@@ -1,4 +1,5 @@
 #include "log.h"
+
 #include <string.h>
 #include <fstream>
 #include <assert.h>
@@ -21,27 +22,32 @@ Logger::~Logger()
     assert(m_stopWorker);
 }
 
+void Logger::DoFlush(ostream& fout)
+{
+    if (!fout.good()) return;
+
+    void* buffer;
+    while (m_pendingMsg.Pop(&buffer))
+    {
+        fout << (char*)buffer;
+        m_buffer.ReleaseBuffer(buffer);
+    }
+}
+
+void Logger::Flush()
+{
+    ofstream fout;
+    fout.open(m_logFile.c_str(), ofstream::out | ofstream::app);
+    DoFlush(fout);
+    fout.close();
+}
+
 void Logger::Run()
 {
     while (!m_stopWorker)
     {
         sem_wait(&m_sig); 
-
-        void* buffer;
-
-        ofstream fout;
-        fout.open(m_logFile.c_str(), ofstream::out | ofstream::app);
-
-        if (!fout.good()) continue;
-
-        while (m_pendingMsg.Pop(&buffer))
-        {
-            fout << (char*)buffer;
-
-            m_buffer.ReleaseBuffer(buffer);
-        }
-
-        fout.close();
+        Flush();
     }
 }
 
@@ -51,17 +57,8 @@ void Logger::StopLogging()
     sem_post(&m_sig);
 }
 
-size_t Logger::Log(const char* msg, size_t sz /* = -1 */)
+size_t Logger::DoLog(void* buffer)
 {
-    if (sz == 0 || sz >= m_granularity) sz = m_granularity - 1;
-
-    char* buffer = (char*)m_buffer.AllocBuffer();
-
-    if (buffer == NULL) return 0;
-
-    strncpy(buffer, msg, sz);
-    buffer[sz] = 0;
-
     bool ret;
     do
     {
@@ -80,19 +77,32 @@ size_t Logger::Log(const char* msg, size_t sz /* = -1 */)
 
 size_t Logger::Log(const std::string& msg)
 {
-    return Log(msg.c_str(), msg.size());
+    size_t sz = msg.size();
+    if (sz == 0) return 0;
+
+    if (sz >= m_granularity) sz = m_granularity - 1;
+
+    char* buffer = (char*)m_buffer.AllocBuffer();
+
+    if (buffer == NULL) return 0;
+
+    strncpy(buffer, msg.c_str(), sz);
+    buffer[sz] = 0;
+
+    return DoLog(buffer);
 }
 
 size_t Logger::Log(const char* format,...)
 {
-    va_list args;
-    char buffer[m_granularity]; // variable lenght array
+    char* buffer = (char*)m_buffer.AllocBuffer();
+    if (buffer == NULL) return 0;
 
+    va_list args;
     va_start(args, format);
     vsnprintf(buffer, m_granularity - 1, format, args);
     va_end(args);
 
-    return Log(buffer, m_granularity - 1);
+    return DoLog(buffer);
 }
 
 
