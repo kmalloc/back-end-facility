@@ -1,10 +1,10 @@
 #ifndef _THREAD_BASE_H_
 #define _THREAD_BASE_H_
 
-#include "ITask.h"
-#include "misc/noncopyable.h"
 #include <pthread.h>
 
+#include "ITask.h"
+#include "misc/noncopyable.h"
 
 class Thread: public noncopyable
 {

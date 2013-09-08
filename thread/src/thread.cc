@@ -1,6 +1,6 @@
 #include "thread.h"
 #include "ITask.h"
-#include "sys/log.h"
+#include "sys/LogLayer.h"
 
 #include <string.h>
 #include <errno.h>
@@ -21,11 +21,10 @@ Thread::~Thread()
 
 void* dummy_proc(void*)
 {
-    slog("dummy proc , gogogo\n");
-    slog("dummy proc , gogogo\n");
+    slog(LOG_ALL, "dummy proc , gogogo\n");
+    slog(LOG_ALL, "dummy proc , gogogo\n");
     return NULL;
-}
-
+} 
 bool Thread::Start()
 {
     if (m_busy || m_task == NULL) return false;
@@ -34,7 +33,7 @@ bool Thread::Start()
     int status = pthread_attr_init(&attr);
     if (status != 0)
     {
-        slog("init attr fail:%d %s\n",status,strerror(status));
+        slog(LOG_ERROR, "init attr fail:%d %s\n",status,strerror(status));
         return false; 
     }
 
@@ -49,7 +48,7 @@ bool Thread::Start()
 
     if (status != 0) 
     {
-        slog("set detachable fail:%d %s\n",status,strerror(status));
+        slog(LOG_ERROR, "set detachable fail:%d %s\n",status,strerror(status));
         return false;
     }
 
@@ -59,7 +58,7 @@ bool Thread::Start()
 
     pthread_attr_destroy(&attr);
 
-    if (status) slog("error:%d %s\n", status, strerror(status));
+    if (status) slog(LOG_FATAL, "error:%d %s\n", status, strerror(status));
 
     return status == 0;
 }

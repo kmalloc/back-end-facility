@@ -95,11 +95,9 @@ TEST(threadpooltest, alltest)
     BusyTaskForThreadPoolTest* m_busy[mbsz];
     NormalTaskForThreadPoolTest* m_norm[mnsz];
 
-
     EXPECT_FALSE(pool.IsRunning());
     EXPECT_TRUE(pool.StartPooling()); 
     EXPECT_EQ(0,pool.GetTaskNumber());
-
 
     for (int i = 0; i < mbsz; ++i)
     {
@@ -221,7 +219,7 @@ TEST(threadpooltest, alltest)
 
     EXPECT_TRUE(pool.IsRunning());
 
-    pool.ForceShutdown();
+    pool.StopPooling();
 
     EXPECT_EQ(mbsz, BusyTaskForThreadPoolTest::m_done);
     EXPECT_EQ(mnsz, NormalTaskForThreadPoolTest::m_done);

@@ -3,7 +3,6 @@
 #include <string.h>
 #include <fstream>
 #include <assert.h>
-#include <stdarg.h>
 
 using namespace std;
 
@@ -19,7 +18,8 @@ Logger::Logger(const char* file, size_t size, size_t granularity)
 
 Logger::~Logger()
 {
-    assert(m_stopWorker);
+    StopLogging();
+    Join();
 }
 
 void Logger::DoFlush(ostream& fout)
@@ -92,17 +92,23 @@ size_t Logger::Log(const std::string& msg)
     return DoLog(buffer);
 }
 
-size_t Logger::Log(const char* format,...)
+size_t Logger::Log(const char* format, va_list args)
 {
     char* buffer = (char*)m_buffer.AllocBuffer();
     if (buffer == NULL) return 0;
 
-    va_list args;
-    va_start(args, format);
     vsnprintf(buffer, m_granularity - 1, format, args);
-    va_end(args);
 
     return DoLog(buffer);
 }
 
+size_t Logger::Log(const char* format,...)
+{
+    va_list args;
+    va_start(args, format);
+    size_t ret = Log(format, args);
+    va_end(args);
+
+    return ret;
+}
 

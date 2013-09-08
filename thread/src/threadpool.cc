@@ -222,7 +222,7 @@ bool ThreadPool::StartPooling()
 bool ThreadPool::StopPooling()
 {
     m_running = false;
-    return m_worker->StopWorking();
+    return m_worker->StopWorking(true);
 }
 
 void ThreadPool::ForceShutdown()
