@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string>
 #include <semaphore.h>
+#include <stdarg.h>
 
 #include "thread/thread.h"
 #include "misc/LockFreeBuffer.h"
@@ -22,6 +23,7 @@ class Logger: public ThreadBase
 
         size_t Log(const std::string& msg);
         size_t Log(const char* format,...);
+        size_t Log(const char* format, va_list args);
 
         void DoFlush(std::ostream& fout);
         void Flush();
@@ -46,18 +48,6 @@ class Logger: public ThreadBase
 
         sem_t m_sig;
 };
-
-
-
-#include <stdio.h>
-
-#define LOG_ENABLE (0)
-
-#if LOG_ENABLE
-    #define slog printf
-#else
-    #define slog(s,...)
-#endif
 
 #endif
 

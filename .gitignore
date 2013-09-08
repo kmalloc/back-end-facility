@@ -11,3 +11,4 @@ cscope.*
 benchmark/lockfreebenchmark
 */core.*
 */*.s
+slog*.log

@@ -6,6 +6,7 @@
 
 #include <time.h>
 #include <errno.h>
+#include <assert.h>
 
 class DummyExitTask: public ITask
 {
@@ -49,12 +50,12 @@ WorkerBodyBase::~WorkerBodyBase()
 
 void WorkerBodyBase::SignalPost()
 {
-    sem_post(&m_sem);
+    assert(0 == sem_post(&m_sem));
 }
 
 void WorkerBodyBase::SignalConsume()
 {
-    sem_wait(&m_sem);
+    assert(0 == sem_wait(&m_sem));
 }
 
 bool WorkerBodyBase::SignalConsumeTimeout(int sec)
@@ -123,7 +124,7 @@ void WorkerBodyBase::Run()
     m_isRuning = false;
     m_ShouldStop = false;
 
-    while(1)
+    while (1)
     {
         ITask* msg = NULL;
 

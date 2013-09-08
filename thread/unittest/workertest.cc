@@ -38,9 +38,10 @@ sem_t workerTestDummyTask::m_sem;
 
 TEST(WorkerTaskTest,WorkerTest)
 {
-
     Worker worker;
     workerTestDummyTask *msg;
+
+    sem_init(&workerTestDummyTask::m_sem, 0, 0);
 
     EXPECT_FALSE(worker.IsRunning());
 
@@ -119,7 +120,6 @@ TEST(WorkerTaskTest,WorkerTest)
         int ii = workerTestDummyTask::m_order[ci];
         EXPECT_EQ(ci,ii);
     }
-
 
     for (int i = 0; i < 5; i++)
     {

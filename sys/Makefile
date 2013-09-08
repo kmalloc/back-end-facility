@@ -16,7 +16,7 @@ LIBNAME = libsysutil.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/log.o
+OBJECTS = $(OUT)/log.o $(OUT)/daemon.o $(OUT)/LogLayer.o
 
 all : $(LIBNAME)
 
@@ -28,9 +28,11 @@ $(OUT):
 $(RES):
 	mkdir -p $(RES)
 
-
 $(OUT)/log.o : $(SRC_DIR)/src/log.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/log.cc $(HEADER) -o $(OUT)/log.o
+
+$(OUT)/LogLayer.o : $(SRC_DIR)/src/LogLayer.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/LogLayer.cc $(HEADER) -o $(OUT)/LogLayer.o
 
 $(OUT)/daemon.o : $(SRC_DIR)/src/daemon.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc $(HEADER) -o $(OUT)/daemon.o
