@@ -56,6 +56,7 @@ void LockFreeBuffer::InitList()
 char* LockFreeBuffer::AllocBuffer()
 {
     DoublePointer old_head;
+
     do
     {
         old_head = atomic_read_double(&m_head);
