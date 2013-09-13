@@ -4,7 +4,7 @@ SRC_DIR = .
 THREAD_DIR = ./thread
 SYS_DIR = ./sys
 
-LIBS = lib/libxthread.a
+LIBS = lib/libxthread.a lib/libmisc.a lib/libsysutil.a
 
 LIBNAME = libserver.a
 CXX = g++

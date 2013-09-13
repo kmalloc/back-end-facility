@@ -1,5 +1,5 @@
 #include "gtest.h"
-#include "thread.h"
+#include "Thread.h"
 #include "ITask.h"
 
 class ThreadTestDummyTask:public ITask

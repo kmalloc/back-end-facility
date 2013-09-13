@@ -1,6 +1,6 @@
 #include "gtest.h"
 
-#include "worker.h"
+#include "Worker.h"
 
 #include <semaphore.h>
 

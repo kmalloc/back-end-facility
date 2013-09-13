@@ -3,8 +3,8 @@
 #include <sstream>
 #include <string>
 
-#include "thread/thread.h"
-#include "log.h"
+#include "thread/Thread.h"
+#include "Logger.h"
 
 using namespace std;
 

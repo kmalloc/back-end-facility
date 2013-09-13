@@ -16,7 +16,7 @@ LIBNAME = libxthread.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/thread.o $(OUT)/worker.o $(OUT)/threadpool.o
+OBJECTS = $(OUT)/Thread.o $(OUT)/Worker.o $(OUT)/ThreadPool.o
 
 all : $(LIBNAME)
 
@@ -28,14 +28,14 @@ $(OUT):
 $(RES):
 	mkdir -p $(RES)
 
-$(OUT)/thread.o : $(SRC_DIR)/src/thread.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/thread.cc $(HEADER) -o $(OUT)/thread.o
+$(OUT)/Thread.o : $(SRC_DIR)/src/Thread.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Thread.cc $(HEADER) -o $(OUT)/Thread.o
 
-$(OUT)/worker.o : $(SRC_DIR)/src/worker.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/worker.cc $(HEADER) -o $(OUT)/worker.o
+$(OUT)/Worker.o : $(SRC_DIR)/src/Worker.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Worker.cc $(HEADER) -o $(OUT)/Worker.o
 
-$(OUT)/threadpool.o : $(SRC_DIR)/src/threadpool.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/threadpool.cc $(HEADER) -o $(OUT)/threadpool.o
+$(OUT)/ThreadPool.o : $(SRC_DIR)/src/ThreadPool.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/ThreadPool.cc $(HEADER) -o $(OUT)/ThreadPool.o
 
 
 $(LIBNAME) : $(OBJECTS)

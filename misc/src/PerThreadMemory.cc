@@ -1,7 +1,7 @@
 #include "PerThreadMemory.h"
 
-#include "sys/defs.h"
-#include "sys/atomic_ops.h"
+#include "sys/Defs.h"
+#include "sys/AtomicOps.h"
 
 #include <string.h>
 #include <stdlib.h>

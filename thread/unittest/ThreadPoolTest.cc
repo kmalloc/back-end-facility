@@ -1,7 +1,7 @@
 #include "gtest.h"
 
-#include "threadpool.h"
-#include "sys/atomic_ops.h"
+#include "ThreadPool.h"
+#include "sys/AtomicOps.h"
 
 #include <semaphore.h>
 

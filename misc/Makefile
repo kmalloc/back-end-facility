@@ -16,7 +16,7 @@ LIBNAME = libmisc.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/lock-free-list.o $(OUT)/LockFreeBuffer.o $(OUT)/PerThreadMemory.o
+OBJECTS = $(OUT)/LockFreeList.o $(OUT)/LockFreeBuffer.o $(OUT)/PerThreadMemory.o
 
 all : $(LIBNAME)
 
@@ -28,8 +28,8 @@ $(OUT):
 $(RES):
 	mkdir -p $(RES)
 
-$(OUT)/lock-free-list.o : $(SRC_DIR)/src/lock-free-list.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/lock-free-list.cc $(HEADER) -o $(OUT)/lock-free-list.o -mcx16
+$(OUT)/LockFreeList.o : $(SRC_DIR)/src/LockFreeList.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/LockFreeList.cc $(HEADER) -o $(OUT)/LockFreeList.o -mcx16
 
 $(OUT)/LockFreeBuffer.o : $(SRC_DIR)/src/LockFreeBuffer.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/LockFreeBuffer.cc $(HEADER) -o $(OUT)/LockFreeBuffer.o -mcx16

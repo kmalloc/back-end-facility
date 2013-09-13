@@ -9,6 +9,7 @@ GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 XLIB_PATH = -L../../lib
 XLIB    = -lxthread
 XLIB    += -lmisc
+XLIB    += -lsysutil
 
 CXX = g++
 CXXFLAGS = -g -Wall -Wextra

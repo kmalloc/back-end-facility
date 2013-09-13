@@ -29,16 +29,16 @@ GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 
 all : $(TESTS)
 
-threadtest.o : $(USER_DIR)/threadtest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/threadtest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+ThreadTest.o : $(USER_DIR)/ThreadTest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/ThreadTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-workertest.o : $(USER_DIR)/workertest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/workertest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+WorkerTest.o : $(USER_DIR)/WorkerTest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/WorkerTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-threadpooltest.o : $(USER_DIR)/threadpooltest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/threadpooltest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+ThreadPoolTest.o : $(USER_DIR)/ThreadPoolTest.cc 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/ThreadPoolTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = threadtest.o workertest.o threadpooltest.o
+OBJS = ThreadTest.o WorkerTest.o ThreadPoolTest.o
 
 unittest : $(OBJS) 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(OBJS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)

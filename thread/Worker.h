@@ -1,9 +1,9 @@
 #ifndef _WORKER_THREAD_H_
 #define _WORKER_THREAD_H_
 
-#include "thread.h"
+#include "Thread.h"
 #include "ITask.h"
-#include "sys/defs.h"
+#include "sys/Defs.h"
 #include "misc/SpinlockQueue.h"
 
 #include <semaphore.h>

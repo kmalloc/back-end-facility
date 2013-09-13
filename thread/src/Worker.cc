@@ -1,5 +1,5 @@
-#include "worker.h"
-#include "sys/log.h"
+#include "Worker.h"
+#include "sys/Log.h"
 
 #include <vector>
 #include <queue>
