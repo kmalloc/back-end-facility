@@ -12,13 +12,22 @@ struct BufferNode
 
 LockFreeBuffer::LockFreeBuffer(size_t size, size_t granularity)
     :m_size(size), m_granularity(AlignTo(granularity, sizeof(DoublePointer)))
-    ,m_freeList(NULL), m_id(0)
+    ,m_freeList(NULL), m_id(0), m_rawBuff(NULL)
 {
     size_t sz = m_size * (sizeof(BufferNode) + m_granularity);
 
-    m_rawBuff = new char[sz];
-    
-    m_freeList = new BufferNode*[m_size];
+    try
+    {
+        m_rawBuff = new char[sz];
+        m_freeList = new BufferNode*[m_size];
+    }
+    catch (...)
+    {
+        if (m_rawBuff) delete[] m_rawBuff;
+        if (m_freeList) delete[] m_freeList;
+
+        throw "out of memory";
+    }
 
     InitList();
 }

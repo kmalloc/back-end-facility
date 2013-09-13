@@ -61,3 +61,4 @@ inline void slog(LogLevel level, const char* format, ...)
 #endif
 
 #endif // __LOG_LAYER_H__
+
