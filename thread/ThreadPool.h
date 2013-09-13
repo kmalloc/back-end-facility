@@ -1,7 +1,7 @@
 #ifndef _THREAD_POOL_H_
 #define _THREAD_POOL_H_
 
-#include "worker.h"
+#include "Worker.h"
 #include <vector>
 
 class Dispatcher;

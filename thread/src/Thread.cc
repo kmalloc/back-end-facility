@@ -1,6 +1,6 @@
-#include "thread.h"
+#include "Thread.h"
 #include "ITask.h"
-#include "sys/LogLayer.h"
+#include "sys/Log.h"
 
 #include <string.h>
 #include <errno.h>

@@ -16,7 +16,7 @@ LIBNAME = libsysutil.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/log.o $(OUT)/daemon.o $(OUT)/LogLayer.o
+OBJECTS = $(OUT)/Log.o $(OUT)/Daemon.o $(OUT)/Logger.o
 
 all : $(LIBNAME)
 
@@ -28,14 +28,14 @@ $(OUT):
 $(RES):
 	mkdir -p $(RES)
 
-$(OUT)/log.o : $(SRC_DIR)/src/log.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/log.cc $(HEADER) -o $(OUT)/log.o
+$(OUT)/Log.o : $(SRC_DIR)/src/Log.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Log.cc $(HEADER) -o $(OUT)/Log.o
 
-$(OUT)/LogLayer.o : $(SRC_DIR)/src/LogLayer.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/LogLayer.cc $(HEADER) -o $(OUT)/LogLayer.o
+$(OUT)/Logger.o : $(SRC_DIR)/src/Logger.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Logger.cc $(HEADER) -o $(OUT)/Logger.o
 
-$(OUT)/daemon.o : $(SRC_DIR)/src/daemon.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/daemon.cc $(HEADER) -o $(OUT)/daemon.o
+$(OUT)/Daemon.o : $(SRC_DIR)/src/Daemon.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Daemon.cc $(HEADER) -o $(OUT)/Daemon.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(RES)/$(LIBNAME) $(OBJECTS)

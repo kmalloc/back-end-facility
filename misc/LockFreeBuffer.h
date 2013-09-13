@@ -1,7 +1,7 @@
 #ifndef __LOCK_FREE_BUFFER_H_
 #define __LOCK_FREE_BUFFER_H_
 
-#include "sys/atomic_ops.h"
+#include "sys/AtomicOps.h"
 
 class BufferNode;
 

@@ -7,9 +7,9 @@
 #include <semaphore.h>
 #include <stdarg.h>
 
-#include "thread/thread.h"
+#include "thread/Thread.h"
 #include "misc/LockFreeBuffer.h"
-#include "misc/lock-free-list.h"
+#include "misc/LockFreeList.h"
 
 class LockFreeListQueue;
 class LockFreeBuffer;

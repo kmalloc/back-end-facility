@@ -1,6 +1,6 @@
 #include "LockFreeBuffer.h"
 
-#include "sys/defs.h"
+#include "sys/Defs.h"
 
 #include <assert.h>
 

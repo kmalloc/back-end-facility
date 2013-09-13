@@ -4,7 +4,7 @@
 #include <pthread.h>
 
 #include "ITask.h"
-#include "misc/noncopyable.h"
+#include "misc/NonCopyable.h"
 
 class Thread: public noncopyable
 {

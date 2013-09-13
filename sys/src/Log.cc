@@ -1,6 +1,6 @@
-#include "LogLayer.h"
+#include "Logger.h"
 
-#include "log.h"
+#include "Log.h"
 
 #if LOG_ENABLE
 

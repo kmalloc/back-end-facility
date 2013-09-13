@@ -1,4 +1,4 @@
-#include "lock-free-list.h"
+#include "LockFreeList.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <iostream>

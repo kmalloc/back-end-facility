@@ -1,7 +1,7 @@
 #include "gtest.h"
 
 #include "SpinlockQueue.h"
-#include "thread/thread.h"
+#include "thread/Thread.h"
 #include "thread/ITask.h"
 
 static const int val1 = 233;

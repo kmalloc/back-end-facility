@@ -1,7 +1,7 @@
 #ifndef _MISC_LOCk_FREE_LIST_H_
 #define _MISC_LOCk_FREE_LIST_H_
 
-#include "sys/atomic_ops.h"
+#include "sys/AtomicOps.h"
 #include "misc/PerThreadMemory.h"
 
 
