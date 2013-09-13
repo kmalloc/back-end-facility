@@ -31,13 +31,13 @@ class Logger: public ThreadBase
         void StopLogging();
 
     protected:
-        
+
         virtual void Run();
         size_t DoLog(void* buffer);
 
     private:
 
-        volatile bool m_stopWorker;
+        sem_t m_sig;
 
         const size_t m_size; // total piece of buffers.
         const size_t m_granularity; // size of per buffer.
@@ -46,7 +46,7 @@ class Logger: public ThreadBase
         LockFreeBuffer m_buffer;
         LockFreeListQueue m_pendingMsg;
 
-        sem_t m_sig;
+        volatile bool m_stopWorker;
 };
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef __LOCK_FREE_CONTAINER_H_
 #define __LOCK_FREE_CONTAINER_H_
 
-#include "atomic_ops.h"
+#include "AtomicOps.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -219,7 +219,6 @@ class LockFreeQueue
             Type ret;
 
             size_t old_read;
-            size_t old_write;
 
             do
             {

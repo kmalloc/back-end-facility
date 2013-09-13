@@ -3,7 +3,8 @@
 
 #include <stdlib.h>
 
-#define offset_of(TYPE, MEMBER) ((size_t) &((TYPE*)0)->MEMBER)
+#define offset_of(TYPE, MEMBER) ((size_t)&((TYPE*)0)->MEMBER)
+
 #define container_of(ptr, type, member) ({\
         const typeof( ((type *)0)->member)* __mptr =\
         (typeof( ((type *)0)->member)*)(ptr);\

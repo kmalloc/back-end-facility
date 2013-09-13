@@ -104,10 +104,16 @@ union DoublePointer
     void* vals[2];
     volatile atomic_longlong val;
 
-    DoublePointer() { val = 0; }
-    DoublePointer(const atomic_longlong& value) { val = value; }
+    // define DoublePointer as plain old data:
+    // 1) to suppress compiler warning.
+    // 2) keep it simple in c style
+    //
+    // don't define member function.
+    //
+    // DoublePointer() { val = 0; }
+    // DoublePointer(const atomic_longlong& value): val(value) {}
+    // operator atomic_longlong() { return val; }
 
-    operator atomic_longlong() { return val; }
 } __attribute__((aligned(sizeof(atomic_longlong))));
 
 

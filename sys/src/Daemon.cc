@@ -11,7 +11,7 @@
 
 void daemonize()
 {
-    int i,fd0,fd1,fd2;
+    size_t i,fd0,fd1,fd2;
     pid_t pid,sid;
     struct rlimit rl;
     struct sigaction sa;

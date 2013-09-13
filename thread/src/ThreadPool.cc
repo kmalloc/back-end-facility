@@ -171,7 +171,7 @@ void Dispatcher::PreHandleTask()
         sem_wait(&m_workerNotify);
         worker = SelectFreeWorker();
 
-    }while (worker == NULL);
+    } while (worker == NULL);
 
     m_freeWorker = worker;
 }

@@ -32,7 +32,7 @@ class LogThread: public ThreadBase
 {
     public:
 
-        LogThread(Logger& logger): m_logger(logger), m_stop(false) {}
+        LogThread(Logger& logger): m_stop(false), m_logger(logger) {}
 
         void Stop() { m_stop = true; }
 
