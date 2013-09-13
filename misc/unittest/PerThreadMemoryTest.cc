@@ -1,7 +1,7 @@
 #include "PerThreadMemory.h"
 #include "ITask.h"
-#include "thread.h"
-#include "threadpool.h"
+#include "Thread.h"
+#include "ThreadPool.h"
 
 #include "gtest.h"
 

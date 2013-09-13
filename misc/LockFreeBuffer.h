@@ -3,7 +3,7 @@
 
 #include "sys/AtomicOps.h"
 
-class BufferNode;
+struct BufferNode;
 
 class LockFreeBuffer
 {
@@ -19,8 +19,8 @@ class LockFreeBuffer
 
         void InitList();
 
-        const int m_size; // total number of buffer.
-        const int m_granularity;
+        const size_t m_size; // total number of buffer.
+        const size_t m_granularity;
 
         volatile size_t m_id;
         char* m_rawBuff;

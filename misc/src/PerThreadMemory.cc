@@ -34,9 +34,9 @@ struct PerThreadMemoryAlloc::NodeHead
     void* volatile mem_frame;
     volatile int node_number;
 
-    const int m_offset;
     const int m_population;
     const int m_granularity;
+    const int m_offset;
 
     // thread id
     pthread_t m_thread;

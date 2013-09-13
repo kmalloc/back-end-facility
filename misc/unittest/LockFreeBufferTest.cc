@@ -1,9 +1,9 @@
 #include "gtest.h"
 
 #include "LockFreeBuffer.h"
-#include "lock-free-list.h"
+#include "LockFreeList.h"
 #include "thread/ITask.h"
-#include "thread/thread.h"
+#include "thread/Thread.h"
 
 static const int gs_buffers = 1024;
 static const int gs_size    = 512;
@@ -14,7 +14,7 @@ static const int gs_candy_sz = sizeof(gs_candy);
 static inline void SetupCandy(void* buffer)
 {
     memcpy(buffer, gs_candy, gs_candy_sz);
-    memcpy(buffer + gs_candy_sz, gs_candy, gs_candy_sz);
+    memcpy((char*)buffer + gs_candy_sz, gs_candy, gs_candy_sz);
 }
 
 static inline bool VerifyCandy(void* buffer)
@@ -29,8 +29,8 @@ class LockFreeBufferReleaseThread: public ThreadBase
 
         LockFreeBufferReleaseThread(LockFreeBuffer& alloc)
             :m_stop(false)
-            ,m_queue(3072)
             ,m_alloc(alloc)
+            ,m_queue(3072)
             
         {
         }

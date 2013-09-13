@@ -1,9 +1,9 @@
-#include "sys/atomic_ops.h"
+#include "sys/AtomicOps.h"
 #include "misc/SpinlockQueue.h"
 #include "misc/LockFreeContainer.h"
-#include "misc/lock-free-list.h"
+#include "misc/LockFreeList.h"
 #include "thread/ITask.h"
-#include "thread/thread.h"
+#include "thread/Thread.h"
 
 #include <time.h>
 #include <stdio.h>
@@ -13,7 +13,6 @@
 #include <iostream>
 using namespace std;
 
-static void* gs_item = (void*)0x233;
 
 template <class T>
 class LockQueue:public SpinlockQueue<T>
@@ -91,7 +90,7 @@ class LockFreeConsumerTask: public ITask
                         && item != (void*)(0x233 + 3) 
                         && item != (void*)(0x233 + 4)) 
                 {
-                    fprintf(stdout, "err,c:%d,v:%x\n", m_count, item);
+                    fprintf(stdout, "err,c:%d,v:%p\n", m_count, item);
                     fflush(stdout);
                     assert(0);
                 }

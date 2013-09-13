@@ -8,9 +8,10 @@ using namespace std;
 
 Logger::Logger(const char* file, size_t size, size_t granularity)
     :m_size(size), m_granularity(granularity)
+    ,m_logFile(file)
     ,m_buffer(m_size, m_granularity)
     ,m_pendingMsg(m_size + 1)
-    ,m_logFile(file)
+    ,m_stopWorker(false)
 {
     sem_init(&m_sig, 0, 0);
     ThreadBase::Start();
