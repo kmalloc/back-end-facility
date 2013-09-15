@@ -153,7 +153,7 @@ class Worker:public Thread
         bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
         
-        virtual int  GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
+        virtual int GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 
         void EnableNotify(bool enable = true) { m_WorkerBody->EnableNotify(enable); }
 

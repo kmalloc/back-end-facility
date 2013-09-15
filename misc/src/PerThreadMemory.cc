@@ -8,7 +8,6 @@
 #include <assert.h>
 
 
-
 static const size_t gs_padding_sz = sizeof(void*);
 static const unsigned char gs_padding_char[2] = { 0x32, 0x23 };
 

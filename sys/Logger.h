@@ -31,7 +31,7 @@ class Logger: public ThreadBase
         void StopLogging();
 
     protected:
-        
+
         virtual void Run();
         size_t DoLog(void* buffer);
 
