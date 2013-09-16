@@ -43,6 +43,7 @@ void Logger::Flush()
     fout.close();
 }
 
+// currently, worker thread will be triggerred when msg queue is full.
 void Logger::Run()
 {
     while (!m_stopWorker)
@@ -67,6 +68,7 @@ size_t Logger::DoLog(void* buffer)
 
         if (ret == false)
         {
+            // msg queue is full, time to wake up worker to flush all the msg.
             sem_post(&m_sig);
             sched_yield();
         }
@@ -76,6 +78,8 @@ size_t Logger::DoLog(void* buffer)
     return m_granularity - 1;
 }
 
+// if lenght of msg is larger than m_granularity.
+// msg will not log completely.
 size_t Logger::Log(const std::string& msg)
 {
     size_t sz = msg.size();
