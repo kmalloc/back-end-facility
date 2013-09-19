@@ -15,7 +15,7 @@ LIBNAME = libsysutil.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/Log.o $(OUT)/Daemon.o $(OUT)/Logger.o
+OBJECTS = $(OUT)/Log.o $(OUT)/Daemon.o $(OUT)/Logger.o $(OUT)/FilePoll.o
 
 all : $(LIBNAME)
 
@@ -35,6 +35,9 @@ $(OUT)/Logger.o : $(SRC_DIR)/src/Logger.cc
 
 $(OUT)/Daemon.o : $(SRC_DIR)/src/Daemon.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Daemon.cc $(HEADER) -o $(OUT)/Daemon.o
+
+$(OUT)/FilePoll.o: $(SRC_DIR)/src/FilePoll.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/FilePoll.cc $(HEADER) -o $(OUT)/FilePoll.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(RES)/$(LIBNAME) $(OBJECTS)
