@@ -25,7 +25,10 @@ all : $(TESTS)
 LoggerTest.o : $(CUR_DIR)/LoggerTest.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/LoggerTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
 
-OBJS = LoggerTest.o
+SocketPollTest.o : $(CUR_DIR)/SocketPollTest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SocketPollTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+
+OBJS = LoggerTest.o SocketPollTest.o
 
 unittest : $(OBJS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(OBJS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)

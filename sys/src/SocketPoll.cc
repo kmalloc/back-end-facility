@@ -1,4 +1,4 @@
-#include "FilePoll.h"
+#include "SocketPoll.h"
 
 #include <sys/epoll.h>
 #include <sys/types.h>
@@ -7,38 +7,39 @@
 #include <assert.h>
 
 
-FilePoll::FilePoll()
+SocketPoll::SocketPoll()
     :m_epoll(-1)
 {
     Init();
 }
 
-void FilePoll::Init()
+void SocketPoll::Init()
 {
     m_epoll = epoll_create(1024);
-    assert(m_epoll == -1);
+    assert(m_epoll != -1);
 }
 
-FilePoll::~FilePoll()
+SocketPoll::~SocketPoll()
 {
     close(m_epoll);
 }
 
-bool FilePoll::AddFile(int file, void* data, bool write) const
+bool SocketPoll::AddSocket(int file, void* data, bool write) const
 {
     struct epoll_event ev;
     ev.events = EPOLLIN | (write? EPOLLOUT : 0);
     ev.data.ptr = data;
 
-    return (epoll_ctl(m_epoll, EPOLL_CTL_ADD, file, &ev) != -1); 
+    int ret = epoll_ctl(m_epoll, EPOLL_CTL_ADD, file, &ev);
+    return (ret != -1); 
 }
 
-bool FilePoll::DeleteFile(int file) const
+bool SocketPoll::DeleteSocket(int file) const
 {
     return (epoll_ctl(m_epoll, EPOLL_CTL_DEL, file, NULL) != -1);
 }
 
-bool FilePoll::ChangeFile(int file, void* data, bool write) const
+bool SocketPoll::ChangeSocket(int file, void* data, bool write) const
 {
     struct epoll_event ev;
     ev.events = EPOLLIN | (write? EPOLLOUT : 0);
@@ -47,7 +48,7 @@ bool FilePoll::ChangeFile(int file, void* data, bool write) const
     return (epoll_ctl(m_epoll, EPOLL_CTL_MOD, file, &ev) != -1);
 }
 
-int FilePoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
+int SocketPoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
 {
     PollEvent event;
     // variant array
@@ -67,7 +68,7 @@ int FilePoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
     return n;
 }
 
-bool FilePoll::SetFileNonBlocking(int fd) const
+bool SocketPoll::SetSocketNonBlocking(int fd) const
 {
     int flag = fcntl(fd, F_GETFL, 0);
 
