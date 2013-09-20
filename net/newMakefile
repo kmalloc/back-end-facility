@@ -1,0 +1,16 @@
+CC=g++
+CFLAGS=-c -Wall
+SOURCES=src/main.cc src/hello.cc
+
+OBJECTS=$(SOURCES:.cc=.o)
+
+EXECUTABLE=hello
+
+all: $(SOURCES) $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+
+.cc.o:
+	$(CC) $(CFLAGS) $< -o $@
+
