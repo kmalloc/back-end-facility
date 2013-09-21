@@ -59,8 +59,8 @@ int SocketPoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
     {
         unsigned flag = ev[i].events;
         event.data  = ev[i].data.ptr;
-        event.write = (flag & EPOLLOUT) != 0;
-        event.read  = (flag & EPOLLIN) != 0;
+        event.write = ((flag & EPOLLOUT) != 0);
+        event.read  = ((flag & EPOLLIN) != 0);
 
         ve.push_back(event);
     }
