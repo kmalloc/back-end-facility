@@ -220,7 +220,15 @@ void WorkerBodyBase::SetExitState()
 
 bool WorkerBodyBase::PostExit()
 {
-    ITask* task = new DummyExitTask(this);
+    ITask* task;
+    try
+    {
+         task = new DummyExitTask(this);
+    }
+    catch (...)
+    {
+        return false;
+    }
 
     return PostInternalCmd(task);
 }

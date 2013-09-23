@@ -93,6 +93,9 @@ void* PerThreadMemoryAlloc::AllocBuffer() const
     NodeHead* pHead = NULL;
     if ((pHead = (NodeHead*)pthread_getspecific(m_key)) == NULL) pHead = InitPerThreadList();
 
+    // out of memory;
+    if (pHead == NULL) return NULL;
+
     // a little detection.
     assert(!IsPaddingCorrupt(pHead->padding, gs_padding_sz));
 
@@ -108,7 +111,17 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 
     if (buf == NULL) return NULL;
 
-    NodeHead* pHead = new NodeHead(m_population, m_granularity, m_offset);
+    NodeHead* pHead;
+
+    try
+    {
+        pHead = new NodeHead(m_population, m_granularity, m_offset);
+    }
+    catch (...)
+    {
+        free(buf);
+        return NULL;
+    }
 
     pHead->m_thread = pthread_self();
     pHead->next = (Node*)buf;

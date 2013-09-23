@@ -64,12 +64,26 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     ,m_workerNum(workerNum)
     ,m_freeWorker(NULL)
 {
+    int i;
     m_workers.reserve(m_workerNum);
-    for (int i = 0; i < m_workerNum; ++i)
+
+    try
     {
-        Worker* worker = new Worker(m_pool, i);
-        worker->EnableNotify(true);
-        m_workers.push_back(worker);
+        // just assume that push_back will not throw exception for the moment.
+        // TODO
+        for (i = 0; i < m_workerNum; ++i)
+        {
+            Worker* worker = new Worker(m_pool, i);
+            worker->EnableNotify(true);
+            m_workers.push_back(worker);
+        }
+    }
+    catch (...)
+    {
+        for (int j = 0; j < i; ++j)
+            delete m_workers[j];
+
+        throw "out of memory";
     }
 
     sem_init(&m_workerNotify,0,m_workerNum);
@@ -202,9 +216,21 @@ void Dispatcher::HandleTask(ITask* task)
 
 ThreadPool::ThreadPool(int num)
    :WorkerManagerBase()
+   ,m_worker(NULL)
+   ,m_dispatcher(NULL)
 {
-    m_dispatcher = new Dispatcher(this, num); 
-    m_worker = new Worker(m_dispatcher);
+    try
+    {
+        m_dispatcher = new Dispatcher(this, num);
+        m_worker = new Worker(m_dispatcher);
+    }
+    catch (...)
+    {
+        if (m_worker) delete m_worker;
+        if (m_dispatcher) delete m_dispatcher;
+
+        throw "out of memory";
+    }
 }
 
 ThreadPool::~ThreadPool()

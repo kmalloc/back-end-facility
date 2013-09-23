@@ -49,7 +49,7 @@ LockFreeListQueue::LockFreeListQueue(size_t capacity)
 
 LockFreeListQueue::~LockFreeListQueue()
 {
-    delete [] m_freeList;
+    delete[] m_freeList;
 }
 
 void LockFreeListQueue::InitInternalNodeList()
