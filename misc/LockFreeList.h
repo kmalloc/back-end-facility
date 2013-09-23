@@ -3,9 +3,9 @@
 
 #include "sys/AtomicOps.h"
 #include "misc/PerThreadMemory.h"
+#include "misc/NonCopyable.h"
 
-
-class LockFreeListQueue
+class LockFreeListQueue: public noncopyable
 {
     public:
 

@@ -4,9 +4,11 @@
 #include "Worker.h"
 #include <vector>
 
+#include "misc/NonCopyable.h"
+
 class Dispatcher;
 
-class ThreadPool: public WorkerManagerBase
+class ThreadPool: public WorkerManagerBase, public noncopyable
 {
     public:
 

@@ -1,6 +1,7 @@
 #ifndef _SPIN_LOCK_QUEUE_H_
 #define _SPIN_LOCK_QUEUE_H_
 
+#include "NonCopyable.h"
 #include "sys/Defs.h"
 
 #include <vector>
@@ -9,7 +10,7 @@
 #include <semaphore.h>
 
 template<class Type, class cmp = std::less<Type> >
-class PriorityQueue
+class PriorityQueue: public noncopyable
 {
     public:
         PriorityQueue() {}

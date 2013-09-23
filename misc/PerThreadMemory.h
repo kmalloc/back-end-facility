@@ -3,6 +3,8 @@
 
 #include <pthread.h>
 
+#include "misc/NonCopyable.h"
+
 
 /*
  * Note:
@@ -30,7 +32,7 @@
  *
  */
 
-class PerThreadMemoryAlloc
+class PerThreadMemoryAlloc: public noncopyable
 {
     public:
 

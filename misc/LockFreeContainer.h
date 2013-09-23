@@ -10,6 +10,8 @@
 
 #include <linux/kernel.h>
 
+#include "misc/NonCopyable.h"
+
 //note:
 //(a)
 //to ensure efficiency of manipulating these structure,
@@ -27,7 +29,7 @@
 
 
 template<class Type>
-class LockFreeStack
+class LockFreeStack: public noncopyable
 {
     public:
 

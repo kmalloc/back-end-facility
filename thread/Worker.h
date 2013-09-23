@@ -5,12 +5,13 @@
 #include "ITask.h"
 #include "sys/Defs.h"
 #include "misc/SpinlockQueue.h"
+#include "misc/NonCopyable.h"
 
 #include <semaphore.h>
 
 class Worker;
 
-class WorkerBodyBase: public ITask
+class WorkerBodyBase: public ITask, public noncopyable
 {
     public:
 

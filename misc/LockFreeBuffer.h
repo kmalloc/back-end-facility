@@ -2,10 +2,11 @@
 #define __LOCK_FREE_BUFFER_H_
 
 #include "sys/AtomicOps.h"
+#include "misc/NonCopyable.h"
 
 struct BufferNode;
 
-class LockFreeBuffer
+class LockFreeBuffer: public noncopyable
 {
     public:
 

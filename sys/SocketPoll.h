@@ -4,6 +4,8 @@
 #include <vector>
 #include <stdlib.h>
 
+#include "misc/NonCopyable.h"
+
 struct PollEvent
 {
     void* data;
@@ -11,7 +13,7 @@ struct PollEvent
     bool  write;
 };
 
-class SocketPoll
+class SocketPoll: public noncopyable
 {
     public:
 
