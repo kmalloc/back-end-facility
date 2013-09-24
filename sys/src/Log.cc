@@ -47,5 +47,12 @@ void slog_fatal(const char* format, va_list arg)
    gs_log_fatal.Log(format, arg); 
 }
 
+// TODO specify log level to filter log
+// the smaller the value is the the fewer log get filterred.
+int slog_level()
+{
+    return LOG_LEVELS;
+}
+
 #endif
 

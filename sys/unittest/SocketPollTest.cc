@@ -107,6 +107,7 @@ TEST(TestWrite, SocketPollTest)
     data1.fd = fd_reads[0][0];
     data2.fd = fd_reads[1][0];
     data3.fd = fd_reads[2][0];
+
     poll.SetSocketNonBlocking(fd_reads[0][0]);
     poll.SetSocketNonBlocking(fd_reads[1][0]);
     poll.SetSocketNonBlocking(fd_reads[2][0]);

@@ -27,9 +27,13 @@ void slog_warn(const char* format, va_list va);
 void slog_error(const char* format, va_list va);
 void slog_fatal(const char* format, va_list va);
 
+int  slog_level();
+
 inline void slog(LogLevel level, const char* format, ...)
 {
-    if (level < 0 || level >= LOG_LEVELS) return;
+    int threshold = slog_level();
+
+    if (level < 0 || level >= threshold) return;
 
     typedef void (* proc)(const char*, va_list);
     static const proc arr[LOG_LEVELS] =
