@@ -30,7 +30,7 @@ void Logger::DoFlush(ostream& fout)
     void* buffer;
     while (m_pendingMsg.Pop(&buffer))
     {
-        fout << (char*)buffer;
+        fout << (char*)buffer << std::endl;
         m_buffer.ReleaseBuffer(buffer);
     }
 }

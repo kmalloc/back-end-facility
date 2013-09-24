@@ -30,10 +30,10 @@ class WorkerBodyBase: public ITask, public noncopyable
         int  TaskDone() const { return m_done; }
         void EnableNotify(bool enable = true) { m_notify = enable; }
 
-        //take care of calling this function.
-        //multitasking-opertion on m_mailbox will 
-        //greatly reduce performance.
-        //don't call it unless really necessary.
+        // take care of calling this function.
+        // multitasking-opertion on m_mailbox will 
+        // greatly reduce performance.
+        // don't call it unless really necessary.
         ITask* TryGetTask();
 
     protected:
@@ -42,7 +42,7 @@ class WorkerBodyBase: public ITask, public noncopyable
         virtual void HandleTask(ITask*) = 0;
         virtual bool  HasTask() = 0; 
 
-        //be aware: this function may block if there is no task
+        // be aware: this function may block if there is no task
         virtual ITask* GetTaskFromContainer() = 0;
         virtual bool   PushTaskToContainer(ITask*) = 0;
 
@@ -55,17 +55,17 @@ class WorkerBodyBase: public ITask, public noncopyable
 
     private:
 
-        //disable overloading from child
+        // disable overloading from child
         void Run();
 
-        //get task from mailbox or m_cmd
-        //may block when there is no task.
-        //caller take responsibility to free the task.
-        //return false if get task from m_cmd.
+        // get task from mailbox or m_cmd
+        // may block when there is no task.
+        // caller take responsibility to free the task.
+        // return false if get task from m_cmd.
         bool GetRunTask(ITask*& task);
 
-        //set up flag to make worker loop exit;
-        //will be called in worker thread only.
+        // set up flag to make worker loop exit;
+        // will be called in worker thread only.
         inline void SetExitState();
 
         inline bool PostInternalCmd(ITask*);
@@ -73,31 +73,31 @@ class WorkerBodyBase: public ITask, public noncopyable
         inline ITask* GetInternalCmd();
         inline void ProcessInternalCmd(ITask*);
 
-        //is running task.
+        // is running task.
         volatile bool m_isRuning;
 
-        //timeout for sem_timewait
+        // timeout for sem_timewait
         const int m_timeout;
         
         const int m_reqThreshold;
 
-        //semaphore for waiting for task.
+        // semaphore for waiting for task.
         sem_t m_sem;
 
-        //task processed.
+        // task processed.
         volatile int m_done;
 
-        //notify thread pool I am free now, send me some tasks
+        // notify thread pool I am free now, send me some tasks
         volatile bool m_notify;
         Worker* m_worker;
 
-        //note this is for internal usage only.
-        //supporting worker internal activities: exit.
+        // note this is for internal usage only.
+        // supporting worker internal activities: exit.
         SpinlockQueue<ITask*> m_cmd;
 
-        //exit flag.
-        //this variable will be accessed on in the worker thread.
-        //It will be set by DummyExitTask only.
+        // exit flag.
+        // this variable will be accessed on in the worker thread.
+        // It will be set by DummyExitTask only.
         bool m_ShouldStop;
 
         friend class DummyExitTask;
@@ -122,6 +122,8 @@ class WorkerBody: public WorkerBodyBase
 
     private:
 
+        // this queue can be replace with other container that supports identical interface.
+        // better replace it with lock free container/list.
         SpinlockWeakPriorityQueue<ITask*> m_mailbox;
 };
 
@@ -168,9 +170,9 @@ class Worker:public Thread
 
     protected:
 
-        //disable setting task. 
-        //this is a special thread specific to a worker thread.
-        //It should not be changed externally.
+        // disable setting task. 
+        // this is a special thread specific to a worker thread.
+        // It should not be changed externally.
         using Thread::SetTask;
         using Thread::Start;
 

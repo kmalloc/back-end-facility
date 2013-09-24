@@ -18,6 +18,14 @@ class Logger: public ThreadBase
 {
     public:
 
+        /*
+         * file: specify the file to store all the log.
+         * size: threshold to flush log to disk.
+         *       don't set this value too large, on application crash, we will lose all the 
+         *       log that is not flush to disk.
+         *          
+         * granularity: fixed size for each piece of log. 
+         */
         Logger(const char* file, size_t size = 2048, size_t granularity = 512);
         ~Logger();
 
@@ -25,6 +33,7 @@ class Logger: public ThreadBase
         size_t Log(const char* format,...);
         size_t Log(const char* format, va_list args);
 
+        // flush all the buffers in memory to disk.
         void DoFlush(std::ostream& fout);
         void Flush();
 
@@ -39,7 +48,7 @@ class Logger: public ThreadBase
 
         sem_t m_sig;
 
-        const size_t m_size; // total piece of buffers.
+        const size_t m_size; // total piece of buffers cached in memory.
         const size_t m_granularity; // size of per buffer.
         const std::string m_logFile;
 

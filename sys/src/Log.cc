@@ -3,6 +3,13 @@
 
 #if LOG_ENABLE
 
+#define LOG_FILE_ALL     "slog_all.log"
+#define LOG_FILE_DEBUG   "slog_debug.log"
+#define LOG_FILE_INFO    "slog_info.log"
+#define LOG_FILE_WARN    "slog_warn.log"
+#define LOG_FILE_ERROR   "slog_error.log"
+#define LOG_FILE_FATAL   "slog_fatal.log"
+
 static Logger gs_log_all(LOG_FILE_ALL, 3072, 512);
 static Logger gs_log_debug(LOG_FILE_DEBUG, 2048, 512);
 static Logger gs_log_info(LOG_FILE_INFO, 2048, 512);

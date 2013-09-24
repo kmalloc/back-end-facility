@@ -36,6 +36,13 @@ class PerThreadMemoryAlloc: public noncopyable
 {
     public:
 
+        /* 
+         * granularity: buffer size is fixed. this parameter specifys the size of each buffer.
+         * population: specifys how many buffers should be created, total number of buffer available.
+         * align: specifys the minimal buffer size of each buffer, please note this value will be adjusted internally to
+         * make the buffer boundary aligned to word size at least
+         */
+
         PerThreadMemoryAlloc(int granularity, int population, int align = sizeof(void*));
         ~PerThreadMemoryAlloc();
 

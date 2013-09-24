@@ -1,18 +1,12 @@
 #ifndef __LOG_LAYER_H__
 #define __LOG_LAYER_H__
 
+// switch to toggle log module
 #define LOG_ENABLE (1)
 
 #if LOG_ENABLE
 
 #include <stdarg.h>
-
-#define LOG_FILE_ALL     "slog_all.log"
-#define LOG_FILE_DEBUG   "slog_debug.log"
-#define LOG_FILE_INFO    "slog_info.log"
-#define LOG_FILE_WARN    "slog_warn.log"
-#define LOG_FILE_ERROR   "slog_error.log"
-#define LOG_FILE_FATAL   "slog_fatal.log"
 
 enum LogLevel
 {

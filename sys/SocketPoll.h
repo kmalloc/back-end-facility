@@ -6,6 +6,13 @@
 
 #include "misc/NonCopyable.h"
 
+/*
+ * simple wrapper of epoll.
+ * technically, I should name it as FilePoll, but since I am just using it to 
+ * poll socket file descriptor, so just leave it as it is for the moment. 
+ *
+ */
+
 struct PollEvent
 {
     void* data;

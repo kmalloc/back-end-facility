@@ -24,6 +24,7 @@ void* dummy_proc(void*)
     slog(LOG_ALL, "dummy proc , gogogo\n");
     return NULL;
 } 
+
 bool Thread::Start()
 {
     if (m_busy || m_task == NULL) return false;
@@ -61,7 +62,6 @@ bool Thread::Start()
 
     return status == 0;
 }
-
 
 void* Thread::RunTask(void*arg)
 {

@@ -241,7 +241,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
  */
 void PerThreadMemoryAlloc::ReleaseBuffer(void* buf) const
 {
-    // To support free operation from other thread,
+    // To support "free" operation from other thread,
     // the following check code must be disable. It is not going to work.
     /*
     NodeHead* head = (NodeHead*)pthread_getspecific(m_key);

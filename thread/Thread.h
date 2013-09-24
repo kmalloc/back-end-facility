@@ -6,6 +6,12 @@
 #include "ITask.h"
 #include "misc/NonCopyable.h"
 
+/*
+ * Naming is a little tricky.
+ * for now, ThreadBase is the ideal choice for most case.
+ * ThreadBase can satisfy most application scenario.
+ */
+
 class Thread: public noncopyable
 {
     public:
@@ -22,6 +28,7 @@ class Thread: public noncopyable
 
         virtual bool IsRunning() const { return m_busy; }
 
+        // this function is not thread safe, be sure not to call it when the thread is already started.
         ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp;}
         const ITask* GetTask() const { return m_task; }
         
