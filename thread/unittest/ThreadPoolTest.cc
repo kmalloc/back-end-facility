@@ -12,17 +12,15 @@ class BusyTaskForThreadPoolTest:public ITask
 {
     public:
 
-        BusyTaskForThreadPoolTest():m_stop(false), m_busy(false) {}
+        BusyTaskForThreadPoolTest():m_busy(false) { sem_init(&m_stopSem, 0, 0); }
         ~BusyTaskForThreadPoolTest() {}
 
         void Run() 
         {
             m_busy = true;
             atomic_increment(&m_exe); 
-            while (!m_stop)
-            {
-                sleep(1);
-            }
+
+            sem_wait(&m_stopSem);
 
             atomic_decrement(&m_exe);
             atomic_increment(&m_done);
@@ -31,12 +29,10 @@ class BusyTaskForThreadPoolTest:public ITask
             sem_post(&m_sem);
         }
 
-        void Stop() { m_stop = true; }
-
         static volatile int m_exe;
         static volatile int m_done;
-        volatile bool m_stop;
         volatile bool m_busy;
+        sem_t m_stopSem;
         static sem_t m_sem;
 };
 
@@ -49,7 +45,7 @@ class NormalTaskForThreadPoolTest:public ITask
 {
     public:
         NormalTaskForThreadPoolTest()
-            :ITask(TP_HIGH),m_counter(0),m_stop(false),m_busy(false) { }
+            :ITask(TP_HIGH),m_counter(0),m_busy(false) { sem_init(&m_stopSem, 0, 0); }
         
         ~NormalTaskForThreadPoolTest() {}
 
@@ -57,10 +53,8 @@ class NormalTaskForThreadPoolTest:public ITask
         {
             m_busy = true;
             atomic_increment(&m_exe);
-            while (!m_stop)
-            {
-                sleep(1);
-            }
+
+            sem_wait(&m_stopSem);
 
             atomic_decrement(&m_exe);
             atomic_increment(&m_done);
@@ -69,11 +63,11 @@ class NormalTaskForThreadPoolTest:public ITask
         }
 
         int m_counter;
-        volatile bool m_stop;
         volatile bool m_busy;
         static volatile int m_exe;
         static volatile int m_done;
         static sem_t  m_sem;
+        sem_t m_stopSem;
 };
 
 
@@ -126,7 +120,7 @@ TEST(threadpooltest, alltest)
     {
         if (m_busy[i]->m_busy)
         {
-            m_busy[i]->m_stop = true;
+            sem_post(&m_busy[i]->m_stopSem);
             stop++;
         }
     }
@@ -147,7 +141,7 @@ TEST(threadpooltest, alltest)
     for (int i = 0; i < mnsz; ++i)
     {
         if (m_norm[i]->m_busy)
-            m_norm[i]->m_stop = true;
+            sem_post(&m_norm[i]->m_stopSem);
     }
 
     for (int i = 0; i < worker; ++i)
@@ -169,7 +163,7 @@ TEST(threadpooltest, alltest)
         {
             if (m_norm[i]->m_busy)
             {
-                m_norm[i]->m_stop = true;
+                sem_post(&m_norm[i]->m_stopSem);
                 ++co;
             }
         }
@@ -200,7 +194,7 @@ TEST(threadpooltest, alltest)
         {
             if (m_busy[i]->m_busy)
             {
-                m_busy[i]->m_stop = true;
+                sem_post(&m_busy[i]->m_stopSem);
                 ++co;
             }
         }
