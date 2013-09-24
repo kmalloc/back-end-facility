@@ -21,6 +21,11 @@ void SocketPoll::Init()
 
 SocketPoll::~SocketPoll()
 {
+    Release();
+}
+
+void SocketPoll::Release()
+{
     close(m_epoll);
 }
 

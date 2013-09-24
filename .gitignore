@@ -1,5 +1,7 @@
 ./daemon
-./snippet/read
+snippet/read
+snippet/exception_handler.cc
+snippet/exec
 .*.swp
 *.a
 *.o

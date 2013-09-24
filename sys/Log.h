@@ -8,6 +8,9 @@
 
 #include <stdarg.h>
 
+// todo
+// provide signal event handler.
+// flush log when program crashes.
 enum LogLevel
 {
     LOG_ALL = 0,

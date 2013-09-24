@@ -76,9 +76,23 @@ inline size_t atomic_decrement(volatile size_t* val)
 #define atomic_sub(ptr, margin)  __sync_fetch_and_sub(ptr, margin)
 #define atomic_increment(ptr)    __sync_fetch_and_add(ptr, 1)
 #define atomic_decrement(ptr)    __sync_fetch_and_sub(ptr, 1)
+#define atomic_add_and_fetch(ptr, op) __sync_add_and_fetch(ptr, op)
+#define atomic_fetch_and_add(ptr, op) __sync_fetch_and_add(ptr, op)
+#define atomic_and_and_fetch(ptr, op) __sync_and_and_fetch(ptr, op)
 
 #endif // USING_CAS_TO_DO_INCREASE
 
+#if __GNUC__ < 4
+inline void atomic_barrier()
+{
+    __asm__ volatile("":::"memory");
+}
+#else
+inline void atomic_barrier()
+{
+    __sync_synchronize();
+}
+#endif
 
 /////////////////////////setting up cas /////////////////////////////
 
