@@ -3,6 +3,21 @@
 
 #include "misc/NonCopyable.h"
 
+
+/*
+ * whole server is based on epoll.
+ * internally, there will be 3 threads running for the server.
+ * 1) poll thread, waiting on epoll_wait().
+ *    this thread handle all the lightweight event.
+ *    and dispatch event to other 2 threads.
+ * 2) writer thread, this thread is responsible for sending buffer for ALL sockets
+ *    when write is possible on any of them. And, all send operations are nonblocking.
+ *    
+ * 3) reader thread, this thread is responsible for receiving data for ALL sockets when read
+ *    is possible on any socket.
+ *
+ */
+
 struct SocketMessage
 {
     int   socketid;

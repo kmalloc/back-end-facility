@@ -8,9 +8,8 @@
 
 /*
  * simple wrapper of epoll.
- * technically, I should name it as FilePoll, but since I am just using it to 
- * poll socket file descriptor, so just leave it as it is for the moment. 
- *
+ * technically, It should be named as FilePoll, because other file descriptor is not restricted,
+ * just leave it as it is for the moment. 
  */
 
 struct PollEvent
