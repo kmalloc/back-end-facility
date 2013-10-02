@@ -1,6 +1,8 @@
 ./daemon
 snippet/read
 snippet/exception_handler.cc
+snippet/of
+snippet/ov
 snippet/exec
 .*.swp
 *.a
@@ -14,3 +16,4 @@ benchmark/lockfreebenchmark
 */core.*
 */*.s
 slog*.log
+

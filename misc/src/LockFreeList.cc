@@ -4,6 +4,10 @@
 #include <iostream>
 
 
+/*
+ * all the nodes will either be linked in the lock-free list(using next) or
+ * linked in the unused-list (using next2)
+ */
 struct LockFreeListQueue::LockFreeListNode
 {
     DoublePointer next; // lock free queue pointer
