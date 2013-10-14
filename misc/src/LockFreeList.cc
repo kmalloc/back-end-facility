@@ -6,12 +6,11 @@
 
 /*
  * all the nodes will either be linked in the lock-free list(using next) or
- * linked in the unused-list (using next2)
+ * linked in the unused-list (using next too)
  */
 struct LockFreeListQueue::LockFreeListNode
 {
-    DoublePointer next; // lock free queue pointer
-    DoublePointer next2; // internal node list pointer
+    DoublePointer next;
 
     void* volatile data;
 
@@ -65,11 +64,11 @@ void LockFreeListQueue::InitInternalNodeList()
     size_t i = 0;
     for (; i < m_max - 1; ++i)
     {
-        m_freeList[i].next2.vals[0] = (void*)(i + 1);
-        m_freeList[i].next2.vals[1] = &m_freeList[i + 1];
+        m_freeList[i].next.vals[0] = (void*)(i + 1);
+        m_freeList[i].next.vals[1] = &m_freeList[i + 1];
     }
 
-    m_freeList[i].next2.val = 0;
+    m_freeList[i].next.val = 0;
 
     SetDoublePointer(m_head, (void*)0, m_freeList);
     m_id2 = i;
@@ -86,7 +85,7 @@ LockFreeListQueue::LockFreeListNode* LockFreeListQueue::AllocNode()
 
         // m_freeList will never be freed untill queue is destroyed.
         // so it is safe to access old_head->next
-        if (atomic_cas2(&m_head.val, old_head.val, ((LockFreeListNode*)old_head.vals[1])->next2.val)) break;
+        if (atomic_cas2(&m_head.val, old_head.val, ((LockFreeListNode*)old_head.vals[1])->next.val)) break;
 
     } while (1);
 
@@ -112,7 +111,7 @@ void LockFreeListQueue::ReleaseNode(LockFreeListNode* node)
     do
     {
         old_head.val = atomic_read_double(&m_head);
-        node->next2 = old_head;
+        node->next = old_head;
 
         if (atomic_cas2(&m_head.val, old_head.val, new_node.val)) break;
 
