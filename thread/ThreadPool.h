@@ -36,7 +36,7 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 
         virtual int SetWorkerNotify(Worker* worker);
 
-        int CalcDefaultThreadNum();
+        virtual int CalcDefaultThreadNum() const;
 
         bool        m_running;
         Worker*     m_worker;

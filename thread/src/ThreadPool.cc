@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <memory.h>
+#include <unistd.h>
 
 
 struct CompareTaskPriority 
@@ -219,6 +220,8 @@ ThreadPool::ThreadPool(int num)
    ,m_worker(NULL)
    ,m_dispatcher(NULL)
 {
+    if (num <= 0) num = CalcDefaultThreadNum();
+
     try
     {
         m_dispatcher = new Dispatcher(this, num);
@@ -229,6 +232,7 @@ ThreadPool::ThreadPool(int num)
         if (m_worker) delete m_worker;
         if (m_dispatcher) delete m_dispatcher;
 
+        slog(LOG_WARN, "threadpool exception, out of memory\n");
         throw "out of memory";
     }
 }
@@ -236,6 +240,17 @@ ThreadPool::ThreadPool(int num)
 ThreadPool::~ThreadPool()
 {
     delete m_worker;
+}
+
+int ThreadPool::CalcDefaultThreadNum() const
+{
+    // glibc extention to get cpu info
+    int num = sysconf(_SC_NPROCESSORS_CONF);
+
+    slog(LOG_DEBUG, "threadpool, cpu number:%d\n", num);
+    if (num <= 0) num = 2;
+
+    return num;
 }
 
 bool ThreadPool::StartPooling()

@@ -24,8 +24,8 @@ class BusyTaskForThreadPoolTest:public ITask
 
             atomic_decrement(&m_exe);
             atomic_increment(&m_done);
-            m_busy = false;
 
+            m_busy = false;
             sem_post(&m_sem);
         }
 
@@ -45,7 +45,7 @@ class NormalTaskForThreadPoolTest:public ITask
 {
     public:
         NormalTaskForThreadPoolTest()
-            :ITask(TP_HIGH),m_counter(0),m_busy(false) { sem_init(&m_stopSem, 0, 0); }
+            :ITask(TP_HIGH), m_busy(false) { sem_init(&m_stopSem, 0, 0); }
         
         ~NormalTaskForThreadPoolTest() {}
 
@@ -58,11 +58,11 @@ class NormalTaskForThreadPoolTest:public ITask
 
             atomic_decrement(&m_exe);
             atomic_increment(&m_done);
+
             m_busy = false;
             sem_post(&m_sem);
         }
 
-        int m_counter;
         volatile bool m_busy;
         static volatile int m_exe;
         static volatile int m_done;
@@ -86,6 +86,7 @@ TEST(threadpooltest, alltest)
 
     ThreadPool pool(worker);
 
+    // note, busy task has lower prioprity
     BusyTaskForThreadPoolTest* m_busy[mbsz];
     NormalTaskForThreadPoolTest* m_norm[mnsz];
 
@@ -93,6 +94,7 @@ TEST(threadpooltest, alltest)
     EXPECT_TRUE(pool.StartPooling()); 
     EXPECT_EQ(0,pool.GetTaskNumber());
 
+    // post busy task to pool
     for (int i = 0; i < mbsz; ++i)
     {
         m_busy[i] = new BusyTaskForThreadPoolTest();
@@ -106,7 +108,7 @@ TEST(threadpooltest, alltest)
     EXPECT_EQ(mbsz - worker, pool.GetTaskNumber());
     EXPECT_EQ(worker, BusyTaskForThreadPoolTest::m_exe);
 
-
+    // post normal task to pool
     for (int i = 0; i < mnsz; ++i)
     {
         m_norm[i] = new NormalTaskForThreadPoolTest();
@@ -115,6 +117,9 @@ TEST(threadpooltest, alltest)
 
     sleep(1);
 
+    // try to stop half of the busy task
+    // but since worker not equal to mbsz.
+    // busy task may not all been run.
     int stop = 0;
     for (int i = 0; stop < mbsz/2 && i < mbsz; ++i)
     {
@@ -127,9 +132,13 @@ TEST(threadpooltest, alltest)
 
     EXPECT_EQ(worker > mbsz/2?mbsz/2:worker, stop);
 
+
+    cout << stop << " busy task stopped" << endl;
+
     int newRun = stop;
     int busyLeft = worker - newRun;
 
+    // wati for the half stopped task to exit
     for (int i = 0; i < newRun; ++i)
         sem_wait(&BusyTaskForThreadPoolTest::m_sem);
 
@@ -138,13 +147,21 @@ TEST(threadpooltest, alltest)
     EXPECT_EQ(newRun, BusyTaskForThreadPoolTest::m_done);
     EXPECT_EQ(busyLeft, BusyTaskForThreadPoolTest::m_exe);
 
+    // try to stop all normal task
+    stop = 0;
     for (int i = 0; i < mnsz; ++i)
     {
         if (m_norm[i]->m_busy)
+        {
             sem_post(&m_norm[i]->m_stopSem);
+            stop++;
+        }
     }
 
-    for (int i = 0; i < worker; ++i)
+    cout << stop << " normal task stopped" << endl;
+
+    // wait for all of the normal task to exit
+    for (int i = 0; i < stop; ++i)
         sem_wait(&NormalTaskForThreadPoolTest::m_sem);
 
     sleep(1);
@@ -184,7 +201,7 @@ TEST(threadpooltest, alltest)
     }
     else
     {
-        EXPECT_EQ(mbsz - worker, BusyTaskForThreadPoolTest::m_exe);
+        EXPECT_EQ(mbsz/2, BusyTaskForThreadPoolTest::m_exe);
     }
 
     while (1)
@@ -199,7 +216,7 @@ TEST(threadpooltest, alltest)
             }
         }
 
-        if (co == 0) break;
+        if (co == 0 && BusyTaskForThreadPoolTest::m_done == mbsz) break;
 
         for (int i = 0; i < co; ++i)
             sem_wait(&BusyTaskForThreadPoolTest::m_sem);
@@ -209,6 +226,7 @@ TEST(threadpooltest, alltest)
     EXPECT_EQ(0, NormalTaskForThreadPoolTest::m_exe);
     EXPECT_EQ(0, BusyTaskForThreadPoolTest::m_exe);
 
+    sleep(1);
     EXPECT_EQ(0, pool.GetTaskNumber());
 
     EXPECT_TRUE(pool.IsRunning());
