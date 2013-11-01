@@ -33,7 +33,7 @@ class LockFreeListQueue: public noncopyable
         DoublePointer m_out;
 
         volatile size_t m_id2;
-        DoublePointer m_head;
+        DoublePointer m_head; // point to unused LockFreeListNode list
         LockFreeListNode* m_freeList; //internal node list
 };
 

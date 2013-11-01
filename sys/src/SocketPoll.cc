@@ -24,7 +24,7 @@ SocketPoll::~SocketPoll()
     Release();
 }
 
-void SocketPoll::Release()
+void SocketPoll::Release() const
 {
     close(m_epoll);
 }

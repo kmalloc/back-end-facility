@@ -191,7 +191,7 @@ static void ReadPipe(int fd, void* buff, int sz)
         {
             if (errno == EINTR) continue;
 
-            slog(LOG_ERROR, "socket-server: read pipe error:%s.\n", strerror(errno));
+            slog(LOG_ERROR, "server: read pipe error:%s.\n", strerror(errno));
             return;
         }
 
@@ -250,13 +250,13 @@ void SocketServerImpl::SetupServer()
     int fd[2];
     if (pipe(fd))
     {
-        slog(LOG_ERROR, "socketserver, create pipe fail");
+        slog(LOG_ERROR, "server, create pipe fail");
         throw "pipe fail";
     }
 
     if (!m_poll.AddSocket(fd[0], NULL))
     {
-        slog(LOG_ERROR, "socketserver:add ctrl fd failed.");
+        slog(LOG_ERROR, "server:add ctrl fd failed.");
         close(fd[0]);
         close(fd[1]);
         throw "add ctrl fd fail";
@@ -524,41 +524,7 @@ int SocketServerImpl::QueueSocketBuffer(request_send* req, socket_message* res)
 
     assert(sock->type != Socket_Listen && sock->type != Socket_PListen);
 
-    if (sock->head == NULL)
-    {
-        int n = write(sock->fd, req->buffer, req->sz);
-        if (n < 0)
-        {
-            if (EINTR == errno || EAGAIN == errno)
-            {
-                n = 0;
-            }
-            else
-            {
-                slog(LOG_ERROR, "socket-server:write to %d(fd=%d) failed.", id, sock->fd);
-                ForceCloseSocket(sock, result);
-                return SOCKET_CLOSE;
-            }
-        }
-
-        if (n == req->sz)
-        {
-            free(req->buffer);
-            return -1;
-        }
-         
-        SendBuffer* buf = (SendBuffer*)malloc(sizeof(SendBuffer));
-        assert(buf);
-        buf->next = NULL;
-        buf->current_ptr = req->buffer + n;
-        buf->left_size = req->sz - n;
-        buf->raw_buffer = req->buffer;
-        buf->raw_size = req->sz;
-
-        sock->head = sock->tail = buf;
-        m_poll.ChangeSocket(sock->fd, sock, true);
-    }
-    else
+    if (sock->head)
     {
        SendBuffer* buf = (SendBuffer*)malloc(sizeof(SendBuffer));
        buf->current_ptr = req->buffer;
@@ -572,7 +538,41 @@ int SocketServerImpl::QueueSocketBuffer(request_send* req, socket_message* res)
        buf->next = NULL;
        sock->tail->next = buf;
        sock->tail = buf;
+
+       return -1;
     }
+
+    int n = write(sock->fd, req->buffer, req->sz);
+    if (n < 0)
+    {
+        if (EINTR == errno || EAGAIN == errno)
+        {
+            n = 0;
+        }
+        else
+        {
+            slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", id, sock->fd);
+            ForceCloseSocket(sock, result);
+            return SOCKET_CLOSE;
+        }
+    }
+
+    if (n == req->sz)
+    {
+        free(req->buffer);
+        return -1;
+    }
+
+    SendBuffer* buf = (SendBuffer*)malloc(sizeof(SendBuffer));
+    assert(buf);
+    buf->next = NULL;
+    buf->current_ptr = req->buffer + n;
+    buf->left_size = req->sz - n;
+    buf->raw_buffer = req->buffer;
+    buf->raw_size = req->sz;
+
+    sock->head = sock->tail = buf;
+    m_poll.ChangeSocket(sock->fd, sock, true);
 
     return -1;
 }
