@@ -72,7 +72,7 @@ class SocketServer: public noncopyable
     
         struct SocketServerImpl;
 
-        SocketServerImpl* m_impl;
+        SocketServerImpl* impl_;
 };
 
 #endif

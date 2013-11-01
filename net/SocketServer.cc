@@ -206,21 +206,26 @@ SocketServerImpl::~SocketServerImpl()
 
 int SocketServerImpl::ReserveSocketSlot()
 {
-    for (int i = 0; i < MAX_SOCKET; ++i)
+    int i = 0;
+    while (i < MAX_SOCKET)
     {
         int id = atomic_increment(&m_allocId);
         if (id < 0)
+        {
             id = atomic_and_and_fetch(&m_allocId, ~(1 << (sizeof(int) - 1)));
+        }
 
         struct SocketEntity* sock = &m_sockets[id%MAX_SOCKET]; 
 
         if (sock->type == Socket_Invalid)
         {
-            if (atomic_cas(&sock->type, Socket_Invalid, Socket_Reserved))
-                return id;
+            int ret = atomic_cas(&sock->type, Socket_Invalid, Socket_Reserved); 
+            if (ret) return id;
 
-            --i;
+            continue;
         }
+
+        ++i;
     }
 
     return -1;
@@ -575,8 +580,9 @@ int SocketServerImpl::QueueSocketBuffer(request_send* req, socket_message* res)
 static int CanSocketListen(int fd, struct addrinfo* ai_ptr, void* data)
 {
     int reuse = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&reuse, sizeof(int)) == -1)
-        return -1;
+    int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&reuse, sizeof(int)); 
+
+    if (ret == -1) return -1;
 
     if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) == -1) return -1;
 
@@ -590,14 +596,13 @@ int SocketServerImpl::ListenSocket(request_listen* req, socket_message* res)
     int id = req->id;
     int listen_fd = -1;
 
-    char port[16];
-    sprintf(port, "%d", req->port);
-
-    int status = 0;
     int sock;
+    int status = 0;
+    char port[16];
 
     struct addrinfo* ai_ptr = NULL;
 
+    sprintf(port, "%d", req->port);
     ai_ptr = AllocSocketFd(&CanSocketListen, req->host, port, &sock, &satus);
 
     // set up socket, but not put it into epoll yet.
@@ -626,6 +631,7 @@ _failed:
 int SocketServerImpl::CloseSocket(request_close* req, socket_message* res)
 {
     int id = req->id;
+
     SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
     if (sock->type == Socket_Invalid || sock->id != id)
     {
@@ -692,9 +698,7 @@ int SocketServerImpl::StartSocket(request_start* req, socket_message* res)
             return SOCKET_ERROR;
         }
 
-        sock->type = (sock->type == Socket_PAccepted)?
-            Socket_Connected:Socket_Listen;
-
+        sock->type = (sock->type == Socket_PAccepted)?Socket_Connected:Socket_Listen;
         sock->opaque = req->opaque;
         res->data = "start";
         return SOCKET_OPEN;
