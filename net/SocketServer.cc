@@ -9,7 +9,7 @@
 #define MAX_SOCKET (1 << SOCK_BITS)
 #define MIN_READ_BUFFER (64)
 
-typedef int (* OnSocketAllocCb)(int, struct addrinfo*, void*);
+typedef int (* SocketPredicateProc)(int, struct addrinfo*, void*);
 
 enum SocketStatus
 {
@@ -33,6 +33,7 @@ struct SocketBuffer
     int raw_size;
 };
 
+// wrapper of raw socket fd
 struct SocketEntity
 {
     int fd;
@@ -56,6 +57,7 @@ struct SocketEntity
     }
 };
 
+// definitions of internal cmd.
 struct request_connect
 {
     int id;
@@ -140,20 +142,36 @@ class SocketServerImpl: public ThreadBase
         int  StartListen(const string& ip, int port);
         int  SendBuffer(int id, void* data, int len);
 
-        void CloseSocket(SocketEntity* sock, SocketMessage* result);
-        void ForceCloseSocket(SocketEntity* so, SocketMessage* res);
         void SetupSocket(int id, int fd, uintptr_t opaque, bool poll); 
         inline void ResetSocketSlot(int id);
-
-        int  AllocSocketFd(const char* host, const char* port,
+        inline void ForceCloseSocket(SocketEntity* so, SocketMessage* res);
+        static int AllocSocketFd(const char* host, const char* port,
                 void* buff, int len, int* status);
 
-        // 
-        int  QueueSocketBuffer(request_send* req, socket_message* res);
+        int ConnectSocket(void* buf, SocketMessage* result);
+        int CloseSocket(void* buf, SocketMessage* result);
+        int BindSocket(void* buf, SocketMessage* result);
+        int StartSocket(void* buf, SocketMessage* result);
+        int ListenSocket(void* buf, SocketMessage* result);
+        int SendSocketBuffer(void* buffer, SocketMessage* res);
+
+        int ProcessInternalCmd(SocketMessage* msg);
 
         virtual void Run();
 
     private:
+
+        enum
+        {
+            ACTION_BIND,
+            ACTION_CONNECT,
+            ACTION_LISTEN,
+            ACTION_START,
+            ACTION_CLOSE,
+            ACTION_SEND,
+
+            ACTION_NONE
+        };
 
         void SetupServer();
         void ShutDown();
@@ -179,8 +197,21 @@ class SocketServerImpl: public ThreadBase
 
         SocketEntity m_sockets[];
         SocketPoll m_poll;
+
+        typedef int (SocketServerImpl::* ActionHandler)(void*, SocketMessage*);
+        static const ActionHandler m_actionHandler[];
 };
 
+
+const ActionHandler m_actionHandler[] =
+{
+   &SocketServerImpl::BindSocket,
+   &SocketServerImpl::ConnectSocket,
+   &SocketServerImpl::ListenSocket,
+   &SocketServerImpl::StartSocket,
+   &SocketServerImpl::CloseSocket,
+   &SocketServerImpl::SendSocketBuffer,
+};
 
 static void ReadPipe(int fd, void* buff, int sz)
 {
@@ -315,8 +346,7 @@ void SocketServerImpl::ShutDown()
     close(m_recvCtrlFd);
 }
 
-SocketEntity* SocketServerImpl::SetupSocket(int id, int fd,
-        uintptr_t opaque, bool poll)
+SocketEntity* SocketServerImpl::SetupSocket(int id, int fd, uintptr_t opaque, bool poll)
 {
     SocketEntity* so = &m_sockets[id % MAX_SOCKET];
     assert(so->type == Socket_Reserved);
@@ -359,7 +389,7 @@ static int CanSocketConnect(int fd, struct addrinfo* ai_ptr, void* data)
 }
 
 // thread safe
-struct addrinfo* SocketServerImpl::AllocSocketFd(OnSocketAllocCb proc,
+struct addrinfo* SocketServerImpl::AllocSocketFd(SocketPredicateProc proc,
         const char* host, const char* port, int* sock_, int* stat)
 {
     int status;
@@ -403,74 +433,8 @@ _failed:
     return NULL;
 }
 
-int SocketServerImpl::SocketConnect(request_connect* req, socket_message* res)
-{
-    int id = req->id;
-    res->opaque = req->opaque;
-    res->id     = req->id;
-    res->ud     = 0;
-    res->data   = NULL;
-
-    char port[16];
-    sprintf(port, "%d", req->port);
-
-    int status = 0;
-    int sock;
-
-    struct addrinfo* ai_ptr = NULL;
-
-    ai_ptr = AllocSocketFd(&CanSocketConnect, req->host, port, &sock, &status);
-
-    if (sock < 0 || ai_ptr == NULL) return SOCKET_ERROR;
-
-    // alloc socket entity, and poll the socket
-    SocketEntity* new_sock = SetupSocket(id, sock, req->opaque, true);
-
-    if (new_sock == NULL)
-    {
-        close(sock);
-        goto _fail;
-    }
-
-    // epoll
-    m_poll.SetSocketNonBlocking(sock);
-
-    if (status == 0)
-    {
-        // convert addr into string
-        struct sockaddr* addr = ai_ptr->ai_addr;
-        void* sin_addr = (ai_ptr->ai_family == AF_INET)?
-            (void*)&((struct sockaddr_in*)addr)->sin_addr:
-            (void*)&((struct sockaddr_in6*)addr)->sin5_addr;
-
-        inet_ntop(ai_ptr->ai_family, sin_addr, m_buff, sizeof(m_buff));
-
-        new_sock->type = Socket_Connected;
-        res->data = m_buff;
-
-        return SOCKET_OPEN;
-    }
-    else
-    {
-        new_sock->type = Socket_Connecting;
-
-        // since socket is nonblocking.
-        // connecting is in the progress.
-        // set writable to track status by epoll.
-        m_poll.ChangeSocket(new_sock, true);
-    }
-
-    return -1;
-
-_failed:
-
-    ResetSocketSlot(id);
-    return SOCKET_ERROR;
-}
-
 // this function should be called in writer thread(one) only.
-int SocketServerImpl::SendBuffer(SocketEntity* sock,
-        socket_message* res)
+int SocketServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res)
 {
     SocketBuffer* buf = NULL;
     while (buf = sock->GetFrontBuff())
@@ -497,7 +461,7 @@ int SocketServerImpl::SendBuffer(SocketEntity* sock,
             break;
         }
 
-        sock->RemoveFrontBuff();
+        sock->ReleaseFrontBuffer();
     }
 
     sock->tail = NULL;
@@ -505,11 +469,15 @@ int SocketServerImpl::SendBuffer(SocketEntity* sock,
     return -1;
 }
 
+/* ----------------- internal actions ------------------*/
+
 // warn: should be called from writer thread only.
 // buffer will be send immediately if no other buffers are pending to send.
 // otherwise, current buffer will be linked to send buffer queue.
-int SocketServerImpl::QueueSocketBuffer(request_send* req, socket_message* res)
+int SocketServerImpl::SendSocketBuffer(void* buffer, socket_message* res)
 {
+    request_send* req = (request_send*)buffer;
+
     int id  = req->id;
     SocketEntity* sock = m_sockets[id % MAX_SOCKET];
 
@@ -577,6 +545,73 @@ int SocketServerImpl::QueueSocketBuffer(request_send* req, socket_message* res)
     return -1;
 }
 
+int SocketServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
+{
+    request_connect* req = (request_connect*)buffer;
+
+    int id = req->id;
+    res->opaque = req->opaque;
+    res->id     = req->id;
+    res->ud     = 0;
+    res->data   = NULL;
+
+    char port[16];
+    sprintf(port, "%d", req->port);
+
+    int status = 0;
+    int sock;
+
+    struct addrinfo* ai_ptr = NULL;
+
+    ai_ptr = AllocSocketFd(&CanSocketConnect, req->host, port, &sock, &status);
+
+    if (sock < 0 || ai_ptr == NULL) return SOCKET_ERROR;
+
+    // alloc socket entity, and poll the socket
+    SocketEntity* new_sock = SetupSocket(id, sock, req->opaque, true);
+
+    if (new_sock == NULL)
+    {
+        close(sock);
+        goto _fail;
+    }
+
+    // epoll
+    m_poll.SetSocketNonBlocking(sock);
+
+    if (status == 0)
+    {
+        // convert addr into string
+        struct sockaddr* addr = ai_ptr->ai_addr;
+        void* sin_addr = (ai_ptr->ai_family == AF_INET)?
+            (void*)&((struct sockaddr_in*)addr)->sin_addr:
+            (void*)&((struct sockaddr_in6*)addr)->sin5_addr;
+
+        inet_ntop(ai_ptr->ai_family, sin_addr, m_buff, sizeof(m_buff));
+
+        new_sock->type = Socket_Connected;
+        res->data = m_buff;
+
+        return SOCKET_OPEN;
+    }
+    else
+    {
+        new_sock->type = Socket_Connecting;
+
+        // since socket is nonblocking.
+        // connecting is in the progress.
+        // set writable to track status by epoll.
+        m_poll.ChangeSocket(new_sock, true);
+    }
+
+    return -1;
+
+_failed:
+
+    ResetSocketSlot(id);
+    return SOCKET_ERROR;
+}
+
 static int CanSocketListen(int fd, struct addrinfo* ai_ptr, void* data)
 {
     int reuse = 1;
@@ -591,8 +626,10 @@ static int CanSocketListen(int fd, struct addrinfo* ai_ptr, void* data)
     return 1;
 }
 
-int SocketServerImpl::ListenSocket(request_listen* req, socket_message* res)
+int SocketServerImpl::ListenSocket(void* buffer, SocketMessage* res)
 {
+    request_listen* req = (request_listen*)buffer;
+
     int id = req->id;
     int listen_fd = -1;
 
@@ -628,8 +665,10 @@ _failed:
     return SOCKET_ERROR;
 }
 
-int SocketServerImpl::CloseSocket(request_close* req, socket_message* res)
+int SocketServerImpl::CloseSocket(void* buffer, SocketMessage* res)
 {
+    request_close* req = (request_close*)buffer;
+
     int id = req->id;
 
     SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
@@ -660,8 +699,10 @@ int SocketServerImpl::CloseSocket(request_close* req, socket_message* res)
     return -1;
 }
 
-int SocketServerImpl::BindSocket(request_bind* req, socket_message* res)
+int SocketServerImpl::BindSocket(void* buffer, SocketMessage* res)
 {
+    request_bind* req = (request_bind*)buffer;
+
     int id = req->id;
     res->id = id;
     res->opaque = req->opaque;
@@ -681,8 +722,10 @@ int SocketServerImpl::BindSocket(request_bind* req, socket_message* res)
 }
 
 // start socket that is pending(acceptted, or open to listen)
-int SocketServerImpl::StartSocket(request_start* req, socket_message* res)
+int SocketServerImpl::StartSocket(void* buffer, SocketMessage* res)
 {
+    request_start* req = (request_start*)buffer;
+
     int id = req->id;
     res->id = id;
     res->opaque = req->opaque;
@@ -705,6 +748,23 @@ int SocketServerImpl::StartSocket(request_start* req, socket_message* res)
     }
 
     return -1;
+}
+
+int SocketServerImpl::ProcessInternalCmd(SocketMessage* result)
+{
+    char buffer[256];
+    char header[2];
+
+    ReadPipe(m_recvCtrlFd, header, sizeof(header));
+
+    int type = header[0];
+    int len  = header[1];
+
+    if (type < 0 || type >= sizeof(m_handler)/sizeof(m_handler[0])) return -1;
+
+    ReadPipe(m_recvCtrlFd, buffer, len);
+    
+    return this->*(m_actionHandler[type])(buffer, resutl);
 }
 
 // SocketServer
