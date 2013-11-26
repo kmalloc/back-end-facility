@@ -11,7 +11,7 @@
 #endif
 
 
-#define USING_CAS_TO_DO_INCREASE 1
+#define USING_CAS_TO_DO_INCREASE 0
 
 #define atomic_cas(ptr, oldVal, newVal)  __sync_bool_compare_and_swap(ptr, oldVal, newVal)
 

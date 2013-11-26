@@ -1,16 +1,10 @@
 SRC_DIR = .
-THREAD_DIR = $(SRC_DIR)/thread
-SYS_DIR = $(SRC_DIR)/sys
-MISC_DIR = $(SRC_DIR)/misc
 OUT = output
 RES = ../lib
 
 
 HEADER = -I./
 HEADER += -I../
-HEADER += -I$(THREAD_DIR)
-HEADER += -I$(SYS_DIR)
-HEADER += -I$(MISC_DIR)
 
 LIBNAME = libxthread.a
 CXX = g++

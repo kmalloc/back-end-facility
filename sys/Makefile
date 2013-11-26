@@ -1,21 +1,15 @@
 SRC_DIR = .
-THREAD_DIR = $(SRC_DIR)/thread
-SYS_DIR = $(SRC_DIR)/sys
-MISC_DIR = $(SRC_DIR)/misc
 OUT = output
 RES = ../lib
 
 HEADER = -I./
 HEADER += -I../
-HEADER += -I$(THREAD_DIR)
-HEADER += -I$(SYS_DIR)
-HEADER += -I$(MISC_DIR)
 
 LIBNAME = libsysutil.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/Log.o $(OUT)/Daemon.o $(OUT)/Logger.o $(OUT)/SocketPoll.o
+OBJECTS = $(OUT)/Log.o $(OUT)/Daemon.o $(OUT)/Logger.o
 
 all : $(LIBNAME)
 
@@ -36,8 +30,6 @@ $(OUT)/Logger.o : $(SRC_DIR)/src/Logger.cc
 $(OUT)/Daemon.o : $(SRC_DIR)/src/Daemon.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/Daemon.cc $(HEADER) -o $(OUT)/Daemon.o
 
-$(OUT)/SocketPoll.o: $(SRC_DIR)/src/SocketPoll.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/SocketPoll.cc $(HEADER) -o $(OUT)/SocketPoll.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar r $(RES)/$(LIBNAME) $(OBJECTS)

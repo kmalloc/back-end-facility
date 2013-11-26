@@ -27,10 +27,10 @@ class SocketPoll: public noncopyable
         ~SocketPoll();
 
         bool AddSocket(int sock, void* data, bool write = false) const;
-        bool DeleteSocket(int sock) const;
+        bool RemoveSocket(int sock) const;
 
-        bool ChangeSocket(int sock, void* data, bool write = false) const;
-        int  WaitAll(std::vector<PollEvent>& ve, size_t max = -1) const;
+        bool ModifySocket(int sock, void* data, bool write = false) const;
+        int  WaitAll(PollEvent* ve, size_t max = -1) const;
 
         bool SetSocketNonBlocking(int fd) const;
 

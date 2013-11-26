@@ -36,15 +36,15 @@ bool SocketPoll::AddSocket(int file, void* data, bool write) const
     ev.data.ptr = data;
 
     int ret = epoll_ctl(m_epoll, EPOLL_CTL_ADD, file, &ev);
-    return (ret != -1); 
+    return (ret != -1);
 }
 
-bool SocketPoll::DeleteSocket(int file) const
+bool SocketPoll::RemoveSocket(int file) const
 {
     return (epoll_ctl(m_epoll, EPOLL_CTL_DEL, file, NULL) != -1);
 }
 
-bool SocketPoll::ChangeSocket(int file, void* data, bool write) const
+bool SocketPoll::ModifySocket(int file, void* data, bool write) const
 {
     struct epoll_event ev;
     ev.events = EPOLLIN | (write? EPOLLOUT : 0);
@@ -53,7 +53,7 @@ bool SocketPoll::ChangeSocket(int file, void* data, bool write) const
     return (epoll_ctl(m_epoll, EPOLL_CTL_MOD, file, &ev) != -1);
 }
 
-int SocketPoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
+int SocketPoll::WaitAll(PollEvent* ve, size_t max) const
 {
     PollEvent event;
     // variant array
@@ -67,7 +67,7 @@ int SocketPoll::WaitAll(std::vector<PollEvent>& ve, size_t max) const
         event.write = ((flag & EPOLLOUT) != 0);
         event.read  = ((flag & EPOLLIN) != 0);
 
-        ve.push_back(event);
+        ve[i] = event;
     }
 
     return n;

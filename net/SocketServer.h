@@ -12,7 +12,7 @@
  *    and dispatch event to other 2 threads.
  * 2) writer thread, this thread is responsible for sending buffer for ALL sockets
  *    when write is possible on any of them. And, all send operations are nonblocking.
- *    
+ *
  * 3) reader thread, this thread is responsible for receiving data for ALL sockets when read
  *    is possible on any socket.
  *
@@ -20,11 +20,13 @@
 
 struct SocketMessage
 {
-    int   socketid;
-    int   identifier;
-    int   size;
-    void* data;
+    int   id;
+    int   opaque;
+    int   ud;
+    const char* data;
 };
+
+class ServerImpl;
 
 class SocketServer: public noncopyable
 {
@@ -36,17 +38,17 @@ class SocketServer: public noncopyable
         // start server
         // a) start polling thread.
         // b) setup socket pool.
-        int StartListen(const std::string& ip, int port);
+        int StartListen(const char* ip, int port);
 
         // connect to a remote host
         // return value is the connected socket id on success.
         // return -1 on error.
-        int Connect(const std::string& ip, int port);
+        int Connect(const char* ip, int port);
 
         // send buffer to socket identified by id.
         int SendBuffer(int id, void* buff, int sz);
 
-        // close the connected socket identified by id. 
+        // close the connected socket identified by id.
         int CloseSocket(int id);
 
         // stop server.
@@ -62,17 +64,16 @@ class SocketServer: public noncopyable
         // d) data read.
         // c) socket error.
         // e) socket close.
-        // 
+        //
         // whatever event arrives, this callback is supposed to be really lightweight.
         // don't do time consuming task within it.
         // best practice is to post task to other thread to handle this socket event if necessary.
         virtual int OnSocketEvent(int id, SocketMessage msg) = 0;
 
     private:
-    
-        struct SocketServerImpl;
 
-        SocketServerImpl* impl_;
+
+        ServerImpl* m_impl;
 };
 
 #endif

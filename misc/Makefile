@@ -1,16 +1,10 @@
 SRC_DIR = .
-THREAD_DIR = $(SRC_DIR)/thread
-SYS_DIR = $(SRC_DIR)/sys
-MISC_DIR = $(SRC_DIR)/misc
+ROOT_DIR=..
 OUT = output
-RES = ../lib
-
+RES = $(ROOT_DIR)/lib
 
 HEADER = -I./
 HEADER += -I../
-HEADER += -I$(THREAD_DIR)
-HEADER += -I$(SYS_DIR)
-HEADER += -I$(MISC_DIR)
 
 LIBNAME = libmisc.a
 CXX = g++
