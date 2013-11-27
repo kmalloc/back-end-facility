@@ -68,7 +68,7 @@ class SocketServer: public noncopyable
         // whatever event arrives, this callback is supposed to be really lightweight.
         // don't do time consuming task within it.
         // best practice is to post task to other thread to handle this socket event if necessary.
-        virtual int OnSocketEvent(int id, SocketMessage msg) = 0;
+        virtual int OnSocketEvent(int id, SocketMessage msg);
 
     private:
 

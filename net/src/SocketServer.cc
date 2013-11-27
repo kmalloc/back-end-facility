@@ -211,7 +211,7 @@ class ServerImpl: public ThreadBase
         // send cmd through pipe
         void SendInternalCmd(RequestPackage* req, char type, int len) const;
 
-        // call epoll_wait, and handle the event accordingly 
+        // call epoll_wait, and handle the event accordingly
         int Poll(SocketMessage* res);
 
         // separated thread to poll the file descriptor.

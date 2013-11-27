@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-c -Wall
-SOURCES=src/SocketServer.cc src/SocketPoll.cc
+SOURCES=src/SocketServer.cc src/SocketPoll.cc src/main.cc
 
 ROOT=..
 LIBS_PATH=-L$(ROOT)/lib
