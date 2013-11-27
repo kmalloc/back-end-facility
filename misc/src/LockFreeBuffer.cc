@@ -75,7 +75,7 @@ char* LockFreeBuffer::AllocBuffer()
         if (atomic_cas2(&m_head.val, old_head.val, tmp)) break;
 
     } while (1);
-    
+
     BufferNode* ret = (BufferNode*)old_head.vals[1];
 
     ret->m_next.val = 0;

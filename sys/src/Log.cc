@@ -19,32 +19,32 @@ static Logger gs_log_fatal(LOG_FILE_FATAL, 2048, 512);
 
 void slog_all(const char* format, va_list arg)
 {
-   gs_log_all.Log(format, arg); 
+   gs_log_all.Log(format, arg);
 }
 
 void slog_debug(const char* format, va_list arg)
 {
-   gs_log_debug.Log(format, arg); 
+   gs_log_debug.Log(format, arg);
 }
 
 void slog_info(const char* format, va_list arg)
 {
-   gs_log_info.Log(format, arg); 
+   gs_log_info.Log(format, arg);
 }
 
 void slog_warn(const char* format, va_list arg)
 {
-   gs_log_warn.Log(format, arg); 
+   gs_log_warn.Log(format, arg);
 }
 
 void slog_error(const char* format, va_list arg)
 {
-   gs_log_error.Log(format, arg); 
+   gs_log_error.Log(format, arg);
 }
 
 void slog_fatal(const char* format, va_list arg)
 {
-   gs_log_fatal.Log(format, arg); 
+   gs_log_fatal.Log(format, arg);
 }
 
 // TODO specify log level to filter log

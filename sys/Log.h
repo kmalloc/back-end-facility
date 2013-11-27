@@ -26,7 +26,7 @@ enum LogLevel
 void slog_all(const char* format, va_list va);
 void slog_debug(const char* format, va_list va);
 void slog_info(const char* format, va_list va);
-void slog_warn(const char* format, va_list va); 
+void slog_warn(const char* format, va_list va);
 void slog_error(const char* format, va_list va);
 void slog_fatal(const char* format, va_list va);
 

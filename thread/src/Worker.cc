@@ -19,8 +19,8 @@ class DummyExitTask: public ITask
 
         virtual ~DummyExitTask() {}
 
-        virtual void Run() 
-        { 
+        virtual void Run()
+        {
             m_worker->SetExitState();
         }
 
@@ -110,7 +110,7 @@ bool WorkerBodyBase::GetRunTask(ITask*& msg)
             if (SignalConsumeTimeout(m_timeout)) break;
         }
     }
-    
+
     msg = GetInternalCmd();
     if (msg) return false;
 
@@ -183,7 +183,7 @@ bool WorkerBodyBase::PostInternalCmd(ITask* task)
 {
     bool ret = PushInternalCmd(task);
 
-    if (ret) 
+    if (ret)
         SignalPost();
     else
         delete task;
@@ -238,15 +238,15 @@ bool WorkerBodyBase::StopRunning()
     return PostExit();
 }
 
-int WorkerBodyBase::GetTaskNumber() 
+int WorkerBodyBase::GetTaskNumber()
 {
     return GetContainerSize() + (m_isRuning?1:0);
 }
 
 
-bool WorkerBodyBase::IsRunning() const 
-{ 
-    return m_isRuning; 
+bool WorkerBodyBase::IsRunning() const
+{
+    return m_isRuning;
 }
 
 /*
@@ -323,7 +323,7 @@ int Worker::Notify()
 {
     if (m_manager)
     {
-        return m_manager->SetWorkerNotify(this); 
+        return m_manager->SetWorkerNotify(this);
     }
 
     return 0;

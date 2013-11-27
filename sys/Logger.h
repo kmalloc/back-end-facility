@@ -21,10 +21,10 @@ class Logger: public ThreadBase
         /*
          * file: specify the file to store all the log.
          * size: threshold to flush log to disk.
-         *       don't set this value too large, on application crash, we will lose all the 
+         *       don't set this value too large, on application crash, we will lose all the
          *       log that is not flush to disk.
-         *          
-         * granularity: fixed size for each piece of log. 
+         *
+         * granularity: fixed size for each piece of log.
          */
         Logger(const char* file, size_t size = 2048, size_t granularity = 512);
         ~Logger();

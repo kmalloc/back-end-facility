@@ -12,8 +12,8 @@
 // this is used to detect memory corruption.
 static const size_t gs_padding_sz = sizeof(void*);
 static const unsigned char gs_padding_char[2][gs_padding_sz/2] =
-{ 
-    {0x32}, 
+{
+    {0x32},
     {0x23},
 };
 
@@ -132,7 +132,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
     pHead->node_number = m_population + 1;
     pHead->mem_frame   = buf;
     FillPadding(pHead->padding);
-    
+
     Node* cur  = (Node*)buf;
 
     for (int i = 0; i < m_population; ++i)
@@ -142,7 +142,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
         FillPadding(cur->padding);
         cur = cur->next;
     }
-    
+
     assert((char*)cur + sizeof(Node) + m_offset + m_granularity == end_buf);
 
     cur->next = NULL;
@@ -195,7 +195,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
 void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
     //Node* node = (Node*)((char*)buf - sizeof(Node));
-    Node* node = container_of(buf, PerThreadMemoryAlloc::Node, data); 
+    Node* node = container_of(buf, PerThreadMemoryAlloc::Node, data);
 
     assert(!IsPaddingCorrupt((unsigned char*)node->padding));
     assert(node->next == NULL);
@@ -267,8 +267,8 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
 
     // make sure all buffers are released when cleaning up.
     assert(pHead->node_number == pHead->m_population + 1);
-    
-    while (cur) 
+
+    while (cur)
     {
         cur = cur->next;
         ++co;

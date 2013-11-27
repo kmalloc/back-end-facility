@@ -43,7 +43,7 @@ class LockFreeStack: public noncopyable
             ,m_maxConcurrntWrite(0xff)
         {
             m_arr = new Type[sz];
-        } 
+        }
 
         ~LockFreeStack()
         {
@@ -65,7 +65,7 @@ class LockFreeStack: public noncopyable
                 if ((old_mask >> 16) >= (m_maxConcurrntWrite)) continue;
 
                 if(atomic_cas(&m_mask, old_mask, old_mask + append)) break;
-            } 
+            }
 
             //now the calling thread acquired 'write-lock'.
 
@@ -74,7 +74,7 @@ class LockFreeStack: public noncopyable
             {
                 old_top = m_top;
 
-                if (old_top == m_maxSz) 
+                if (old_top == m_maxSz)
                 {
                     ret = false;
                     break;
@@ -106,14 +106,14 @@ class LockFreeStack: public noncopyable
             size_t old_top;
             size_t old_mask, append = 0x01;
 
-            while(1) 
+            while(1)
             {
                 old_mask = (m_mask & (~m_writeMask));
 
                 if (old_mask >= m_maxConcurrentRead) continue;
 
                 if (atomic_cas(&m_mask, old_mask, old_mask + append)) break;
-            }  
+            }
 
             while (1)
             {
@@ -133,7 +133,7 @@ class LockFreeStack: public noncopyable
                 ret = m_arr[old_top - 1];
                 m_arr[old_top - 1] = (Type)0xcdcd; //to detech corruption.
             }
-            
+
             assert((m_mask & (~m_readMask)) == 0);
 
             while (1)
@@ -205,7 +205,7 @@ class LockFreeQueue
             } while(!atomic_cas(&m_write, old_write, (old_write + 1)%m_maxSz));
 
             m_arr[old_write] = val;
-            
+
             //if calling thread dies or exits here, this queue will be in an abnormal state:
             //subsequent read or write to it will make the calling thread hang forever.
             //so, technically this lock free structure is not that true "lock free".

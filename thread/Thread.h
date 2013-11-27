@@ -31,22 +31,22 @@ class Thread: public noncopyable
         // this function is not thread safe, be sure not to call it when the thread is already started.
         ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp;}
         const ITask* GetTask() const { return m_task; }
-        
+
     protected:
-        
-        static void* RunTask(void* arg);        
+
+        static void* RunTask(void* arg);
 
         ITask* m_task;
 
     private:
 
         pthread_t m_tid;
-        
+
         volatile bool m_busy;
         volatile bool m_detachable;
 };
 
-class ThreadBase: public Thread 
+class ThreadBase: public Thread
 {
     public:
 

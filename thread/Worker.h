@@ -31,7 +31,7 @@ class WorkerBodyBase: public ITask, public noncopyable
         void EnableNotify(bool enable = true) { m_notify = enable; }
 
         // take care of calling this function.
-        // multitasking-opertion on m_mailbox will 
+        // multitasking-opertion on m_mailbox will
         // greatly reduce performance.
         // don't call it unless really necessary.
         ITask* TryGetTask();
@@ -40,7 +40,7 @@ class WorkerBodyBase: public ITask, public noncopyable
 
         virtual void PreHandleTask() {}
         virtual void HandleTask(ITask*) = 0;
-        virtual bool  HasTask() = 0; 
+        virtual bool  HasTask() = 0;
 
         // be aware: this function may block if there is no task
         virtual ITask* GetTaskFromContainer() = 0;
@@ -78,7 +78,7 @@ class WorkerBodyBase: public ITask, public noncopyable
 
         // timeout for sem_timewait
         const int m_timeout;
-        
+
         const int m_reqThreshold;
 
         // semaphore for waiting for task.
@@ -155,22 +155,22 @@ class Worker:public Thread
         virtual bool IsRunning() const { return m_WorkerBody->IsRunning(); }
         bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
-        
+
         virtual int GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
 
         void EnableNotify(bool enable = true) { m_WorkerBody->EnableNotify(enable); }
 
         virtual bool StartWorking();
 
-        int GetWorkerId() const { return m_id; } 
+        int GetWorkerId() const { return m_id; }
 
-        int Notify(); 
+        int Notify();
 
         int TaskDone() const { return m_WorkerBody->TaskDone(); }
 
     protected:
 
-        // disable setting task. 
+        // disable setting task.
         // this is a special thread specific to a worker thread.
         // It should not be changed externally.
         using Thread::SetTask;

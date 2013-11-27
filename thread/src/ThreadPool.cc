@@ -9,9 +9,9 @@
 #include <unistd.h>
 
 
-struct CompareTaskPriority 
+struct CompareTaskPriority
 {
-    inline bool operator()(ITask*& x, ITask*&y) const 
+    inline bool operator()(ITask*& x, ITask*&y) const
     {
         return x->Priority() >= y->Priority();
     }
@@ -46,7 +46,7 @@ class Dispatcher:public WorkerBodyBase
 
         void DispatchTask(ITask*);
         Worker* SelectFreeWorker();
-        
+
     private:
 
         ThreadPool* m_pool;
@@ -126,7 +126,7 @@ void Dispatcher::StopWorker()
 bool Dispatcher::StopRunning()
 {
     bool ret = WorkerBodyBase::StopRunning();
-    
+
     if (ret) StopWorker();
 
     return ret;
@@ -145,7 +145,7 @@ ITask* Dispatcher::GetTaskFromContainer()
     return NULL;
 }
 
-int Dispatcher::GetContainerSize() 
+int Dispatcher::GetContainerSize()
 {
     return m_queue.Size();
 }
@@ -159,7 +159,7 @@ bool Dispatcher::HasTask()
  * return one worker that is free: with no task to run
  *
  * considering the total amount of workers is usually rather small,
- * we don't have to apply any advanced algorithm and data structure to 
+ * we don't have to apply any advanced algorithm and data structure to
  * maintain the worker list.
  * just avoiding premptive operation and use brute-search is enough.
  */
@@ -167,7 +167,7 @@ Worker* Dispatcher::SelectFreeWorker()
 {
     for (int i = 0; i < m_workerNum; ++i)
     {
-        int sz = m_workers[i]->GetTaskNumber(); 
+        int sz = m_workers[i]->GetTaskNumber();
         if (sz == 0)
         {
             return m_workers[i];
@@ -281,7 +281,7 @@ int ThreadPool::SetWorkerNotify(Worker* worker)
 bool ThreadPool::IsRunning() const
 {
     return m_running;
-} 
+}
 
 int ThreadPool::GetTaskNumber()
 {

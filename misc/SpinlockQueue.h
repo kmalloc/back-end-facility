@@ -151,7 +151,7 @@ class SpinlockQueue
 
             return !full;
         }
-        
+
         void Clear()
         {
             pthread_spin_lock(&m_lock);
@@ -159,7 +159,7 @@ class SpinlockQueue
             pthread_spin_unlock(&m_lock);
         }
 
-        int  Size() 
+        int  Size()
         {
             int count = -1;
 
@@ -170,7 +170,7 @@ class SpinlockQueue
             return count;
         }
 
-        bool IsEmpty() 
+        bool IsEmpty()
         {
             bool ret;
 
@@ -180,7 +180,7 @@ class SpinlockQueue
 
             return ret;
         }
-       
+
     protected:
 
         const size_t m_maxSz;

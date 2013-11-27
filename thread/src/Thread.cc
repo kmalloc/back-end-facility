@@ -23,7 +23,7 @@ void* dummy_proc(void*)
     slog(LOG_ALL, "dummy proc , gogogo\n");
     slog(LOG_ALL, "dummy proc , gogogo\n");
     return NULL;
-} 
+}
 
 bool Thread::Start()
 {
@@ -34,7 +34,7 @@ bool Thread::Start()
     if (status != 0)
     {
         slog(LOG_ERROR, "init attr fail:%d %s\n",status,strerror(status));
-        return false; 
+        return false;
     }
 
     if (m_detachable)
@@ -46,7 +46,7 @@ bool Thread::Start()
         status = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     }
 
-    if (status != 0) 
+    if (status != 0)
     {
         slog(LOG_ERROR, "set detachable fail:%d %s\n",status,strerror(status));
         return false;
@@ -85,7 +85,7 @@ bool Thread::Join(void** ret)
     return pthread_join(m_tid,ret) == 0;
 }
 
-bool Thread::Cancel() 
+bool Thread::Cancel()
 {
     if (!m_busy) return true;
     return pthread_cancel(m_tid) == 0;

@@ -59,7 +59,7 @@ void LockFreeListQueue::InitInternalNodeList()
 {
     assert(!m_freeList);
 
-    m_freeList = new LockFreeListNode[m_max];        
+    m_freeList = new LockFreeListNode[m_max];
 
     size_t i = 0;
     for (; i < m_max - 1; ++i)
@@ -123,7 +123,7 @@ bool LockFreeListQueue::Push(void* data)
     LockFreeListNode* node = AllocNode();
 
     if (node == NULL) return false;
-    
+
     node->data = data;
     node->next.val = 0;
 
@@ -143,12 +143,12 @@ bool LockFreeListQueue::Push(void* data)
         LockFreeListNode* node_tail = (LockFreeListNode*)atomic_read(&in.vals[1]);
         next.val = atomic_read_double(&node_tail->next);
 
-        if (!IsDoublePointerNull(next)) 
+        if (!IsDoublePointerNull(next))
         {
             atomic_cas2(&(m_in.val), in.val, next.val);
             continue;
         }
-        
+
         if (atomic_cas2((&(((LockFreeListNode*)(in.vals[1]))->next.val)), 0, new_node.val)) break;
     }
 
@@ -169,10 +169,10 @@ bool LockFreeListQueue::Pop(void*& data)
 
         LockFreeListNode* node_head = (LockFreeListNode*)atomic_read(&out.vals[1]);
         next.val = atomic_read_double(&node_head->next);
-        
+
         if (IsDoublePointerNull(next)) return false;
 
-        if (IsDoublePointerEqual(in, out)) 
+        if (IsDoublePointerEqual(in, out))
         {
             atomic_cas2(&(m_in.val), in.val, next.val);
             continue;
