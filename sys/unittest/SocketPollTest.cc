@@ -48,7 +48,7 @@ class SocketPollListener: public ThreadBase
                 for (int i = 0; i < sz; i++)
                 {
                     if (vs[i].read) m_read.push_back(vs[i]);
-                    
+
                     if (vs[i].write) m_write.push_back(vs[i]);
                 }
 

@@ -21,3 +21,6 @@ $(EXECUTABLE): $(OBJECTS)
 .cc.o:
 	$(CC) $(CFLAGS) $(INCLUDE) $< -o $@
 
+clean:
+	rm src/*.o $(EXECUTABLE)
+

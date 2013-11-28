@@ -9,5 +9,6 @@ echo "total files:"
 extract_souce_file | wc -l
 
 echo "total lines of code:"
-extract_souce_file | xargs cat | sed -e '/^$/d' -e '/^\s\+$/d' | wc -l
+extract_souce_file | xargs cat | sed -e '/^$/d' -e '/^[[:space:]]*$/d' | wc -l
+
 

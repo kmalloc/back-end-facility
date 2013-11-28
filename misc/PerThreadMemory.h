@@ -26,17 +26,17 @@
  * memory of current thread will be free only when:
  * a) current thread exits AND all buffers are released.
  * b) the last buffer is released and the owner thread is exited.
- * c) thread that creates the buffer owns the buffer. 
+ * c) thread that creates the buffer owns the buffer.
  *    when buffer is released, it will be put into list of the owner.
  * d) there is no garbage collector. users take responsibility to free(ReleaseBuffer) the resource.
- * d) just use PerThreadMemoryAlloc as malloc. 
+ * d) just use PerThreadMemoryAlloc as malloc.
  */
 
 class PerThreadMemoryAlloc: public noncopyable
 {
     public:
 
-        /* 
+        /*
          * granularity: buffer size is fixed. this parameter specifys the size of each buffer.
          * population: specifys how many buffers should be created, total number of buffer available.
          * align: specifys the minimal buffer size of each buffer, please note this value will be adjusted internally to
@@ -48,7 +48,7 @@ class PerThreadMemoryAlloc: public noncopyable
 
         void* AllocBuffer() const;
         void  ReleaseBuffer(void*) const;
-        int   Size() const; 
+        int   Size() const;
         int   Granularity() const { return m_granularity; }
 
         bool  FreeCurThreadMemory();
@@ -64,15 +64,15 @@ class PerThreadMemoryAlloc: public noncopyable
         static void OnThreadExit(void*);
         static void DoReleaseBuffer(void*);
         static void Cleaner(NodeHead*);
-        
+
         NodeHead* InitPerThreadList() const;
-        void* GetFreeBufferFromList(NodeHead*) const;        
+        void* GetFreeBufferFromList(NodeHead*) const;
 
         const int m_align; // buffer alignment
         const int m_granularity; // sizeof per buffer
         const int m_offset; //
         const int m_population; // total number of buffer
-        
+
         volatile pthread_key_t m_key;
 };
 
