@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-c -Wall
+CFLAGS=-c -Wall -g
 SOURCES=src/SocketServer.cc src/SocketPoll.cc src/main.cc
 
 ROOT=..

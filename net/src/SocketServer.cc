@@ -39,23 +39,6 @@ enum SocketStatus
     SS_BIND
 };
 
-enum SocketCode
-{
-    SC_BADSOCK,
-    SC_DATA,
-    SC_CLOSE,
-    SC_HALFCLOSE,
-    SC_LISTEN,
-    SC_CONNECTED,
-    SC_ACCEPT,
-    SC_HALFSEND,
-    SC_SEND,
-    SC_ERROR,
-    SC_IERROR, // error ignored
-    SC_EXIT,
-
-    SC_SUCC
-};
 
 struct SocketBuffer
 {
@@ -162,24 +145,21 @@ class ServerImpl: public ThreadBase
 
         int ReserveSocketSlot();
 
-        // intermedia temp buffer.
-        char m_buff[256];
-
-        friend class SocketServer;
-
         // interface
+
+        void RegisterSocketEventHandler(SocketEventHandler handler) { m_handler = handler; }
 
         // connect to addr, and add the corresponding socket to epoll for watching.
         int ConnectTo(const char* addr, int port, uintptr_t opaque);
 
         // connect to ip:port, return the socket fd, not add to epoll for watching.
-        int ListenTo(const char* addr, int port, uintptr_t opaque, int backlog, bool poll);
+        int ListenTo(const char* addr, int port, uintptr_t opaque, int backlog = 64, bool poll = true);
 
         // add socket denoted by id to epoll for watching.
-        void EnableEpollOnSocket(int id, uintptr_t opaque);
+        void WatchSocket(int id, uintptr_t opaque);
 
         // add socket fd to epoll for watching.
-        int AddRawSocket(int fd, uintptr_t opaque);
+        int WatchRawSocket(int fd, uintptr_t opaque);
 
         int SendData(int sock_id, const void* buffer, int sz);
 
@@ -190,6 +170,9 @@ class ServerImpl: public ThreadBase
         void StartServer();
 
         void StopServer();
+
+        // intermedia temp buffer.
+        char m_buff[256];
 
     protected:
 
@@ -265,6 +248,8 @@ class ServerImpl: public ThreadBase
         PollEvent m_pollEvent[MAX_SOCKET];
         SocketPoll m_poll;
 
+        SocketEventHandler m_handler;
+
         typedef int (ServerImpl::* ActionHandler)(void*, SocketMessage*);
         static const ActionHandler m_actionHandler[];
 };
@@ -280,6 +265,10 @@ const ServerImpl::ActionHandler ServerImpl::m_actionHandler[] =
    &ServerImpl::SendSocketBuffer,
    &ServerImpl::ShutdownServer
 };
+
+static void DummySockEventHandler(int, SocketMessage*)
+{
+}
 
 static inline void ReleaseFrontBuffer(SocketEntity* sock)
 {
@@ -343,6 +332,7 @@ ServerImpl::ServerImpl()
     ,m_maxSocket(MAX_SOCKET)
     ,m_isRunning(false)
     ,m_poll()
+    ,m_handler(&DummySockEventHandler)
 {
 }
 
@@ -459,6 +449,7 @@ static int TryConnectTo(int fd, struct addrinfo* ai_ptr, void*)
     int status = connect(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
     if (status != 0 && errno != EINPROGRESS)
     {
+        slog(LOG_ERROR, "connect failed, error:%s\n", strerror(errno));
         return -1;
     }
 
@@ -523,6 +514,7 @@ int ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res) const
                 if (errno == EINTR) continue;
                 else if (errno == EAGAIN) return SC_ERROR;
 
+                // ForceSocketClose will free all pending buffers internally.
                 ForceSocketClose(sock, res);
                 return SC_CLOSE;
             }
@@ -541,6 +533,8 @@ int ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res) const
     }
 
     sock->tail = NULL;
+
+    // send done, reset epoll flag to read.
     m_poll.ModifySocket(sock->fd, sock, false);
 
     if (sock->type == SS_HALFCLOSE) ForceSocketClose(sock, res);
@@ -571,6 +565,9 @@ int ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
 
     assert(sock->type != SS_LISTEN && sock->type != SS_PLISTEN);
 
+    res->id = sock->id;
+    res->opaque = sock->opaque;
+
     if (sock->head)
     {
        SocketBuffer* buf = (SocketBuffer*)malloc(sizeof(SocketBuffer));
@@ -600,6 +597,7 @@ int ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
         }
         else
         {
+            free(req->buffer);
             slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", id, sock->fd);
             ForceSocketClose(sock, res);
             return SC_CLOSE;
@@ -609,6 +607,7 @@ int ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     if (n == req->sz)
     {
         free(req->buffer);
+        res->ud = n;
         return SC_SEND;
     }
 
@@ -622,7 +621,11 @@ int ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     buf->raw_size = req->sz;
 
     sock->head = sock->tail = buf;
+
+    // set epoll to watch write event.
     m_poll.ModifySocket(sock->fd, sock, true);
+
+    res->ud = n;
 
     return SC_HALFSEND;
 }
@@ -699,11 +702,11 @@ static int TryListenTo(int fd, struct addrinfo* ai_ptr, void* data)
     int reuse = 1;
     int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&reuse, sizeof(int));
 
-    if (ret == -1) return SC_SUCC;
+    if (ret == -1) return -1;
 
-    if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) == -1) return SC_SUCC;
+    if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) == -1) return -1;
 
-    if (listen(fd, ((RequestListen*)data)->backlog) == -1) return SC_SUCC;
+    if (listen(fd, ((RequestListen*)data)->backlog) == -1) return -1;
 
     return 1;
 }
@@ -715,18 +718,19 @@ int ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
     int id = req->id;
     int listen_fd = -1;
 
-    int sock;
     int status = 0;
     char port[16];
 
     struct addrinfo* ai_ptr = NULL;
 
     sprintf(port, "%d", req->port);
-    ai_ptr = AllocSocketFd(&TryListenTo, req->host, port, &sock, &status, req);
+    ai_ptr = AllocSocketFd(&TryListenTo, req->host, port, &listen_fd, &status, req);
+
+    if (listen_fd < 0 || ai_ptr == NULL) return SC_ERROR;
 
     // set up socket, but not put it into epoll yet.
     // call start socket to if user wants to.
-    SocketEntity* new_sock = SetupSocketEntity(id, sock, req->opaque, req->poll);
+    SocketEntity* new_sock = SetupSocketEntity(id, listen_fd, req->opaque, req->poll);
 
     if (new_sock == NULL) goto _failed;
 
@@ -751,7 +755,7 @@ int ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
 
 _failed:
 
-    close(sock);
+    close(listen_fd);
     ResetSocketSlot(id);
 
     return SC_ERROR;
@@ -775,6 +779,7 @@ int ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
 
     if (sock->head)
     {
+        m_poll.ModifySocket(sock->fd, sock, true);
         int type = SendPendingBuffer(sock, res);
         if (type != SC_SEND)
         {
@@ -838,22 +843,19 @@ int ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
             return SC_ERROR;
         }
 
-        int ret;
         sock->opaque = req->opaque;
         if (sock->type == SS_PACCEPT)
         {
             sock->type = SS_CONNECTED;
             res->data = "accepted";
-            ret = SC_CONNECTED;
         }
         else
         {
             sock->type = SS_LISTEN;
             res->data = "listen done";
-            ret = SC_LISTEN;
         }
 
-        return ret;
+        return SC_WATCHED;
     }
 
     return SC_SUCC;
@@ -1182,7 +1184,7 @@ int ServerImpl::SendData(int sock_id, const void* buffer, int sz)
     return 0;
 }
 
-int ServerImpl::AddRawSocket(int sock_fd, uintptr_t opaque)
+int ServerImpl::WatchRawSocket(int sock_fd, uintptr_t opaque)
 {
     RequestPackage req;
     int id = ReserveSocketSlot();
@@ -1195,7 +1197,7 @@ int ServerImpl::AddRawSocket(int sock_fd, uintptr_t opaque)
     return id;
 }
 
-void ServerImpl::EnableEpollOnSocket(int id, uintptr_t opaque)
+void ServerImpl::WatchSocket(int id, uintptr_t opaque)
 {
     RequestPackage req;
     req.u.epoll.id = id;
@@ -1239,27 +1241,8 @@ void ServerImpl::Run()
 
         ret = Poll(&res);
 
-        switch (ret)
-        {
-            case SC_EXIT:
-                return;
-            case SC_CLOSE:
-                break;
-            case SC_HALFCLOSE:
-                break;
-            case SC_CONNECTED:
-                break;
-            case SC_DATA:
-                break;
-            case SC_ACCEPT:
-                break;
-            case SC_SEND:
-                break;
-            case SC_HALFSEND:
-                break;
-            default:
-                break;
-        }
+        m_handler(ret, &res);
+
     }
 }
 
@@ -1272,5 +1255,68 @@ SocketServer::SocketServer()
 
 SocketServer::~SocketServer()
 {
+}
+
+void SocketServer::RegisterSocketEventHandler(SocketEventHandler handler)
+{
+    m_impl->RegisterSocketEventHandler(handler);
+}
+
+int SocketServer::StartServer(const char* ip, int port, uintptr_t opaque)
+{
+    m_impl->StartServer();
+
+    return m_impl->ListenTo(ip, port, opaque);
+}
+
+void SocketServer::StopServer()
+{
+    m_impl->StopServer();
+}
+
+int SocketServer::Connect(const char* ip, int port , uintptr_t opaque)
+{
+    return m_impl->ConnectTo(ip, port, opaque);
+}
+
+int SocketServer::ListenTo(const char* ip, int port, uintptr_t opaque)
+{
+    return m_impl->ListenTo(ip, port, opaque);
+}
+
+int SocketServer::SendBuffer(int id, const void* data, int sz)
+{
+    return m_impl->SendData(id, data, sz);
+}
+
+void SocketServer::CloseSocket(int id, uintptr_t opaque)
+{
+    m_impl->CloseConnection(id, opaque);
+}
+
+int SocketServer::SendString(int id, const char* data)
+{
+    if (data == NULL) return 0;
+
+    int sz = strlen(data);
+    if (sz <= 0) return 0;
+
+    char* buff = (char*)malloc(sz + 1);
+
+    if (buff == NULL) return 0;
+
+    strcpy(buff, data);
+
+    return SendBuffer(id, buff, sz + 1);
+}
+
+void SocketServer::WatchSocket(int id, uintptr_t opaque)
+{
+    m_impl->WatchSocket(id, opaque);
+}
+
+int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
+{
+    return m_impl->WatchRawSocket(fd, opaque);
 }
 
