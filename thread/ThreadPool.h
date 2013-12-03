@@ -1,9 +1,7 @@
 #ifndef _THREAD_POOL_H_
 #define _THREAD_POOL_H_
 
-#include "Worker.h"
-#include <vector>
-
+#include "WorkerBodyBase.h"
 #include "misc/NonCopyable.h"
 
 class Dispatcher;
@@ -30,7 +28,6 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
         //shutdown threadpool immediately.
         //killing all workers.
         void ForceShutdown();
-
 
     protected:
 

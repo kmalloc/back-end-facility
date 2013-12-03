@@ -10,7 +10,7 @@ LIBNAME = libxthread.a
 CXX = g++
 CXXFLAGS += -g -Wall -Wextra
 
-OBJECTS = $(OUT)/Thread.o $(OUT)/Worker.o $(OUT)/ThreadPool.o
+OBJECTS = $(OUT)/Thread.o $(OUT)/Worker.o $(OUT)/ThreadPool.o $(OUT)/WorkerBodyBase.o
 
 all : $(LIBNAME)
 
@@ -31,6 +31,8 @@ $(OUT)/Worker.o : $(SRC_DIR)/src/Worker.cc
 $(OUT)/ThreadPool.o : $(SRC_DIR)/src/ThreadPool.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/ThreadPool.cc $(HEADER) -o $(OUT)/ThreadPool.o
 
+$(OUT)/WorkerBodyBase.o : $(SRC_DIR)/src/WorkerBodyBase.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(SRC_DIR)/src/WorkerBodyBase.cc $(HEADER) -o $(OUT)/WorkerBodyBase.o
 
 $(LIBNAME) : $(OBJECTS)
 	ar rcs $(RES)/$(LIBNAME) $(OBJECTS)

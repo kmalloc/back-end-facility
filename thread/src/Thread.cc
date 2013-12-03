@@ -6,23 +6,16 @@
 #include <errno.h>
 
 Thread::Thread(ITask* task, bool detachable)
-:m_task(task)
-,m_tid(0)
-,m_busy(false)
-,m_detachable(detachable)
+    :m_task(task)
+    ,m_tid(0)
+    ,m_busy(false)
+    ,m_detachable(detachable)
 {
 }
 
 Thread::~Thread()
 {
     if (m_busy) pthread_cancel(m_tid);
-}
-
-void* dummy_proc(void*)
-{
-    slog(LOG_ALL, "dummy proc , gogogo\n");
-    slog(LOG_ALL, "dummy proc , gogogo\n");
-    return NULL;
 }
 
 bool Thread::Start()

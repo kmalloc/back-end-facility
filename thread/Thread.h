@@ -16,7 +16,7 @@ class Thread: public noncopyable
 {
     public:
 
-        Thread(ITask* = NULL,bool detachable = false);
+        Thread(ITask* = NULL, bool detachable = false);
         virtual ~Thread();
 
         bool   IsDetachable() const { return m_detachable; }
@@ -29,7 +29,7 @@ class Thread: public noncopyable
         virtual bool IsRunning() const { return m_busy; }
 
         // this function is not thread safe, be sure not to call it when the thread is already started.
-        ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp;}
+        ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp; }
         const ITask* GetTask() const { return m_task; }
 
     protected:
