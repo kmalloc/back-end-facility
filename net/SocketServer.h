@@ -5,17 +5,8 @@
 #include <stdint.h>
 
 /*
- * whole server is based on epoll.
- * internally, there will be 3 threads running for the server.
- * 1) poll thread, waiting on epoll_wait().
- *    this thread handle all the lightweight event.
- *    and dispatch event to other 2 threads.
- * 2) writer thread, this thread is responsible for sending buffer for ALL sockets
- *    when write is possible on any of them. And, all send operations are nonblocking.
- *
- * 3) reader thread, this thread is responsible for receiving data for ALL sockets when read
- *    is possible on any socket.
- *
+ * server is based on epoll.
+ * internally, there will be an isolated thread polling the socket r/w event.
  */
 
 struct SocketMessage
@@ -33,10 +24,9 @@ struct SocketMessage
     const char* data;
 };
 
-typedef void (*SocketEventHandler)(int, SocketMessage*);
-
 enum SocketCode
 {
+    SC_NONE,
     SC_BADSOCK,
     SC_DATA,
     SC_CLOSE,
@@ -53,6 +43,8 @@ enum SocketCode
 
     SC_SUCC
 };
+
+typedef void (*SocketEventHandler)(SocketCode, SocketMessage*);
 
 class ServerImpl;
 
@@ -84,41 +76,22 @@ class SocketServer: public noncopyable
         void CloseSocket(int id, uintptr_t opaque = -1);
 
         // send buffer to socket identified by id.
-        int SendBuffer(int id, const void* buff, int sz);
+        // param 'copy', control whether we should copy the buff.
+        // if copy == false, please make sure, the buff is allocated from malloc()
+        // because after the buffer is sended, server will freed manually.
+        int SendBuffer(int id, const void* buff, int sz, bool copy = false);
 
         int SendString(int id, const char* buff);
 
+        // add the corresponding socket to be watched.
         void WatchSocket(int id, uintptr_t opaque);
 
         int WatchRawSocket(int fd, uintptr_t opaque);
 
-        /*
-         * switch (code)
-         * {
-         *     case SC_EXIT:
-         *         return;
-         *     case SC_CLOSE:
-         *         break;
-         *     case SC_HALFCLOSE:
-         *         break;
-         *     case SC_CONNECTED:
-         *         break;
-         *     case SC_DATA:
-         *         break;
-         *     case SC_ACCEPT:
-         *         break;
-         *     case SC_SEND:
-         *         break;
-         *     case SC_HALFSEND:
-         *         break;
-         *     default:
-         *         break;
-         * }
-         */
-
+        // handler will be called in the polling thread whenever I/O is ready, make sure it is thread safe.
+        // and since the polling thread is responsible for all socket I/O events, it is also critical
+        // to make sure that handler is fast as possible
         void RegisterSocketEventHandler(SocketEventHandler handler);
-
-    protected:
 
     private:
 

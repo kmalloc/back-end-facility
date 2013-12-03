@@ -5,7 +5,7 @@ using namespace std;
 
 SocketServer server;
 
-static void handler(int code, SocketMessage* msg)
+static void handler(SocketCode code, SocketMessage* msg)
 {
     switch (code)
     {
