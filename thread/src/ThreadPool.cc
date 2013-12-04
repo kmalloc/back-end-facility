@@ -35,7 +35,7 @@ class Dispatcher:public WorkerBodyBase
          * worker calls this function to require task to Run
          * keep in mind that this function will be called in different threads
          */
-        int SetWorkerNotify(Worker* worker);
+        int SetWorkerNotify(NotifyerBase* worker);
 
     protected:
 
@@ -197,7 +197,7 @@ void Dispatcher::DispatchTask(ITask* task)
     m_freeWorker->PostTask(task);
 }
 
-int Dispatcher::SetWorkerNotify(Worker* worker)
+int Dispatcher::SetWorkerNotify(NotifyerBase* worker)
 {
     if (worker) return sem_post(&m_workerNotify);
 
@@ -273,7 +273,7 @@ void ThreadPool::ForceShutdown()
     m_dispatcher->KillAllWorker();
 }
 
-int ThreadPool::SetWorkerNotify(Worker* worker)
+int ThreadPool::SetWorkerNotify(NotifyerBase* worker)
 {
     return m_dispatcher->SetWorkerNotify(worker);
 }

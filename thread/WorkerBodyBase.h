@@ -4,6 +4,7 @@
 #include "ITask.h"
 #include "sys/Defs.h"
 #include "misc/NonCopyable.h"
+#include "misc/SpinlockQueue.h"
 
 #include <semaphore.h>
 
@@ -115,7 +116,7 @@ class WorkerManagerBase
 
     protected:
 
-        virtual int SetWorkerNotify(Worker*) = 0;
+        virtual int SetWorkerNotify(NotifyerBase*) = 0;
 
         friend class Worker;
 };

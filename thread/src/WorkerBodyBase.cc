@@ -28,13 +28,13 @@ class DummyExitTask: public ITask
 /*
  *     WorkerBodyBase
  */
-WorkerBodyBase::WorkerBodyBase(Worker* worker)
+WorkerBodyBase::WorkerBodyBase(NotifyerBase* worker)
     :m_isRuning(false)
     ,m_timeout(5)
     ,m_reqThreshold(3)
     ,m_done(0)
     ,m_notify(false)
-    ,m_worker(worker)
+    ,m_notifyer(worker)
 {
     sem_init(&m_sem,0,0);
 }
@@ -75,9 +75,9 @@ bool WorkerBodyBase::TryConsume()
 
 int WorkerBodyBase::Notify()
 {
-    if (m_worker)
+    if (m_notifyer)
     {
-        return m_worker->Notify();
+        return m_notifyer->Notify();
     }
 
     return 0;

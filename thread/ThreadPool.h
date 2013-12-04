@@ -2,6 +2,7 @@
 #define _THREAD_POOL_H_
 
 #include "WorkerBodyBase.h"
+#include "Worker.h"
 #include "misc/NonCopyable.h"
 
 class Dispatcher;
@@ -31,7 +32,7 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 
     protected:
 
-        virtual int SetWorkerNotify(Worker* worker);
+        virtual int SetWorkerNotify(NotifyerBase* notifyer);
 
         virtual int CalcDefaultThreadNum() const;
 

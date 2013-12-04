@@ -5,8 +5,8 @@
  * WorkerBody
  */
 
-WorkerBody::WorkerBody(Worker* work, int maxMsgSize)
-    :WorkerBodyBase(work), m_mailbox(maxMsgSize)
+WorkerBody::WorkerBody(NotifyerBase* notifyer, int maxMsgSize)
+    :WorkerBodyBase(notifyer), m_mailbox(maxMsgSize)
 {
 }
 
