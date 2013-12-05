@@ -19,7 +19,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define SOCK_BITS (sizeof(short))
+#define SOCK_BITS (sizeof(short) << 3)
 #define MAX_SOCKET (1 << SOCK_BITS)
 #define MIN_READ_BUFFER (64)
 
@@ -368,6 +368,8 @@ void ServerImpl::SetupServer()
     }
 
     m_isRunning = true;
+
+    slog(LOG_INFO, "Server Setup, slot number:%d\n", m_maxSocket);
 }
 
 // release all pending send-buffer, and close socket.
@@ -559,7 +561,6 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     int id  = req->id;
 
     res->id = id;
-    res->opaque = req->opaque;
     SocketEntity* sock = &m_sockets[id % MAX_SOCKET];
 
     if (sock->type == SS_INVALID

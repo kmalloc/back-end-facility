@@ -21,7 +21,7 @@ struct SocketMessage
 
     // for socket connected event, this is the hostname of the connected socket.
     // for read socket event, this the data received, size is denoted by ud.
-    const char* data;
+    char* data;
 };
 
 enum SocketCode
