@@ -25,8 +25,9 @@ class Logger: public ThreadBase
          *       log that is not flush to disk.
          *
          * granularity: fixed size for each piece of log.
+         * flush_timeout: specify the timeout len for flushing log
          */
-        Logger(const char* file, size_t size = 2048, size_t granularity = 512);
+        Logger(const char* file, size_t size = 2048, size_t granularity = 512, unsigned int flush_timeout = 23);
         ~Logger();
 
         size_t Log(const std::string& msg);
@@ -56,6 +57,8 @@ class Logger: public ThreadBase
         LockFreeListQueue m_pendingMsg;
 
         volatile bool m_stopWorker;
+
+        const unsigned int m_timeout;
 };
 
 #endif

@@ -1,17 +1,20 @@
 #include "Logger.h"
 
+#include <time.h>
+#include <errno.h>
 #include <string.h>
 #include <fstream>
 #include <assert.h>
 
 using namespace std;
 
-Logger::Logger(const char* file, size_t size, size_t granularity)
+Logger::Logger(const char* file, size_t size, size_t granularity, unsigned int flush_time)
     :m_size(size), m_granularity(granularity)
     ,m_logFile(file)
     ,m_buffer(m_size, m_granularity)
     ,m_pendingMsg(m_size + 1)
     ,m_stopWorker(false)
+    ,m_timeout(flush_time)
 {
     sem_init(&m_sig, 0, 0);
     ThreadBase::Start();
@@ -43,12 +46,21 @@ void Logger::Flush()
     fout.close();
 }
 
-// currently, worker thread will be triggerred when msg queue is full.
+// currently, worker thread will be triggerred when msg queue is full or after 23 seconds.
 void Logger::Run()
 {
     while (!m_stopWorker)
     {
-        sem_wait(&m_sig);
+        int s;
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            continue;
+
+        ts.tv_sec += m_timeout;
+
+        while ((s = sem_timedwait(&m_sig,&ts)) == -1 && errno == EINTR)
+            continue;
+
         Flush();
     }
 }

@@ -4,7 +4,7 @@ SOURCES=src/SocketServer.cc src/SocketPoll.cc src/main.cc
 
 ROOT=..
 LIBS_PATH=-L$(ROOT)/lib
-LIBS=-lxthread -lsysutil -lmisc -lpthread
+LIBS=-lxthread -lsysutil -lmisc -lpthread -lrt
 
 INCLUDE=-I./
 INCLUDE+=-I$(ROOT)
