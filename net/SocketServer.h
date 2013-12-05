@@ -27,16 +27,16 @@ struct SocketMessage
 enum SocketCode
 {
     SC_NONE,
-    SC_BADSOCK,
-    SC_DATA,
-    SC_CLOSE,
-    SC_HALFCLOSE,
-    SC_LISTEN,
-    SC_CONNECTED,
-    SC_ACCEPT,
-    SC_HALFSEND,
-    SC_SEND,
-    SC_WATCHED, // socket is added to be watched
+    SC_BADSOCK, // SocketMessage::id denotes the bad socket
+    SC_DATA, // SocketMessage::id is the socket that receive data, note: user is responsible to free SocketMessage::data
+    SC_CLOSE, // SocketMessage::id is the socket that been close
+    SC_HALFCLOSE, // SocketMessage::id denotes the corresponding socket
+    SC_LISTEN, // SocketMessage::id denotes the corresponding socket
+    SC_CONNECTED, // SocketMessage::id denotes the corresponding socket
+    SC_ACCEPT, // SocketMessage::ud denotes the accepted socket, SocketMessage::id denotes the corresponding socket that is listening.
+    SC_HALFSEND, // SocketMessage::id denotes the socket, SocketMessage::ud denotes the size of data been send.
+    SC_SEND,  // SocketMessage::id denotes the socket , SocketMessage::ud denotes the size of data been send
+    SC_WATCHED, // socket is added to be watched, SocketMessage::id is the corresponding socket
     SC_ERROR,
     SC_IERROR, // error ignored
     SC_EXIT,

@@ -263,8 +263,10 @@ const ServerImpl::ActionHandler ServerImpl::m_actionHandler[] =
    &ServerImpl::ShutdownServer
 };
 
-static void DummySockEventHandler(SocketCode, SocketMessage*)
+static void DummySockEventHandler(SocketCode code, SocketMessage* msg)
 {
+    if (code == SC_DATA)
+        free(msg->data);
 }
 
 static inline void ReleaseFrontBuffer(SocketEntity* sock)
@@ -501,6 +503,9 @@ _failed:
 SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res) const
 {
     SocketBuffer* buf = NULL;
+    res->id = sock->id;
+
+    int sz_send = 0;
     while ((buf = sock->head))
     {
         while (1)
@@ -520,15 +525,18 @@ SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res)
             {
                 buf->current_ptr += sz;
                 buf->left_size -= sz;
+                res->ud = sz;
                 return SC_HALFSEND;
             }
 
+            sz_send += sz;
             break;
         }
 
         ReleaseFrontBuffer(sock);
     }
 
+    res->ud = sz_send;
     sock->tail = NULL;
 
     // send done, reset epoll flag to read.
@@ -549,6 +557,9 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     RequestSend* req = (RequestSend*)buffer;
 
     int id  = req->id;
+
+    res->id = id;
+    res->opaque = req->opaque;
     SocketEntity* sock = &m_sockets[id % MAX_SOCKET];
 
     if (sock->type == SS_INVALID
@@ -581,6 +592,8 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
        buf->next = NULL;
        sock->tail->next = buf;
        sock->tail = buf;
+
+       res->ud = 0;
 
        return SC_HALFSEND;
     }
@@ -764,11 +777,11 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
 
     int id = req->id;
 
+    res->id = id;
+    res->opaque = req->opaque;
     SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
     if (sock->type == SS_INVALID || sock->id != id)
     {
-        res->id = id;
-        res->opaque = req->opaque;
         res->ud = 0;
         res->data = NULL;
         return SC_BADSOCK;

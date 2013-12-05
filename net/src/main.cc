@@ -21,6 +21,7 @@ static void handler(SocketCode code, SocketMessage* msg)
             break;
         case SC_DATA:
             cout << "receive data from socket:" << msg->id << ", data:" << (char*)msg->data << ", data size:" << msg->ud << endl;
+            free(msg->data);
             break;
         case SC_ACCEPT:
             server.WatchSocket(msg->ud, 12333);
