@@ -1,55 +1,103 @@
 #include "Logger.h"
 
+#include "thread/Thread.h"
+#include "misc/LockFreeBuffer.h"
+#include "misc/LockFreeList.h"
+
 #include <time.h>
 #include <errno.h>
 #include <string.h>
 #include <fstream>
 #include <assert.h>
+#include <iostream>
+#include <pthread.h>
+#include <semaphore.h>
 
 using namespace std;
 
-Logger::Logger(const char* file, size_t size, size_t granularity, unsigned int flush_time)
-    :m_size(size), m_granularity(granularity)
-    ,m_logFile(file)
-    ,m_buffer(m_size, m_granularity)
+struct LogEntity
+{
+    string file;
+    char data[0];
+};
+
+class LogWorker: public ThreadBase
+{
+    public:
+
+        LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time);
+        ~LogWorker();
+
+        size_t Log(const char* file, const std::string& msg);
+        size_t Log(const char* file, const char* format,...);
+        size_t Log(const char* file, const char* format, va_list args);
+
+        void Flush();
+        void StopLogging();
+
+    protected:
+
+        size_t DoLog(LogEntity* log);
+        virtual void Run();
+
+    private:
+
+        sem_t m_sig;
+        sem_t m_stop;
+
+        const size_t m_size; // total piece of buffers cached in memory.
+        const size_t m_granularity; // size of per buffer.
+
+        LockFreeBuffer m_buffer;
+        LockFreeListQueue m_pendingMsg;
+
+        const unsigned int m_timeout;
+};
+
+LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time)
+    :m_size(max_pending_log)
+    ,m_granularity(granularity)
+    ,m_buffer(m_size, m_granularity + sizeof(LogEntity))
     ,m_pendingMsg(m_size + 1)
-    ,m_stopWorker(false)
     ,m_timeout(flush_time)
 {
     sem_init(&m_sig, 0, 0);
+    sem_init(&m_stop,0, 0);
     ThreadBase::Start();
 }
 
-Logger::~Logger()
+LogWorker::~LogWorker()
 {
     StopLogging();
     Join();
 }
 
-void Logger::DoFlush(ostream& fout)
+void LogWorker::StopLogging()
 {
-    if (!fout.good()) return;
+    sem_post(&m_sig);
+    sem_post(&m_stop);
+}
 
-    void* buffer;
-    while (m_pendingMsg.Pop(&buffer))
+void LogWorker::Flush()
+{
+    LogEntity* log;
+    while (m_pendingMsg.Pop((void**)&log))
     {
-        fout << (char*)buffer << std::endl;
-        m_buffer.ReleaseBuffer(buffer);
+        ofstream fout;
+
+        fout.open(log->file.c_str(), ofstream::out | ofstream::app);
+        if (!fout.good()) continue;
+
+        fout << (char*)log->data << std::endl;
+
+        log->~LogEntity();
+        m_buffer.ReleaseBuffer(log);
     }
 }
 
-void Logger::Flush()
+void LogWorker::Run()
 {
-    ofstream fout;
-    fout.open(m_logFile.c_str(), ofstream::out | ofstream::app);
-    DoFlush(fout);
-    fout.close();
-}
-
-// currently, worker thread will be triggerred when msg queue is full or after 23 seconds.
-void Logger::Run()
-{
-    while (!m_stopWorker)
+    while (1)
     {
         int s;
         struct timespec ts;
@@ -62,27 +110,31 @@ void Logger::Run()
             continue;
 
         Flush();
+
+        if (0 == sem_trywait(&m_stop)) break;
     }
 }
 
-void Logger::StopLogging()
-{
-    m_stopWorker = true;
-    sem_post(&m_sig);
-}
-
-size_t Logger::DoLog(void* buffer)
+size_t LogWorker::DoLog(LogEntity* buffer)
 {
     bool ret;
+    int retry = 0;
+
     do
     {
         ret = m_pendingMsg.Push(buffer);
 
-        if (ret == false)
+        if (ret == false && retry < 16)
         {
             // msg queue is full, time to wake up worker to flush all the msg.
+            ++retry;
             sem_post(&m_sig);
             sched_yield();
+        }
+        else if (retry >= 8)
+        {
+            retry = 0;
+            Flush();
         }
 
     } while (ret == false);
@@ -92,34 +144,82 @@ size_t Logger::DoLog(void* buffer)
 
 // if lenght of msg is larger than m_granularity.
 // msg will not log completely.
-size_t Logger::Log(const std::string& msg)
+size_t LogWorker::Log(const char* file, const std::string& msg)
 {
     size_t sz = msg.size();
     if (sz == 0) return 0;
 
     if (sz >= m_granularity) sz = m_granularity - 1;
 
-    char* buffer = (char*)m_buffer.AllocBuffer();
+    void* addr = m_buffer.AllocBuffer();
+    if (addr == NULL) return 0;
 
-    if (buffer == NULL) return 0;
+    // placement new
+    LogEntity* log = new(addr) LogEntity();
+
+    log->file = file;
+    char* buffer = log->data;
 
     strncpy(buffer, msg.c_str(), sz);
     buffer[sz] = 0;
 
-    return DoLog(buffer);
+    return DoLog(log);
+}
+
+size_t LogWorker::Log(const char* file, const char* format, va_list args)
+{
+    void* addr = m_buffer.AllocBuffer();
+    if (addr == NULL) return 0;
+
+    LogEntity* log = new(addr) LogEntity();
+
+    log->file = file;
+    char* buffer = log->data;
+
+    vsnprintf(buffer, m_granularity - 1, format, args);
+
+    return DoLog(log);
+}
+
+size_t LogWorker::Log(const char* file, const char* format,...)
+{
+    va_list args;
+    va_start(args, format);
+    size_t ret = Log(file, format, args);
+    va_end(args);
+
+    return ret;
+}
+
+
+static LogWorker g_worker(LOG_MAX_PENDING, LOG_GRANULARITY, LOG_FLUSH_TIMEOUT);
+
+// definition of logger
+Logger::Logger(const char* file)
+    :m_logFile(file)
+{
+}
+
+Logger::~Logger()
+{
+}
+
+void Logger::Flush()
+{
+    g_worker.Flush();
 }
 
 size_t Logger::Log(const char* format, va_list args)
 {
-    char* buffer = (char*)m_buffer.AllocBuffer();
-    if (buffer == NULL) return 0;
-
-    vsnprintf(buffer, m_granularity - 1, format, args);
-
-    return DoLog(buffer);
+    return g_worker.Log(m_logFile.c_str(), format, args);
 }
 
-size_t Logger::Log(const char* format,...)
+size_t Logger::Log(const string& msg)
+{
+    return g_worker.Log(m_logFile.c_str(), msg);
+}
+
+size_t Logger::Log(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -127,5 +227,10 @@ size_t Logger::Log(const char* format,...)
     va_end(args);
 
     return ret;
+}
+
+void Logger::StopLogging()
+{
+    g_worker.StopLogging();
 }
 
