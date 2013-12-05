@@ -6,7 +6,7 @@
  */
 
 WorkerBody::WorkerBody(NotifyerBase* notifyer, int maxMsgSize)
-    :WorkerBodyBase(notifyer), m_mailbox(maxMsgSize)
+    :WorkerBodyBase(notifyer), mailbox_(maxMsgSize)
 {
 }
 
@@ -18,24 +18,24 @@ WorkerBody::~WorkerBody()
 ITask* WorkerBody::GetTaskFromContainer()
 {
     ITask* task;
-    if (m_mailbox.PopFront(&task)) return task;
+    if (mailbox_.PopFront(&task)) return task;
 
     return NULL;
 }
 
 bool WorkerBody::PushTaskToContainer(ITask* task)
 {
-    return m_mailbox.PushBack(task);
+    return mailbox_.PushBack(task);
 }
 
 int WorkerBody::GetContainerSize()
 {
-    return m_mailbox.Size();
+    return mailbox_.Size();
 }
 
 bool WorkerBody::HasTask()
 {
-    return !m_mailbox.IsEmpty();
+    return !mailbox_.IsEmpty();
 }
 
 void WorkerBody::HandleTask(ITask* task)
@@ -50,20 +50,20 @@ void WorkerBody::HandleTask(ITask* task)
  */
 
 Worker::Worker(WorkerManagerBase* man, int id, int maxMsgSize)
-    :Thread(), m_id(id), m_manager(man)
+    :Thread(), id_(id), manager_(man)
 {
-   m_task = m_WorkerBody = new WorkerBody(this,maxMsgSize);
+   task_ = WorkerBody_ = new WorkerBody(this,maxMsgSize);
 }
 
 Worker::Worker(WorkerBodyBase* task, int id, WorkerManagerBase* man)
-    :Thread(), m_id(id), m_manager(man)
+    :Thread(), id_(id), manager_(man)
 {
-    m_task = m_WorkerBody = task;
+    task_ = WorkerBody_ = task;
 }
 
 Worker::~Worker()
 {
-    delete m_task;
+    delete task_;
 }
 
 bool Worker::StartWorking()
@@ -73,9 +73,9 @@ bool Worker::StartWorking()
 
 int Worker::Notify()
 {
-    if (m_manager)
+    if (manager_)
     {
-        return m_manager->SetWorkerNotify(this);
+        return manager_->SetWorkerNotify(this);
     }
 
     return 0;
@@ -83,7 +83,7 @@ int Worker::Notify()
 
 bool Worker::StopWorking(bool join)
 {
-    bool ret =  m_WorkerBody->StopRunning();
+    bool ret =  WorkerBody_->StopRunning();
 
     if (join && ret) ret = Join();
 

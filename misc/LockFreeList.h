@@ -15,8 +15,8 @@ class LockFreeListQueue: public noncopyable
         bool Push(void* data);
         bool Pop(void*& data);
         bool Pop(void** data);
-        size_t Size() const { return m_no; }
-        bool IsEmpty() const { return m_no == 0; }
+        size_t Size() const { return no_; }
+        bool IsEmpty() const { return no_ == 0; }
 
     private:
 
@@ -26,15 +26,15 @@ class LockFreeListQueue: public noncopyable
         void ReleaseNode(LockFreeListNode*);
         void InitInternalNodeList();
 
-        volatile size_t m_id;
-        size_t    m_no;
-        const size_t m_max;
-        DoublePointer m_in;
-        DoublePointer m_out;
+        volatile size_t id_;
+        size_t    no_;
+        const size_t max_;
+        DoublePointer in_;
+        DoublePointer out_;
 
-        volatile size_t m_id2;
-        DoublePointer m_head; // point to unused LockFreeListNode list
-        LockFreeListNode* m_freeList; //internal node list
+        volatile size_t id2_;
+        DoublePointer head_; // point to unused LockFreeListNode list
+        LockFreeListNode* freeList_; //internal node list
 };
 
 

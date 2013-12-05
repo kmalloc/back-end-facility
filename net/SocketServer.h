@@ -95,7 +95,7 @@ class SocketServer: public noncopyable
 
     private:
 
-        ServerImpl* m_impl;
+        ServerImpl* impl_;
 };
 
 #endif

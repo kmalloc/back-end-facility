@@ -20,13 +20,13 @@ class LockFreeBuffer: public noncopyable
 
         void InitList();
 
-        const size_t m_size; // total number of buffer.
-        const size_t m_granularity;
+        const size_t size_; // total number of buffer.
+        const size_t granularity_;
 
-        volatile size_t m_id;
-        char* m_rawBuff;
-        DoublePointer m_head;
-        BufferNode** m_freeList;
+        volatile size_t id_;
+        char* rawBuff_;
+        DoublePointer head_;
+        BufferNode** freeList_;
 };
 
 #endif

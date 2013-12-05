@@ -13,21 +13,21 @@ class ITask
 {
     public:
 
-        ITask(TaskPriority prio = TP_NORMAL): m_priority(prio){}
+        ITask(TaskPriority prio = TP_NORMAL): priority_(prio){}
         virtual ~ITask(){}
         virtual void Run()=0;
 
-        TaskPriority Priority() const { return m_priority; }
+        TaskPriority Priority() const { return priority_; }
         TaskPriority SetPriority(TaskPriority prio)
         {
-            TaskPriority old = m_priority;
-            m_priority = prio;
+            TaskPriority old = priority_;
+            priority_ = prio;
             return old;
         }
 
     protected:
 
-        TaskPriority m_priority;
+        TaskPriority priority_;
 };
 
 #endif

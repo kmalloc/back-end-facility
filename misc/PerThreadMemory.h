@@ -49,11 +49,11 @@ class PerThreadMemoryAlloc: public noncopyable
         void* AllocBuffer() const;
         void  ReleaseBuffer(void*) const;
         int   Size() const;
-        int   Granularity() const { return m_granularity; }
+        int   Granularity() const { return granularity_; }
 
         bool  FreeCurThreadMemory();
 
-        pthread_key_t GetPerThreadKey() const { return m_key; }
+        pthread_key_t GetPerThreadKey() const { return key_; }
 
     private:
 
@@ -68,12 +68,12 @@ class PerThreadMemoryAlloc: public noncopyable
         NodeHead* InitPerThreadList() const;
         void* GetFreeBufferFromList(NodeHead*) const;
 
-        const int m_align; // buffer alignment
-        const int m_granularity; // sizeof per buffer
-        const int m_offset; //
-        const int m_population; // total number of buffer
+        const int align_; // buffer alignment
+        const int granularity_; // sizeof per buffer
+        const int offset_; //
+        const int population_; // total number of buffer
 
-        volatile pthread_key_t m_key;
+        volatile pthread_key_t key_;
 };
 
 #endif

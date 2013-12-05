@@ -19,31 +19,31 @@ class Thread: public noncopyable
         Thread(ITask* = NULL, bool detachable = false);
         virtual ~Thread();
 
-        bool   IsDetachable() const { return m_detachable; }
+        bool   IsDetachable() const { return detachable_; }
         bool   SetDetachable(bool enable);
 
         bool   Start();
         bool   Join(void** ret = NULL);
         bool   Cancel();
 
-        virtual bool IsRunning() const { return m_busy; }
+        virtual bool IsRunning() const { return busy_; }
 
         // this function is not thread safe, be sure not to call it when the thread is already started.
-        ITask* SetTask(ITask*task) { ITask* tmp = m_task; m_task = task; return tmp; }
-        const ITask* GetTask() const { return m_task; }
+        ITask* SetTask(ITask*task) { ITask* tmp = task_; task_ = task; return tmp; }
+        const ITask* GetTask() const { return task_; }
 
     protected:
 
         static void* RunTask(void* arg);
 
-        ITask* m_task;
+        ITask* task_;
 
     private:
 
-        pthread_t m_tid;
+        pthread_t tid_;
 
-        volatile bool m_busy;
-        volatile bool m_detachable;
+        volatile bool busy_;
+        volatile bool detachable_;
 };
 
 class ThreadBase: public Thread
@@ -66,20 +66,20 @@ class ThreadBase: public Thread
         {
             public:
 
-                ThreadBaseTask(ThreadBase* host) :m_host(host) {}
+                ThreadBaseTask(ThreadBase* host) :host_(host) {}
 
                 virtual void Run()
                 {
-                    m_host->Run();
+                    host_->Run();
                 }
 
             private:
 
-                ThreadBase* m_host;
+                ThreadBase* host_;
         };
 
 
-        ThreadBaseTask m_task;
+        ThreadBaseTask task_;
 };
 
 #endif

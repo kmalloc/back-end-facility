@@ -44,30 +44,30 @@ class LogWorker: public ThreadBase
 
     private:
 
-        sem_t m_sig;
-        sem_t m_stop;
-        pthread_mutex_t m_guardRunning;
+        sem_t sig_;
+        sem_t stop_;
+        pthread_mutex_t guardRunning_;
 
-        const size_t m_size; // total piece of buffers cached in memory.
-        const size_t m_granularity; // size of per buffer.
+        const size_t size_; // total piece of buffers cached in memory.
+        const size_t granularity_; // size of per buffer.
 
         // buffer Pool
-        LockFreeBuffer m_buffer;
-        LockFreeListQueue m_pendingMsg;
+        LockFreeBuffer buffer_;
+        LockFreeListQueue pendingMsg_;
 
-        const unsigned int m_timeout;
+        const unsigned int timeout_;
 };
 
 LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time)
-    :m_size(max_pending_log)
-    ,m_granularity(granularity)
-    ,m_buffer(m_size, m_granularity + sizeof(LogEntity))
-    ,m_pendingMsg(m_size + 1)
-    ,m_timeout(flush_time)
+    :size_(max_pending_log)
+    ,granularity_(granularity)
+    ,buffer_(size_, granularity_ + sizeof(LogEntity))
+    ,pendingMsg_(size_ + 1)
+    ,timeout_(flush_time)
 {
-    sem_init(&m_sig, 0, 0);
-    sem_init(&m_stop,0, 0);
-    pthread_mutex_init(&m_guardRunning, NULL);
+    sem_init(&sig_, 0, 0);
+    sem_init(&stop_,0, 0);
+    pthread_mutex_init(&guardRunning_, NULL);
     ThreadBase::Start();
 }
 
@@ -76,31 +76,31 @@ LogWorker::~LogWorker()
     StopLogging();
     Join();
 
-    sem_destroy(&m_sig);
-    sem_destroy(&m_stop);
-    pthread_mutex_destroy(&m_guardRunning);
+    sem_destroy(&sig_);
+    sem_destroy(&stop_);
+    pthread_mutex_destroy(&guardRunning_);
 }
 
 void LogWorker::StopLogging()
 {
-    sem_post(&m_sig);
-    sem_post(&m_stop);
+    sem_post(&sig_);
+    sem_post(&stop_);
 }
 
 void LogWorker::RunWorker()
 {
-    pthread_mutex_lock(&m_guardRunning);
+    pthread_mutex_lock(&guardRunning_);
     if (ThreadBase::IsRunning() == false)
     {
         ThreadBase::Start();
     }
-    pthread_mutex_unlock(&m_guardRunning);
+    pthread_mutex_unlock(&guardRunning_);
 }
 
 void LogWorker::Flush()
 {
     LogEntity* log;
-    while (m_pendingMsg.Pop((void**)&log))
+    while (pendingMsg_.Pop((void**)&log))
     {
         ostream* fout = log->fout;
         if (!fout->good()) continue;
@@ -108,7 +108,7 @@ void LogWorker::Flush()
         *fout << (char*)log->data << std::endl;
 
         // log->~LogEntity();
-        m_buffer.ReleaseBuffer(log);
+        buffer_.ReleaseBuffer(log);
     }
 }
 
@@ -120,14 +120,14 @@ void LogWorker::Run()
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
             continue;
 
-        ts.tv_sec += m_timeout;
+        ts.tv_sec += timeout_;
 
-        while (sem_timedwait(&m_sig,&ts) == -1 && errno == EINTR)
+        while (sem_timedwait(&sig_,&ts) == -1 && errno == EINTR)
             continue;
 
         Flush();
 
-        if (0 == sem_trywait(&m_stop)) break;
+        if (0 == sem_trywait(&stop_)) break;
     }
 }
 
@@ -138,13 +138,13 @@ size_t LogWorker::DoLog(LogEntity* buffer)
 
     do
     {
-        ret = m_pendingMsg.Push(buffer);
+        ret = pendingMsg_.Push(buffer);
 
         if (ret == false && retry < 32)
         {
             // msg queue is full, time to wake up worker to flush all the msg.
             ++retry;
-            sem_post(&m_sig);
+            sem_post(&sig_);
             sched_yield();
         }
         else if (retry >= 32)
@@ -155,19 +155,19 @@ size_t LogWorker::DoLog(LogEntity* buffer)
 
     } while (ret == false);
 
-    return m_granularity - 1;
+    return granularity_ - 1;
 }
 
-// if lenght of msg is larger than m_granularity.
+// if lenght of msg is larger than granularity_.
 // msg will not log completely.
 size_t LogWorker::Log(ostream* fout, const std::string& msg)
 {
     size_t sz = msg.size();
     if (sz == 0) return 0;
 
-    if (sz >= m_granularity) sz = m_granularity - 1;
+    if (sz >= granularity_) sz = granularity_ - 1;
 
-    void* addr = m_buffer.AllocBuffer();
+    void* addr = buffer_.AllocBuffer();
     if (addr == NULL) return 0;
 
     // placement new
@@ -185,7 +185,7 @@ size_t LogWorker::Log(ostream* fout, const std::string& msg)
 
 size_t LogWorker::Log(ostream* fout, const char* format, va_list args)
 {
-    void* addr = m_buffer.AllocBuffer();
+    void* addr = buffer_.AllocBuffer();
     if (addr == NULL) return 0;
 
     // LogEntity* log = new(addr) LogEntity();
@@ -194,7 +194,7 @@ size_t LogWorker::Log(ostream* fout, const char* format, va_list args)
     log->fout = fout;
     char* buffer = log->data;
 
-    vsnprintf(buffer, m_granularity - 1, format, args);
+    vsnprintf(buffer, granularity_ - 1, format, args);
 
     return DoLog(log);
 }

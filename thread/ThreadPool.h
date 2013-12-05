@@ -36,9 +36,9 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 
         virtual int CalcDefaultThreadNum() const;
 
-        bool        m_running;
-        Worker*     m_worker;
-        Dispatcher* m_dispatcher;
+        bool        running_;
+        Worker*     worker_;
+        Dispatcher* dispatcher_;
 };
 
 #endif

@@ -31,11 +31,11 @@ class WorkerBodyBase: public ITask, public noncopyable
         virtual bool StopRunning();
 
         bool IsRunning() const;
-        int  TaskDone() const { return m_done; }
-        void EnableNotify(bool enable = true) { m_notify = enable; }
+        int  TaskDone() const { return done_; }
+        void EnableNotify(bool enable = true) { notify_ = enable; }
 
         // take care of calling this function.
-        // multitasking-opertion on m_mailbox will
+        // multitasking-opertion on mailbox_ will
         // greatly reduce performance.
         // don't call it unless really necessary.
         ITask* TryGetTask();
@@ -62,10 +62,10 @@ class WorkerBodyBase: public ITask, public noncopyable
         // disable overloading from child
         void Run();
 
-        // get task from mailbox or m_cmd
+        // get task from mailbox or cmd_
         // may block when there is no task.
         // caller take responsibility to free the task.
-        // return false if get task from m_cmd.
+        // return false if get task from cmd_.
         bool GetRunTask(ITask*& task);
 
         // set up flag to make worker loop exit;
@@ -78,31 +78,31 @@ class WorkerBodyBase: public ITask, public noncopyable
         inline void ProcessInternalCmd(ITask*);
 
         // is running task.
-        volatile bool m_isRuning;
+        volatile bool isRuning_;
 
         // timeout for sem_timewait
-        const int m_timeout;
+        const int timeout_;
 
-        const int m_reqThreshold;
+        const int reqThreshold_;
 
         // semaphore for waiting for task.
-        sem_t m_sem;
+        sem_t sem_;
 
         // task processed.
-        volatile int m_done;
+        volatile int done_;
 
         // notify thread pool I am free now, send me some tasks
-        volatile bool m_notify;
-        NotifyerBase* m_notifyer;
+        volatile bool notify_;
+        NotifyerBase* notifyer_;
 
         // note this is for internal usage only.
         // supporting worker internal activities: exit.
-        SpinlockQueue<ITask*> m_cmd;
+        SpinlockQueue<ITask*> cmd_;
 
         // exit flag.
         // this variable will be accessed on in the worker thread.
         // It will be set by DummyExitTask only.
-        bool m_ShouldStop;
+        bool ShouldStop_;
 
         friend class DummyExitTask;
 };

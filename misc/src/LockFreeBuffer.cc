@@ -6,25 +6,25 @@
 
 struct BufferNode
 {
-    DoublePointer m_next;
-    char m_buffer[0];
+    DoublePointer next_;
+    char buffer_[0];
 };
 
 LockFreeBuffer::LockFreeBuffer(size_t size, size_t granularity)
-    :m_size(size), m_granularity(AlignTo(granularity, sizeof(DoublePointer)))
-    ,m_id(0), m_rawBuff(NULL), m_freeList(NULL)
+    :size_(size), granularity_(AlignTo(granularity, sizeof(DoublePointer)))
+    ,id_(0), rawBuff_(NULL), freeList_(NULL)
 {
-    size_t sz = m_size * (sizeof(BufferNode) + m_granularity);
+    size_t sz = size_ * (sizeof(BufferNode) + granularity_);
 
     try
     {
-        m_rawBuff = new char[sz];
-        m_freeList = new BufferNode*[m_size];
+        rawBuff_ = new char[sz];
+        freeList_ = new BufferNode*[size_];
     }
     catch (...)
     {
-        if (m_rawBuff) delete[] m_rawBuff;
-        if (m_freeList) delete[] m_freeList;
+        if (rawBuff_) delete[] rawBuff_;
+        if (freeList_) delete[] freeList_;
 
         throw "out of memory";
     }
@@ -34,31 +34,31 @@ LockFreeBuffer::LockFreeBuffer(size_t size, size_t granularity)
 
 LockFreeBuffer::~LockFreeBuffer()
 {
-    delete[] m_freeList;
-    delete[] m_rawBuff;
+    delete[] freeList_;
+    delete[] rawBuff_;
 }
 
 void LockFreeBuffer::InitList()
 {
     size_t i, off_set = 0;
-    const size_t sz = sizeof(BufferNode) + m_granularity;
+    const size_t sz = sizeof(BufferNode) + granularity_;
 
-    for (i = 0; i < m_size; ++i)
+    for (i = 0; i < size_; ++i)
     {
         off_set = i * sz;
-        m_freeList[i] = (BufferNode*)(m_rawBuff + off_set);
+        freeList_[i] = (BufferNode*)(rawBuff_ + off_set);
     }
 
-    for (i = 0; i < m_size - 1; ++i)
+    for (i = 0; i < size_ - 1; ++i)
     {
-        m_freeList[i]->m_next.vals[0] = (void*)(i + 1);
-        m_freeList[i]->m_next.vals[1] = m_freeList[i + 1];
+        freeList_[i]->next_.vals[0] = (void*)(i + 1);
+        freeList_[i]->next_.vals[1] = freeList_[i + 1];
     }
 
-    m_freeList[i]->m_next.val = 0;
+    freeList_[i]->next_.val = 0;
 
-    SetDoublePointer(m_head, (void*)0, m_freeList[0]);
-    m_id = i;
+    SetDoublePointer(head_, (void*)0, freeList_[0]);
+    id_ = i;
 }
 
 
@@ -68,38 +68,38 @@ char* LockFreeBuffer::AllocBuffer()
 
     do
     {
-        old_head.val = atomic_read_double(&m_head);
+        old_head.val = atomic_read_double(&head_);
         if (IsDoublePointerNull(old_head)) return NULL;
 
-        atomic_longlong tmp = ((BufferNode*)old_head.vals[1])->m_next.val;
-        if (atomic_cas2(&m_head.val, old_head.val, tmp)) break;
+        atomic_longlong tmp = ((BufferNode*)old_head.vals[1])->next_.val;
+        if (atomic_cas2(&head_.val, old_head.val, tmp)) break;
 
     } while (1);
 
     BufferNode* ret = (BufferNode*)old_head.vals[1];
 
-    ret->m_next.val = 0;
+    ret->next_.val = 0;
 
-    return ret->m_buffer;
+    return ret->buffer_;
 }
 
 void LockFreeBuffer::ReleaseBuffer(void* buffer)
 {
-    BufferNode* node = container_of(buffer, BufferNode, m_buffer);
+    BufferNode* node = container_of(buffer, BufferNode, buffer_);
 
-    assert(node >= m_freeList[0] && node <= m_freeList[m_size - 1]);
+    assert(node >= freeList_[0] && node <= freeList_[size_ - 1]);
 
     DoublePointer old_head, new_node;
 
-    size_t id = atomic_increment(&m_id);
+    size_t id = atomic_increment(&id_);
     SetDoublePointer(new_node, (void*)id, node);
 
     do
     {
-        old_head.val = atomic_read_double(&m_head);
-        node->m_next = old_head;
+        old_head.val = atomic_read_double(&head_);
+        node->next_ = old_head;
 
-        if (atomic_cas2(&m_head.val, old_head.val, new_node.val)) break;
+        if (atomic_cas2(&head_.val, old_head.val, new_node.val)) break;
 
     } while (1);
 }

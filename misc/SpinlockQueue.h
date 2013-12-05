@@ -18,37 +18,37 @@ class PriorityQueue: public noncopyable
 
         const Type& front()
         {
-            return m_queue.top();
+            return queue_.top();
         }
 
         void pop()
         {
-            m_queue.pop();
+            queue_.pop();
         }
 
         void push(const Type& x)
         {
-            m_queue.push(x);
+            queue_.push(x);
         }
 
         bool empty() const
         {
-            return m_queue.empty();
+            return queue_.empty();
         }
 
         size_t size() const
         {
-            return m_queue.size();
+            return queue_.size();
         }
 
         void clear()
         {
-            m_queue = std::priority_queue<Type, std::vector<Type>, cmp>();
+            queue_ = std::priority_queue<Type, std::vector<Type>, cmp>();
         }
 
     private:
 
-        std::priority_queue<Type, std::vector<Type>, cmp> m_queue;
+        std::priority_queue<Type, std::vector<Type>, cmp> queue_;
 
 };
 
@@ -61,42 +61,42 @@ class DequeQueue
 
         const Type& front()
         {
-            return m_queue.front();
+            return queue_.front();
         }
 
         void pop()
         {
-            m_queue.pop_front();
+            queue_.pop_front();
         }
 
         void push(const Type& x)
         {
-            m_queue.push_back(x);
+            queue_.push_back(x);
         }
 
         void push_front(const Type& x)
         {
-            m_queue.push_front(x);
+            queue_.push_front(x);
         }
 
         bool empty() const
         {
-            return m_queue.empty();
+            return queue_.empty();
         }
 
         size_t size() const
         {
-            return m_queue.size();
+            return queue_.size();
         }
 
         void clear()
         {
-            m_queue.clear();
+            queue_.clear();
         }
 
     protected:
 
-        std::deque<Type> m_queue;
+        std::deque<Type> queue_;
 };
 
 template<class Type,class QUEUE=std::queue<Type> >
@@ -105,9 +105,9 @@ class SpinlockQueue
     public:
 
         SpinlockQueue(int Maxsize = DEFAULT_WORKER_TASK_MSG_SIZE)
-            :m_maxSz(Maxsize)
+            :maxSz_(Maxsize)
         {
-            pthread_spin_init(&m_lock,0);
+            pthread_spin_init(&lock_,0);
         }
 
         ~SpinlockQueue()
@@ -118,17 +118,17 @@ class SpinlockQueue
         {
             Type val;
 
-            pthread_spin_lock(&m_lock);
+            pthread_spin_lock(&lock_);
 
-            if (m_queue.empty())
+            if (queue_.empty())
             {
-                pthread_spin_unlock(&m_lock);
+                pthread_spin_unlock(&lock_);
                 return false;
             }
 
-            val = m_queue.front();
-            m_queue.pop();
-            pthread_spin_unlock(&m_lock);
+            val = queue_.front();
+            queue_.pop();
+            pthread_spin_unlock(&lock_);
 
             if (ret) *ret = val;
 
@@ -139,33 +139,33 @@ class SpinlockQueue
         {
             bool full = true;
 
-            pthread_spin_lock(&m_lock);
-            full = m_queue.size() >= m_maxSz;
+            pthread_spin_lock(&lock_);
+            full = queue_.size() >= maxSz_;
 
             if (!full)
             {
-                m_queue.push(val);
+                queue_.push(val);
             }
 
-            pthread_spin_unlock(&m_lock);
+            pthread_spin_unlock(&lock_);
 
             return !full;
         }
 
         void Clear()
         {
-            pthread_spin_lock(&m_lock);
-            m_queue.clear();
-            pthread_spin_unlock(&m_lock);
+            pthread_spin_lock(&lock_);
+            queue_.clear();
+            pthread_spin_unlock(&lock_);
         }
 
         int  Size()
         {
             int count = -1;
 
-            pthread_spin_lock(&m_lock);
-            count = m_queue.size();
-            pthread_spin_unlock(&m_lock);
+            pthread_spin_lock(&lock_);
+            count = queue_.size();
+            pthread_spin_unlock(&lock_);
 
             return count;
         }
@@ -174,18 +174,18 @@ class SpinlockQueue
         {
             bool ret;
 
-            pthread_spin_lock(&m_lock);
-            ret = m_queue.empty();
-            pthread_spin_unlock(&m_lock);
+            pthread_spin_lock(&lock_);
+            ret = queue_.empty();
+            pthread_spin_unlock(&lock_);
 
             return ret;
         }
 
     protected:
 
-        const size_t m_maxSz;
-        volatile pthread_spinlock_t m_lock;
-        QUEUE m_queue;
+        const size_t maxSz_;
+        volatile pthread_spinlock_t lock_;
+        QUEUE queue_;
 };
 
 
@@ -202,15 +202,15 @@ class SpinlockWeakPriorityQueue: public SpinlockQueue<Type,DequeQueue<Type> >
         {
             bool full = true;
 
-            pthread_spin_lock(&this->m_lock);
-            full = this->m_queue.size() >= this->m_maxSz;
+            pthread_spin_lock(&this->lock_);
+            full = this->queue_.size() >= this->maxSz_;
 
             if (!full)
             {
-                this->m_queue.push_front(val);
+                this->queue_.push_front(val);
             }
 
-            pthread_spin_unlock(&this->m_lock);
+            pthread_spin_unlock(&this->lock_);
 
             return !full;
         }

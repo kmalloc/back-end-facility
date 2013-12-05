@@ -39,7 +39,7 @@ class SocketPoll: public noncopyable
         void Init();
         void Release() const;
 
-        int m_epoll;
+        int epoll_;
 };
 
 #endif // __SOCKET_POLL_H_

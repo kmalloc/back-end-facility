@@ -6,21 +6,21 @@
 #include <errno.h>
 
 Thread::Thread(ITask* task, bool detachable)
-    :m_task(task)
-    ,m_tid(0)
-    ,m_busy(false)
-    ,m_detachable(detachable)
+    :task_(task)
+    ,tid_(0)
+    ,busy_(false)
+    ,detachable_(detachable)
 {
 }
 
 Thread::~Thread()
 {
-    if (m_busy) pthread_cancel(m_tid);
+    if (busy_) pthread_cancel(tid_);
 }
 
 bool Thread::Start()
 {
-    if (m_busy || m_task == NULL) return false;
+    if (busy_ || task_ == NULL) return false;
 
     pthread_attr_t attr;
     int status = pthread_attr_init(&attr);
@@ -30,7 +30,7 @@ bool Thread::Start()
         return false;
     }
 
-    if (m_detachable)
+    if (detachable_)
     {
         status = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     }
@@ -45,7 +45,7 @@ bool Thread::Start()
         return false;
     }
 
-    status = pthread_create(&m_tid,&attr, Thread::RunTask, static_cast<void*>(this));
+    status = pthread_create(&tid_,&attr, Thread::RunTask, static_cast<void*>(this));
 
     pthread_attr_destroy(&attr);
 
@@ -57,46 +57,46 @@ bool Thread::Start()
 void* Thread::RunTask(void*arg)
 {
     Thread* thread  = static_cast<Thread*>(arg);
-    ITask * task    = thread->m_task;
+    ITask * task    = thread->task_;
 
     if (task == NULL) return NULL;
 
-    thread->m_busy = true;
+    thread->busy_ = true;
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
     task->Run();
 
-    thread->m_busy = false;
+    thread->busy_ = false;
 
     return task;
 }
 
 bool Thread::Join(void** ret)
 {
-    if (m_detachable) return false;
+    if (detachable_) return false;
 
-    return pthread_join(m_tid,ret) == 0;
+    return pthread_join(tid_,ret) == 0;
 }
 
 bool Thread::Cancel()
 {
-    if (!m_busy) return true;
-    return pthread_cancel(m_tid) == 0;
+    if (!busy_) return true;
+    return pthread_cancel(tid_) == 0;
 }
 
 bool Thread::SetDetachable(bool enable)
 {
-    if (m_busy) return false;
+    if (busy_) return false;
 
-    m_detachable = enable;
+    detachable_ = enable;
     return true;
 }
 
 ///thread base
 ThreadBase::ThreadBase(bool detachable /* = false*/)
-    :Thread(NULL, detachable), m_task(this)
+    :Thread(NULL, detachable), task_(this)
 {
-    Thread::SetTask(&m_task);
+    Thread::SetTask(&task_);
 }
 
 ThreadBase::~ThreadBase()

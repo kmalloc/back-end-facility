@@ -27,7 +27,7 @@ class WorkerBody: public WorkerBodyBase
 
         // this queue can be replace with other container that supports identical interface.
         // better replace it with lock free container/list.
-        SpinlockWeakPriorityQueue<ITask*> m_mailbox;
+        SpinlockWeakPriorityQueue<ITask*> mailbox_;
 };
 
 class Worker: public Thread, public NotifyerBase
@@ -41,19 +41,19 @@ class Worker: public Thread, public NotifyerBase
 
         ~Worker();
 
-        virtual bool IsRunning() const { return m_WorkerBody->IsRunning(); }
+        virtual bool IsRunning() const { return WorkerBody_->IsRunning(); }
         bool StopWorking(bool join = true);
-        bool PostTask(ITask* msg) { return m_WorkerBody->PostTask(msg); }
+        bool PostTask(ITask* msg) { return WorkerBody_->PostTask(msg); }
 
-        virtual int GetTaskNumber() { return m_WorkerBody->GetTaskNumber(); }
+        virtual int GetTaskNumber() { return WorkerBody_->GetTaskNumber(); }
 
-        void EnableNotify(bool enable = true) { m_WorkerBody->EnableNotify(enable); }
+        void EnableNotify(bool enable = true) { WorkerBody_->EnableNotify(enable); }
 
         virtual bool StartWorking();
 
-        int GetWorkerId() const { return m_id; }
+        int GetWorkerId() const { return id_; }
 
-        int TaskDone() const { return m_WorkerBody->TaskDone(); }
+        int TaskDone() const { return WorkerBody_->TaskDone(); }
 
         virtual int Notify();
 
@@ -65,9 +65,9 @@ class Worker: public Thread, public NotifyerBase
         using Thread::SetTask;
         using Thread::Start;
 
-        const int m_id;
-        WorkerManagerBase* m_manager;
-        WorkerBodyBase* m_WorkerBody;
+        const int id_;
+        WorkerManagerBase* manager_;
+        WorkerBodyBase* WorkerBody_;
 };
 
 #endif

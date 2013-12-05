@@ -49,78 +49,78 @@ class Dispatcher:public WorkerBodyBase
 
     private:
 
-        ThreadPool* m_pool;
-        const int m_workerNum;
+        ThreadPool* pool_;
+        const int workerNum_;
 
-        sem_t m_workerNotify;
-        Worker* m_freeWorker;//keep this variable using in dispatch thread only, eliminating volatile
-        std::vector<Worker*> m_workers;
-        SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > m_queue;
+        sem_t workerNotify_;
+        Worker* freeWorker_;//keep this variable using in dispatch thread only, eliminating volatile
+        std::vector<Worker*> workers_;
+        SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > queue_;
 };
 
 
 Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     :WorkerBodyBase()
-    ,m_pool(pool)
-    ,m_workerNum(workerNum)
-    ,m_freeWorker(NULL)
+    ,pool_(pool)
+    ,workerNum_(workerNum)
+    ,freeWorker_(NULL)
 {
     int i;
-    m_workers.reserve(m_workerNum);
+    workers_.reserve(workerNum_);
 
     try
     {
         // just assume that push_back will not throw exception for the moment.
         // TODO
-        for (i = 0; i < m_workerNum; ++i)
+        for (i = 0; i < workerNum_; ++i)
         {
-            Worker* worker = new Worker(m_pool, i);
+            Worker* worker = new Worker(pool_, i);
             worker->EnableNotify(true);
-            m_workers.push_back(worker);
+            workers_.push_back(worker);
         }
     }
     catch (...)
     {
         for (int j = 0; j < i; ++j)
-            delete m_workers[j];
+            delete workers_[j];
 
         throw "out of memory";
     }
 
-    sem_init(&m_workerNotify,0,m_workerNum);
+    sem_init(&workerNotify_,0,workerNum_);
 }
 
 Dispatcher::~Dispatcher()
 {
     WorkerBodyBase::ClearAllTask();
-    for (int i = 0; i < m_workerNum; ++i)
+    for (int i = 0; i < workerNum_; ++i)
     {
-        m_workers[i]->Cancel();
-        delete m_workers[i];
+        workers_[i]->Cancel();
+        delete workers_[i];
     }
 
-    sem_destroy(&m_workerNotify);
+    sem_destroy(&workerNotify_);
 }
 
 void Dispatcher::StartWorker()
 {
-    for (int i = 0; i < m_workerNum; ++i)
-        m_workers[i]->StartWorking();
+    for (int i = 0; i < workerNum_; ++i)
+        workers_[i]->StartWorking();
 }
 
 void Dispatcher::KillAllWorker()
 {
-    for (int i = 0; i < m_workerNum; ++i)
+    for (int i = 0; i < workerNum_; ++i)
     {
-        m_workers[i]->Cancel();
+        workers_[i]->Cancel();
     }
 }
 
 void Dispatcher::StopWorker()
 {
-    for (int i = 0; i < m_workerNum; ++i)
+    for (int i = 0; i < workerNum_; ++i)
     {
-        m_workers[i]->StopWorking();
+        workers_[i]->StopWorking();
     }
 }
 
@@ -135,25 +135,25 @@ bool Dispatcher::StopRunning()
 
 bool Dispatcher::PushTaskToContainer(ITask* task)
 {
-    return m_queue.PushBack(task);
+    return queue_.PushBack(task);
 }
 
 ITask* Dispatcher::GetTaskFromContainer()
 {
     ITask* task;
-    if (m_queue.PopFront(&task)) return task;
+    if (queue_.PopFront(&task)) return task;
 
     return NULL;
 }
 
 int Dispatcher::GetContainerSize()
 {
-    return m_queue.Size();
+    return queue_.Size();
 }
 
 bool Dispatcher::HasTask()
 {
-    return !m_queue.IsEmpty();
+    return !queue_.IsEmpty();
 }
 
 /*
@@ -166,12 +166,12 @@ bool Dispatcher::HasTask()
  */
 Worker* Dispatcher::SelectFreeWorker()
 {
-    for (int i = 0; i < m_workerNum; ++i)
+    for (int i = 0; i < workerNum_; ++i)
     {
-        int sz = m_workers[i]->GetTaskNumber();
+        int sz = workers_[i]->GetTaskNumber();
         if (sz == 0)
         {
-            return m_workers[i];
+            return workers_[i];
         }
     }
 
@@ -184,23 +184,23 @@ void Dispatcher::PreHandleTask()
 
     do
     {
-        sem_wait(&m_workerNotify);
+        sem_wait(&workerNotify_);
         worker = SelectFreeWorker();
 
     } while (worker == NULL);
 
-    m_freeWorker = worker;
+    freeWorker_ = worker;
 }
 
 void Dispatcher::DispatchTask(ITask* task)
 {
-    assert(m_freeWorker);
-    m_freeWorker->PostTask(task);
+    assert(freeWorker_);
+    freeWorker_->PostTask(task);
 }
 
 int Dispatcher::SetWorkerNotify(NotifyerBase* worker)
 {
-    if (worker) return sem_post(&m_workerNotify);
+    if (worker) return sem_post(&workerNotify_);
 
     return 0;
 }
@@ -218,20 +218,20 @@ void Dispatcher::HandleTask(ITask* task)
 
 ThreadPool::ThreadPool(int num)
    :WorkerManagerBase()
-   ,m_worker(NULL)
-   ,m_dispatcher(NULL)
+   ,worker_(NULL)
+   ,dispatcher_(NULL)
 {
     if (num <= 0) num = CalcDefaultThreadNum();
 
     try
     {
-        m_dispatcher = new Dispatcher(this, num);
-        m_worker = new Worker(m_dispatcher);
+        dispatcher_ = new Dispatcher(this, num);
+        worker_ = new Worker(dispatcher_);
     }
     catch (...)
     {
-        if (m_worker) delete m_worker;
-        if (m_dispatcher) delete m_dispatcher;
+        if (worker_) delete worker_;
+        if (dispatcher_) delete dispatcher_;
 
         slog(LOG_WARN, "threadpool exception, out of memory\n");
         throw "out of memory";
@@ -240,7 +240,7 @@ ThreadPool::ThreadPool(int num)
 
 ThreadPool::~ThreadPool()
 {
-    delete m_worker;
+    delete worker_;
 }
 
 int ThreadPool::CalcDefaultThreadNum() const
@@ -256,41 +256,41 @@ int ThreadPool::CalcDefaultThreadNum() const
 
 bool ThreadPool::StartPooling()
 {
-    m_running = true;
-    m_dispatcher->StartWorker();
-    return m_worker->StartWorking();
+    running_ = true;
+    dispatcher_->StartWorker();
+    return worker_->StartWorking();
 }
 
 bool ThreadPool::StopPooling()
 {
-    m_running = false;
-    return m_worker->StopWorking(true);
+    running_ = false;
+    return worker_->StopWorking(true);
 }
 
 void ThreadPool::ForceShutdown()
 {
-    m_running = false;
-    m_worker->Cancel();
-    m_dispatcher->KillAllWorker();
+    running_ = false;
+    worker_->Cancel();
+    dispatcher_->KillAllWorker();
 }
 
 int ThreadPool::SetWorkerNotify(NotifyerBase* worker)
 {
-    return m_dispatcher->SetWorkerNotify(worker);
+    return dispatcher_->SetWorkerNotify(worker);
 }
 
 bool ThreadPool::IsRunning() const
 {
-    return m_running;
+    return running_;
 }
 
 int ThreadPool::GetTaskNumber()
 {
-    return m_worker->GetTaskNumber();
+    return worker_->GetTaskNumber();
 }
 
 bool ThreadPool::PostTask(ITask* task)
 {
-    return m_worker->PostTask(task);
+    return worker_->PostTask(task);
 }
 

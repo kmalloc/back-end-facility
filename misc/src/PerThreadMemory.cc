@@ -18,7 +18,7 @@ static const unsigned char gs_padding_char[2][gs_padding_sz/2] =
 };
 
 
-// make sure data is aligned to m_granularity
+// make sure data is aligned to granularity_
 // some application relys on that.
 struct PerThreadMemoryAlloc::Node
 {
@@ -37,19 +37,19 @@ struct PerThreadMemoryAlloc::NodeHead
     Node* volatile next;
     char* volatile dummy;
 
-    void* volatile mem_frame;
+    void* volatile mem_frame_;
     volatile int node_number;
 
-    const int m_population;
-    const int m_granularity;
-    const int m_offset;
+    const int population_;
+    const int granularity_;
+    const int offset_;
 
     // thread id
-    pthread_t m_thread;
+    pthread_t thread_;
 
     unsigned char padding[gs_padding_sz];
 
-    NodeHead(int population, int granularity, int offset):m_population(population), m_granularity(granularity), m_offset(offset) {}
+    NodeHead(int population, int granularity, int offset):population_(population), granularity_(granularity), offset_(offset) {}
 };
 
 //TODO more advance padding.
@@ -72,10 +72,10 @@ static inline bool IsPaddingCorrupt(const unsigned char* buf)
 }
 
 PerThreadMemoryAlloc::PerThreadMemoryAlloc(int granularity, int population, int align)
-    :m_align(AlignTo(align, sizeof(void*)))
-    ,m_granularity(AlignTo(granularity, m_align))
-    ,m_offset(m_granularity - sizeof(Node)%m_granularity)
-    ,m_population(population), m_key(0)
+    :align_(AlignTo(align, sizeof(void*)))
+    ,granularity_(AlignTo(granularity, align_))
+    ,offset_(granularity_ - sizeof(Node)%granularity_)
+    ,population_(population), key_(0)
 {
     Init();
 }
@@ -86,7 +86,7 @@ PerThreadMemoryAlloc::~PerThreadMemoryAlloc()
 
 void PerThreadMemoryAlloc::Init()
 {
-    pthread_key_create((pthread_key_t*)&m_key, &PerThreadMemoryAlloc::OnThreadExit);
+    pthread_key_create((pthread_key_t*)&key_, &PerThreadMemoryAlloc::OnThreadExit);
 }
 
 /*
@@ -95,7 +95,7 @@ void PerThreadMemoryAlloc::Init()
 void* PerThreadMemoryAlloc::AllocBuffer() const
 {
     NodeHead* pHead = NULL;
-    if ((pHead = (NodeHead*)pthread_getspecific(m_key)) == NULL) pHead = InitPerThreadList();
+    if ((pHead = (NodeHead*)pthread_getspecific(key_)) == NULL) pHead = InitPerThreadList();
 
     // out of memory;
     if (pHead == NULL) return NULL;
@@ -108,7 +108,7 @@ void* PerThreadMemoryAlloc::AllocBuffer() const
 
 PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 {
-    const size_t sz = (sizeof(Node) + m_offset + m_granularity) * (m_population + 1);
+    const size_t sz = (sizeof(Node) + offset_ + granularity_) * (population_ + 1);
 
     char* buf = (char*)malloc(sz);
     char* end_buf = buf + sz;
@@ -119,7 +119,7 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
 
     try
     {
-        pHead = new NodeHead(m_population, m_granularity, m_offset);
+        pHead = new NodeHead(population_, granularity_, offset_);
     }
     catch (...)
     {
@@ -127,29 +127,29 @@ PerThreadMemoryAlloc::NodeHead* PerThreadMemoryAlloc::InitPerThreadList() const
         return NULL;
     }
 
-    pHead->m_thread = pthread_self();
+    pHead->thread_ = pthread_self();
     pHead->next = (Node*)buf;
-    pHead->node_number = m_population + 1;
-    pHead->mem_frame   = buf;
+    pHead->node_number = population_ + 1;
+    pHead->mem_frame_   = buf;
     FillPadding(pHead->padding);
 
     Node* cur  = (Node*)buf;
 
-    for (int i = 0; i < m_population; ++i)
+    for (int i = 0; i < population_; ++i)
     {
         cur->head = pHead;
-        cur->next = (Node*)((char*)cur + sizeof(Node) + m_offset + m_granularity);
+        cur->next = (Node*)((char*)cur + sizeof(Node) + offset_ + granularity_);
         FillPadding(cur->padding);
         cur = cur->next;
     }
 
-    assert((char*)cur + sizeof(Node) + m_offset + m_granularity == end_buf);
+    assert((char*)cur + sizeof(Node) + offset_ + granularity_ == end_buf);
 
     cur->next = NULL;
     cur->head = pHead;
     FillPadding(cur->padding);
 
-    pthread_setspecific(m_key, pHead);
+    pthread_setspecific(key_, pHead);
 
     pHead->dummy = (char*)GetFreeBufferFromList(pHead);
     return pHead;
@@ -184,7 +184,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
     } while(1);
 
     node->next = NULL;
-    buf = node->data + m_offset;
+    buf = node->data + offset_;
 
     return buf;
 }
@@ -200,17 +200,17 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
     assert(!IsPaddingCorrupt((unsigned char*)node->padding));
     assert(node->next == NULL);
 
-    // NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
+    // NodeHead* pHead = (NodeHead*)pthread_getspecific(key_);
     NodeHead* pHead = node->head;
 
     assert(!IsPaddingCorrupt(pHead->padding));
 
-    memset(buf, 0, pHead->m_granularity);
+    memset(buf, 0, pHead->granularity_);
 
     Node* old_head;
 
     const int sz = atomic_increment(&pHead->node_number);
-    assert(sz <= pHead->m_population + 1);
+    assert(sz <= pHead->population_ + 1);
 
     do
     {
@@ -228,7 +228,7 @@ void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 
     } while(1);
 
-    if (sz == pHead->m_population + 1)
+    if (sz == pHead->population_ + 1)
     {
         Cleaner(pHead);
         return;
@@ -244,19 +244,19 @@ void PerThreadMemoryAlloc::ReleaseBuffer(void* buf) const
     // To support "free" operation from other thread,
     // the following check code must be disable. It is not going to work.
     /*
-    NodeHead* head = (NodeHead*)pthread_getspecific(m_key);
+    NodeHead* head = (NodeHead*)pthread_getspecific(key_);
     if (head == NULL) return;
 
-    assert(buf > head->mem_frame && buf < head->mem_frame + head->m_granularity * head->m_population);
+    assert(buf > head->mem_frame_ && buf < head->mem_frame_ + head->granularity_ * head->population_);
     */
 
-    DoReleaseBuffer((char*)buf - m_offset);
+    DoReleaseBuffer((char*)buf - offset_);
 }
 
 void PerThreadMemoryAlloc::OnThreadExit(void* val)
 {
     NodeHead* pHead = (NodeHead*)val;
-    DoReleaseBuffer(pHead->dummy - pHead->m_offset);
+    DoReleaseBuffer(pHead->dummy - pHead->offset_);
 }
 
 void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
@@ -266,7 +266,7 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     int       co    = 0;
 
     // make sure all buffers are released when cleaning up.
-    assert(pHead->node_number == pHead->m_population + 1);
+    assert(pHead->node_number == pHead->population_ + 1);
 
     while (cur)
     {
@@ -274,11 +274,11 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
         ++co;
     }
 
-    assert(co == pHead->m_population + 1);
+    assert(co == pHead->population_ + 1);
 
     memset(pHead->padding, 0, gs_padding_sz);
 
-    free(pHead->mem_frame);
+    free(pHead->mem_frame_);
     delete pHead;
 }
 
@@ -287,11 +287,11 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
  */
 bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 {
-    NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
-    if (pHead == NULL || pHead->node_number < m_population) return false;
+    NodeHead* pHead = (NodeHead*)pthread_getspecific(key_);
+    if (pHead == NULL || pHead->node_number < population_) return false;
 
-    DoReleaseBuffer(pHead->dummy - m_offset);
-    pthread_setspecific(m_key, NULL);
+    DoReleaseBuffer(pHead->dummy - offset_);
+    pthread_setspecific(key_, NULL);
 
     return true;
 }
@@ -299,7 +299,7 @@ bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 // buffers that are available at the moment.
 int PerThreadMemoryAlloc::Size() const
 {
-    NodeHead* pHead = (NodeHead*)pthread_getspecific(m_key);
+    NodeHead* pHead = (NodeHead*)pthread_getspecific(key_);
     if (pHead == NULL) return 0;
 
     return pHead->node_number;

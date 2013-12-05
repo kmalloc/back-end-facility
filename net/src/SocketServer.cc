@@ -144,7 +144,7 @@ class ServerImpl: public ThreadBase
 
         // interface
 
-        void RegisterSocketEventHandler(SocketEventHandler handler) { m_handler = handler; }
+        void RegisterSocketEventHandler(SocketEventHandler handler) { handler_ = handler; }
 
         // connect to addr, and add the corresponding socket to epoll for watching.
         int ConnectTo(const char* addr, int port, uintptr_t opaque);
@@ -223,36 +223,36 @@ class ServerImpl: public ThreadBase
         };
 
         // intermedia temp buffer.
-        char m_buff[256];
+        char buff_[256];
 
-        int m_pollEventIndex;
-        int m_pollEventNum;
+        int pollEventIndex_;
+        int pollEventNum_;
 
-        int m_sendCtrlFd;
-        int m_recvCtrlFd;
+        int sendCtrlFd_;
+        int recvCtrlFd_;
 
         // indexer for allocate id;
-        int m_allocId;
+        int allocId_;
         // TODO
         // set to the maximum number of file descriptor of process.
         // need to query ulimit -n.
         // for now, just set it to 0xffff
-        const int m_maxSocket;
+        const int maxSocket_;
 
-        bool m_isRunning;
+        bool isRunning_;
 
-        SocketEntity m_sockets[MAX_SOCKET];
-        PollEvent m_pollEvent[MAX_SOCKET];
-        SocketPoll m_poll;
+        SocketEntity sockets_[MAX_SOCKET];
+        PollEvent pollEvent_[MAX_SOCKET];
+        SocketPoll poll_;
 
-        SocketEventHandler m_handler;
+        SocketEventHandler handler_;
 
         typedef SocketCode (ServerImpl::* ActionHandler)(void*, SocketMessage*);
-        static const ActionHandler m_actionHandler[];
+        static const ActionHandler actionHandler_[];
 };
 
 
-const ServerImpl::ActionHandler ServerImpl::m_actionHandler[] =
+const ServerImpl::ActionHandler ServerImpl::actionHandler_[] =
 {
    &ServerImpl::BindRawSocket,
    &ServerImpl::ConnectSocket,
@@ -301,13 +301,13 @@ int ServerImpl::ReserveSocketSlot()
     int i = 0;
     while (i < MAX_SOCKET)
     {
-        int id = atomic_increment(&m_allocId);
+        int id = atomic_increment(&allocId_);
         if (id < 0)
         {
-            id = atomic_and_and_fetch(&m_allocId, ~(1 << (sizeof(int) - 1)));
+            id = atomic_and_and_fetch(&allocId_, ~(1 << (sizeof(int) - 1)));
         }
 
-        SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
+        SocketEntity* sock = &sockets_[id%MAX_SOCKET];
 
         if (sock->type == SS_INVALID)
         {
@@ -325,13 +325,13 @@ int ServerImpl::ReserveSocketSlot()
 
 // ServerImpl
 ServerImpl::ServerImpl()
-    :m_pollEventIndex(0)
-    ,m_pollEventNum(0)
-    ,m_allocId(0)
-    ,m_maxSocket(MAX_SOCKET)
-    ,m_isRunning(false)
-    ,m_poll()
-    ,m_handler(&DummySockEventHandler)
+    :pollEventIndex_(0)
+    ,pollEventNum_(0)
+    ,allocId_(0)
+    ,maxSocket_(MAX_SOCKET)
+    ,isRunning_(false)
+    ,poll_()
+    ,handler_(&DummySockEventHandler)
 {
 }
 
@@ -349,7 +349,7 @@ void ServerImpl::SetupServer()
         throw "pipe fail";
     }
 
-    if (!m_poll.AddSocket(fd[0], NULL))
+    if (!poll_.AddSocket(fd[0], NULL))
     {
         slog(LOG_ERROR, "server:add ctrl fd failed.");
         close(fd[0]);
@@ -357,19 +357,19 @@ void ServerImpl::SetupServer()
         throw "add ctrl fd fail";
     }
 
-    m_recvCtrlFd = fd[0];
-    m_sendCtrlFd = fd[1];
+    recvCtrlFd_ = fd[0];
+    sendCtrlFd_ = fd[1];
 
-    for (int i = 0; i < m_maxSocket; ++i)
+    for (int i = 0; i < maxSocket_; ++i)
     {
-        m_sockets[i].head = NULL;
-        m_sockets[i].tail = NULL;
-        m_sockets[i].type = SS_INVALID;
+        sockets_[i].head = NULL;
+        sockets_[i].tail = NULL;
+        sockets_[i].type = SS_INVALID;
     }
 
-    m_isRunning = true;
+    isRunning_ = true;
 
-    slog(LOG_INFO, "Server Setup, slot number:%d\n", m_maxSocket);
+    slog(LOG_INFO, "Server Setup, slot number:%d\n", maxSocket_);
 }
 
 // release all pending send-buffer, and close socket.
@@ -395,7 +395,7 @@ void ServerImpl::ForceSocketClose(SocketEntity* sock, SocketMessage* result) con
     }
 
     sock->head = sock->tail = NULL;
-    m_poll.RemoveSocket(sock->fd);
+    poll_.RemoveSocket(sock->fd);
     close(sock->fd);
 
     sock->type = SS_INVALID;
@@ -406,23 +406,23 @@ void ServerImpl::ShutDownAllSockets()
     for (int i = 0; i < MAX_SOCKET; i++)
     {
         SocketMessage dummy;
-        SocketEntity* so = &m_sockets[i];
+        SocketEntity* so = &sockets_[i];
         if (so->type != SS_RESERVED) ForceSocketClose(so, &dummy);
     }
 
-    close(m_sendCtrlFd);
-    close(m_recvCtrlFd);
+    close(sendCtrlFd_);
+    close(recvCtrlFd_);
 
-    m_isRunning = false;
+    isRunning_ = false;
 }
 
 SocketEntity* ServerImpl::SetupSocketEntity(int id, int fd, uintptr_t opaque, bool poll)
 {
-    SocketEntity* so = &m_sockets[id % MAX_SOCKET];
+    SocketEntity* so = &sockets_[id % MAX_SOCKET];
 
     assert(so->type == SS_RESERVED);
 
-    if (poll && !m_poll.AddSocket(fd, so))
+    if (poll && !poll_.AddSocket(fd, so))
     {
         so->type = SS_INVALID;
         slog(LOG_ERROR, "SetupSocketEntity failed, id: %d, opaque:%d", id, opaque);
@@ -442,7 +442,7 @@ SocketEntity* ServerImpl::SetupSocketEntity(int id, int fd, uintptr_t opaque, bo
 
 void ServerImpl::ResetSocketSlot(int id)
 {
-    m_sockets[id%MAX_SOCKET].type = SS_INVALID;
+    sockets_[id%MAX_SOCKET].type = SS_INVALID;
 }
 
 static int TryConnectTo(int fd, struct addrinfo* ai_ptr, void*)
@@ -542,7 +542,7 @@ SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res)
     sock->tail = NULL;
 
     // send done, reset epoll flag to read.
-    m_poll.ModifySocket(sock->fd, sock, false);
+    poll_.ModifySocket(sock->fd, sock, false);
 
     if (sock->type == SS_HALFCLOSE) ForceSocketClose(sock, res);
 
@@ -561,7 +561,7 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     int id  = req->id;
 
     res->id = id;
-    SocketEntity* sock = &m_sockets[id % MAX_SOCKET];
+    SocketEntity* sock = &sockets_[id % MAX_SOCKET];
 
     if (sock->type == SS_INVALID
             || sock->id != id
@@ -634,7 +634,7 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     sock->head = sock->tail = buf;
 
     // set epoll to watch write event.
-    m_poll.ModifySocket(sock->fd, sock, true);
+    poll_.ModifySocket(sock->fd, sock, true);
 
     res->ud = n;
 
@@ -673,7 +673,7 @@ SocketCode ServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
     }
 
     // epoll
-    m_poll.SetSocketNonBlocking(sock);
+    poll_.SetSocketNonBlocking(sock);
 
     if (status == 0)
     {
@@ -683,10 +683,10 @@ SocketCode ServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
             (void*)&((struct sockaddr_in*)addr)->sin_addr:
             (void*)&((struct sockaddr_in6*)addr)->sin6_addr;
 
-        inet_ntop(ai_ptr->ai_family, sin_addr, m_buff, sizeof(m_buff));
+        inet_ntop(ai_ptr->ai_family, sin_addr, buff_, sizeof(buff_));
 
         new_sock->type = SS_CONNECTED;
-        res->data = m_buff;
+        res->data = buff_;
 
         return SC_CONNECTED;
     }
@@ -697,7 +697,7 @@ SocketCode ServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
         // since socket is nonblocking.
         // connecting is in the progress.
         // set writable to track status by epoll.
-        m_poll.ModifySocket(new_sock->fd, new_sock, true);
+        poll_.ModifySocket(new_sock->fd, new_sock, true);
     }
 
     return SC_SUCC;
@@ -780,7 +780,7 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
 
     res->id = id;
     res->opaque = req->opaque;
-    SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
+    SocketEntity* sock = &sockets_[id%MAX_SOCKET];
     if (sock->type == SS_INVALID || sock->id != id)
     {
         res->ud = 0;
@@ -790,7 +790,7 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
 
     if (sock->head)
     {
-        m_poll.ModifySocket(sock->fd, sock, true);
+        poll_.ModifySocket(sock->fd, sock, true);
         SocketCode type = SendPendingBuffer(sock, res);
         if (type != SC_SEND)
         {
@@ -828,7 +828,7 @@ SocketCode ServerImpl::BindRawSocket(void* buffer, SocketMessage* res)
         return SC_ERROR;
     }
 
-    m_poll.SetSocketNonBlocking(req->fd);
+    poll_.SetSocketNonBlocking(req->fd);
     sock->type = SS_BIND;
     res->data = "binding";
     return SC_CONNECTED;
@@ -845,10 +845,10 @@ SocketCode ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
     res->ud = 0;
     res->data = NULL;
 
-    SocketEntity* sock = &m_sockets[id%MAX_SOCKET];
+    SocketEntity* sock = &sockets_[id%MAX_SOCKET];
     if (sock->type == SS_PACCEPT || sock->type == SS_PLISTEN)
     {
-        if (!m_poll.AddSocket(sock->fd, sock))
+        if (!poll_.AddSocket(sock->fd, sock))
         {
             sock->type = SS_INVALID;
             return SC_ERROR;
@@ -889,16 +889,16 @@ SocketCode ServerImpl::ProcessInternalCmd(SocketMessage* result)
     char buffer[256];
     char header[2];
 
-    ReadPipe(m_recvCtrlFd, header, sizeof(header));
+    ReadPipe(recvCtrlFd_, header, sizeof(header));
 
     int type = header[0];
     int len  = header[1];
 
-    if (type < 0 || type >= sizeof(m_actionHandler)/sizeof(m_actionHandler[0])) return SC_SUCC;
+    if (type < 0 || type >= sizeof(actionHandler_)/sizeof(actionHandler_[0])) return SC_SUCC;
 
-    ReadPipe(m_recvCtrlFd, buffer, len);
+    ReadPipe(recvCtrlFd_, buffer, len);
 
-    return (this->*(m_actionHandler[type]))(buffer, result);
+    return (this->*(actionHandler_[type]))(buffer, result);
 }
 
 SocketCode ServerImpl::HandleReadReady(SocketEntity* sock, SocketMessage* result) const
@@ -970,7 +970,7 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
         result->opaque = sock->opaque;
         result->id = sock->id;
         result->ud = 0;
-        m_poll.ModifySocket(sock->fd, sock, false);
+        poll_.ModifySocket(sock->fd, sock, false);
 
         // retrieve peer name of the connected socket.
         union SockAddrAll u;
@@ -980,9 +980,9 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
             void* sin_addr = (u.s.sa_family == AF_INET)?
                 (void*)&u.v4.sin_addr:(void*)&u.v6.sin6_addr;
 
-            if (inet_ntop(u.s.sa_family, sin_addr, m_buff, sizeof(m_buff)))
+            if (inet_ntop(u.s.sa_family, sin_addr, buff_, sizeof(buff_)))
             {
-                result->data = m_buff;
+                result->data = buff_;
                 return SC_CONNECTED;
             }
         }
@@ -1006,7 +1006,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
         return SC_ERROR;
     }
 
-    m_poll.SetSocketNonBlocking(client_fd);
+    poll_.SetSocketNonBlocking(client_fd);
     SocketEntity* new_sock = SetupSocketEntity(id, client_fd, sock->opaque, false);
 
     if (new_sock == NULL)
@@ -1024,9 +1024,9 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     void* sin_addr = (ua.s.sa_family == AF_INET)?
         (void*)&ua.v4.sin_addr : (void*)&ua.v6.sin6_addr;
 
-    if (inet_ntop(ua.s.sa_family, sin_addr, m_buff, sizeof(m_buff)))
+    if (inet_ntop(ua.s.sa_family, sin_addr, buff_, sizeof(buff_)))
     {
-        result->data = m_buff;
+        result->data = buff_;
     }
 
     return SC_SUCC;
@@ -1034,15 +1034,15 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
 
 int ServerImpl::WaitEpollIfNecessary()
 {
-    if (m_pollEventIndex != m_pollEventNum) return 1;
+    if (pollEventIndex_ != pollEventNum_) return 1;
 
-    m_pollEventNum = m_poll.WaitAll(m_pollEvent, m_maxSocket);
+    pollEventNum_ = poll_.WaitAll(pollEvent_, maxSocket_);
 
-    m_pollEventIndex = 0;
+    pollEventIndex_ = 0;
 
-    if (m_pollEventNum > 0) return 1;
+    if (pollEventNum_ > 0) return 1;
 
-    m_pollEventNum = 0;
+    pollEventNum_ = 0;
     return -1;
 }
 
@@ -1056,7 +1056,7 @@ SocketCode ServerImpl::Poll(SocketMessage* result)
         int ret = 0;
         if ((ret = WaitEpollIfNecessary()) < 0) return SC_NONE;
 
-        PollEvent* event = &m_pollEvent[m_pollEventIndex++];
+        PollEvent* event = &pollEvent_[pollEventIndex_++];
         SocketEntity* sock = (SocketEntity*)event->data;
 
         if (sock == NULL)
@@ -1101,7 +1101,7 @@ void ServerImpl::SendInternalCmd(RequestPackage* req, char type, int len) const
 
     while (1)
     {
-        int n = write(m_sendCtrlFd, &req->header[6], len + 2);
+        int n = write(sendCtrlFd_, &req->header[6], len + 2);
         if (n < 0)
         {
             if (errno != EINTR)
@@ -1180,7 +1180,7 @@ int ServerImpl::ListenTo(const char* addr, int port, uintptr_t opaque, int backl
 
 int ServerImpl::SendData(int sock_id, const void* buffer, int sz)
 {
-    SocketEntity* sock = &m_sockets[sock_id % m_maxSocket];
+    SocketEntity* sock = &sockets_[sock_id % maxSocket_];
     if (sock->id != sock_id || sock->type == SS_INVALID) return -1;
 
     assert(sock->type != SS_RESERVED);
@@ -1228,7 +1228,7 @@ void ServerImpl::CloseConnection(int sock_id, uintptr_t opaque)
 
 void ServerImpl::StartServer()
 {
-    if (m_isRunning) return;
+    if (isRunning_) return;
 
     SetupServer();
     ThreadBase::Start();
@@ -1236,7 +1236,7 @@ void ServerImpl::StartServer()
 
 void ServerImpl::StopServer()
 {
-    if (!m_isRunning) return;
+    if (!isRunning_) return;
 
     RequestPackage req;
     SendInternalCmd(&req, ACTION_STOP_SERVER, 0);
@@ -1252,47 +1252,47 @@ void ServerImpl::Run()
 
         ret = Poll(&res);
 
-        m_handler(ret, &res);
+        handler_(ret, &res);
     }
 }
 
 // SocketServer
 SocketServer::SocketServer()
-    :m_impl(NULL)
+    :impl_(NULL)
 {
-    m_impl = new ServerImpl();
+    impl_ = new ServerImpl();
 }
 
 SocketServer::~SocketServer()
 {
-    delete m_impl;
+    delete impl_;
 }
 
 void SocketServer::RegisterSocketEventHandler(SocketEventHandler handler)
 {
-    m_impl->RegisterSocketEventHandler(handler);
+    impl_->RegisterSocketEventHandler(handler);
 }
 
 int SocketServer::StartServer(const char* ip, int port, uintptr_t opaque)
 {
-    m_impl->StartServer();
+    impl_->StartServer();
 
-    return m_impl->ListenTo(ip, port, opaque);
+    return impl_->ListenTo(ip, port, opaque);
 }
 
 void SocketServer::StopServer()
 {
-    m_impl->StopServer();
+    impl_->StopServer();
 }
 
 int SocketServer::Connect(const char* ip, int port , uintptr_t opaque)
 {
-    return m_impl->ConnectTo(ip, port, opaque);
+    return impl_->ConnectTo(ip, port, opaque);
 }
 
 int SocketServer::ListenTo(const char* ip, int port, uintptr_t opaque)
 {
-    return m_impl->ListenTo(ip, port, opaque);
+    return impl_->ListenTo(ip, port, opaque);
 }
 
 int SocketServer::SendBuffer(int id, const void* data, int sz, bool copy)
@@ -1303,15 +1303,15 @@ int SocketServer::SendBuffer(int id, const void* data, int sz, bool copy)
         if (buff_to_send == NULL) return 0;
 
         memcpy(buff_to_send, data, sz);
-        return m_impl->SendData(id, buff_to_send, sz);
+        return impl_->SendData(id, buff_to_send, sz);
     }
 
-    return m_impl->SendData(id, data, sz);
+    return impl_->SendData(id, data, sz);
 }
 
 void SocketServer::CloseSocket(int id, uintptr_t opaque)
 {
-    m_impl->CloseConnection(id, opaque);
+    impl_->CloseConnection(id, opaque);
 }
 
 int SocketServer::SendString(int id, const char* data)
@@ -1326,11 +1326,11 @@ int SocketServer::SendString(int id, const char* data)
 
 void SocketServer::WatchSocket(int id, uintptr_t opaque)
 {
-    m_impl->WatchSocket(id, opaque);
+    impl_->WatchSocket(id, opaque);
 }
 
 int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
 {
-    return m_impl->WatchRawSocket(fd, opaque);
+    return impl_->WatchRawSocket(fd, opaque);
 }
 

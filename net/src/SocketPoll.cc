@@ -8,15 +8,15 @@
 
 
 SocketPoll::SocketPoll()
-    :m_epoll(-1)
+    :epoll_(-1)
 {
     Init();
 }
 
 void SocketPoll::Init()
 {
-    m_epoll = epoll_create(1024);
-    assert(m_epoll != -1);
+    epoll_ = epoll_create(1024);
+    assert(epoll_ != -1);
 }
 
 SocketPoll::~SocketPoll()
@@ -26,7 +26,7 @@ SocketPoll::~SocketPoll()
 
 void SocketPoll::Release() const
 {
-    close(m_epoll);
+    close(epoll_);
 }
 
 bool SocketPoll::AddSocket(int file, void* data, bool write) const
@@ -35,13 +35,13 @@ bool SocketPoll::AddSocket(int file, void* data, bool write) const
     ev.events = EPOLLIN | (write? EPOLLOUT : 0);
     ev.data.ptr = data;
 
-    int ret = epoll_ctl(m_epoll, EPOLL_CTL_ADD, file, &ev);
+    int ret = epoll_ctl(epoll_, EPOLL_CTL_ADD, file, &ev);
     return (ret != -1);
 }
 
 bool SocketPoll::RemoveSocket(int file) const
 {
-    return (epoll_ctl(m_epoll, EPOLL_CTL_DEL, file, NULL) != -1);
+    return (epoll_ctl(epoll_, EPOLL_CTL_DEL, file, NULL) != -1);
 }
 
 bool SocketPoll::ModifySocket(int file, void* data, bool write) const
@@ -50,7 +50,7 @@ bool SocketPoll::ModifySocket(int file, void* data, bool write) const
     ev.events = EPOLLIN | (write? EPOLLOUT : 0);
     ev.data.ptr = data;
 
-    return (epoll_ctl(m_epoll, EPOLL_CTL_MOD, file, &ev) != -1);
+    return (epoll_ctl(epoll_, EPOLL_CTL_MOD, file, &ev) != -1);
 }
 
 int SocketPoll::WaitAll(PollEvent* ve, size_t max) const
@@ -58,7 +58,7 @@ int SocketPoll::WaitAll(PollEvent* ve, size_t max) const
     PollEvent event;
     // variant array
     struct epoll_event ev[max];
-    int n = epoll_wait(m_epoll, ev, max, -1);
+    int n = epoll_wait(epoll_, ev, max, -1);
 
     for (int i = 0; i < n; ++i)
     {
