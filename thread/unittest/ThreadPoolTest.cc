@@ -13,7 +13,7 @@ class BusyTaskForThreadPoolTest:public ITask
     public:
 
         BusyTaskForThreadPoolTest():m_busy(false) { sem_init(&m_stopSem, 0, 0); }
-        ~BusyTaskForThreadPoolTest() {}
+        ~BusyTaskForThreadPoolTest() { sem_destroy(&m_stopSem); }
 
         void Run() 
         {
@@ -46,8 +46,8 @@ class NormalTaskForThreadPoolTest:public ITask
     public:
         NormalTaskForThreadPoolTest()
             :ITask(TP_HIGH), m_busy(false) { sem_init(&m_stopSem, 0, 0); }
-        
-        ~NormalTaskForThreadPoolTest() {}
+
+        ~NormalTaskForThreadPoolTest() { sem_destroy(&m_stopSem); }
 
         void Run()
         {
@@ -237,5 +237,7 @@ TEST(threadpooltest, alltest)
     EXPECT_EQ(mnsz, NormalTaskForThreadPoolTest::m_done);
     EXPECT_FALSE(pool.IsRunning()); 
 
+    sem_destroy(&BusyTaskForThreadPoolTest::m_sem);
+    sem_destroy(&NormalTaskForThreadPoolTest::m_sem);
 }
 

@@ -223,6 +223,9 @@ TEST(TestWrite, SocketPollTest)
     sem_post(&sem2);
 
     delete [] bigbuf;
+
+    sem_destroy(&m_sem1);
+    sem_destroy(&m_sem2);
 }
 
 

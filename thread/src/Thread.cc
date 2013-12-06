@@ -45,8 +45,6 @@ bool Thread::Start()
         return false;
     }
 
-    m_busy = true;
-
     status = pthread_create(&m_tid,&attr, Thread::RunTask, static_cast<void*>(this));
 
     pthread_attr_destroy(&attr);
@@ -62,6 +60,8 @@ void* Thread::RunTask(void*arg)
     ITask * task    = thread->m_task;
 
     if (task == NULL) return NULL;
+
+    thread->m_busy = true;
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
     task->Run();
@@ -93,8 +93,6 @@ bool Thread::SetDetachable(bool enable)
 }
 
 ///thread base
-//
-
 ThreadBase::ThreadBase(bool detachable /* = false*/)
     :Thread(NULL, detachable), m_task(this)
 {

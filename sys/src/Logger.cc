@@ -35,19 +35,23 @@ class LogWorker: public ThreadBase
         void Flush();
         void StopLogging();
 
+        void RunWorker();
+
     protected:
 
-        size_t DoLog(LogEntity* log);
         virtual void Run();
+        size_t DoLog(LogEntity* log);
 
     private:
 
         sem_t m_sig;
         sem_t m_stop;
+        pthread_mutex_t m_guardRunning;
 
         const size_t m_size; // total piece of buffers cached in memory.
         const size_t m_granularity; // size of per buffer.
 
+        // buffer Pool
         LockFreeBuffer m_buffer;
         LockFreeListQueue m_pendingMsg;
 
@@ -63,6 +67,7 @@ LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_ti
 {
     sem_init(&m_sig, 0, 0);
     sem_init(&m_stop,0, 0);
+    pthread_mutex_init(&m_guardRunning, NULL);
     ThreadBase::Start();
 }
 
@@ -70,12 +75,26 @@ LogWorker::~LogWorker()
 {
     StopLogging();
     Join();
+
+    sem_destroy(&m_sig);
+    sem_destroy(&m_stop);
+    pthread_mutex_destroy(&m_guardRunning);
 }
 
 void LogWorker::StopLogging()
 {
     sem_post(&m_sig);
     sem_post(&m_stop);
+}
+
+void LogWorker::RunWorker()
+{
+    pthread_mutex_lock(&m_guardRunning);
+    if (ThreadBase::IsRunning() == false)
+    {
+        ThreadBase::Start();
+    }
+    pthread_mutex_unlock(&m_guardRunning);
 }
 
 void LogWorker::Flush()
@@ -99,14 +118,13 @@ void LogWorker::Run()
 {
     while (1)
     {
-        int s;
         struct timespec ts;
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
             continue;
 
         ts.tv_sec += m_timeout;
 
-        while ((s = sem_timedwait(&m_sig,&ts)) == -1 && errno == EINTR)
+        while (sem_timedwait(&m_sig,&ts) == -1 && errno == EINTR)
             continue;
 
         Flush();
@@ -124,17 +142,17 @@ size_t LogWorker::DoLog(LogEntity* buffer)
     {
         ret = m_pendingMsg.Push(buffer);
 
-        if (ret == false && retry < 16)
+        if (ret == false && retry < 32)
         {
             // msg queue is full, time to wake up worker to flush all the msg.
             ++retry;
             sem_post(&m_sig);
             sched_yield();
         }
-        else if (retry >= 8)
+        else if (retry >= 32)
         {
-            retry = 0;
-            Flush();
+            // logging thread might already been stop.
+            return 0;
         }
 
     } while (ret == false);
@@ -192,6 +210,7 @@ size_t LogWorker::Log(const char* file, const char* format,...)
 }
 
 
+// one worker serves all logger.
 static LogWorker g_worker(LOG_MAX_PENDING, LOG_GRANULARITY, LOG_FLUSH_TIMEOUT);
 
 // definition of logger
@@ -232,5 +251,10 @@ size_t Logger::Log(const char* format, ...)
 void Logger::StopLogging()
 {
     g_worker.StopLogging();
+}
+
+void Logger::RunLogging()
+{
+    g_worker.RunWorker();
 }
 

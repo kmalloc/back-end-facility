@@ -17,6 +17,7 @@ class Logger
         Logger(const char* file);
         ~Logger();
 
+        // in case of failure, return 0
         size_t Log(const std::string& msg);
         size_t Log(const char* format,...);
         size_t Log(const char* format, va_list args);
@@ -24,6 +25,7 @@ class Logger
         // flush all the buffers in memory to disk.
         void Flush();
 
+        static void RunLogging();
         static void StopLogging();
 
     private:

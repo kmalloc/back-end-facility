@@ -98,7 +98,7 @@ Dispatcher::~Dispatcher()
         delete m_workers[i];
     }
 
-    WorkerBodyBase::ClearAllTask();
+    sem_destroy(&m_workerNotify);
 }
 
 void Dispatcher::StartWorker()
