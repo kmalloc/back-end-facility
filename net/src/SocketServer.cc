@@ -516,7 +516,7 @@ SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res)
             if (sz < 0)
             {
                 if (errno == EINTR) continue;
-                else if (errno == EAGAIN) return SC_ERROR;
+                else if (errno == EAGAIN) return SC_HALFSEND;
 
                 // ForceSocketClose will free all pending buffers internally.
                 ForceSocketClose(sock, res);
@@ -962,7 +962,7 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
     if (code < 0 || error)
     {
         ForceSocketClose(sock, result);
-        return SC_ERROR;
+        return SC_CLOSE;
     }
     else
     {
@@ -1265,6 +1265,7 @@ SocketServer::SocketServer()
 
 SocketServer::~SocketServer()
 {
+    delete m_impl;
 }
 
 void SocketServer::RegisterSocketEventHandler(SocketEventHandler handler)

@@ -37,7 +37,7 @@ enum SocketCode
     SC_HALFSEND, // SocketMessage::id denotes the socket, SocketMessage::ud denotes the size of data been send.
     SC_SEND,  // SocketMessage::id denotes the socket , SocketMessage::ud denotes the size of data been send
     SC_WATCHED, // socket is added to be watched, SocketMessage::id is the corresponding socket
-    SC_ERROR,
+    SC_ERROR,  // out of resource: socket fd or memory
     SC_IERROR, // error ignored
     SC_EXIT,
 
