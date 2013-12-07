@@ -1,7 +1,7 @@
 #include <gtest.h>
 
 #include "thread/Thread.h"
-#include "sys/SocketPoll.h"
+#include "net/SocketPoll.h"
 
 #include <vector>
 #include <stdio.h>
@@ -31,19 +31,16 @@ class SocketPollListener: public ThreadBase
 
         virtual void Run()
         {
-            std::vector<PollEvent> vs;
-            vs.reserve(64);
+            PollEvent vs[64];
 
             while (!m_stop)
             {
-                int sz = m_poll.WaitAll(vs, 1024);
+                int sz = m_poll.WaitAll(vs, 64);
 
                 m_read.clear();
                 m_write.clear();
 
                 m_events = sz;
-
-                EXPECT_EQ(sz, vs.size());
 
                 for (int i = 0; i < sz; i++)
                 {
@@ -51,8 +48,6 @@ class SocketPollListener: public ThreadBase
 
                     if (vs[i].write) m_write.push_back(vs[i]);
                 }
-
-                vs.clear();
 
                 sem_post(&m_sem1);
                 sem_wait(&m_sem2);
@@ -224,8 +219,8 @@ TEST(TestWrite, SocketPollTest)
 
     delete [] bigbuf;
 
-    sem_destroy(&m_sem1);
-    sem_destroy(&m_sem2);
+    sem_destroy(&sem1);
+    sem_destroy(&sem2);
 }
 
 

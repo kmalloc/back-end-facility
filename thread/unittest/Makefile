@@ -7,43 +7,37 @@ SRC_HEAD += -I../
 
 GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 # Flags passed to the preprocessor.
-CPPFLAGS += -I$(GTEST_DIR)/include
 
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra
+CXXFLAGS += -g -c -Wall -Wextra
 
 XLIB_PATH = -L../../lib
 XLIB  = -lxthread
 XLIB += -lsysutil
-XLIB += -lxthread
 XLIB += -lmisc
 
-TESTS = unittest 
+TESTS = unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
-GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest 
+GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest
 GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
+GTEST_HEADERS += -I$(GTEST_DIR)/include
+
+SOURCE=$(USER_DIR)/ThreadTest.cc $(USER_DIR)/WorkerTest.cc $(USER_DIR)/ThreadPoolTest.cc
+OBJECTS=$(SOURCE:.cc=.o)
 
 # House-keeping build targets.
 
 all : $(TESTS)
 
-ThreadTest.o : $(USER_DIR)/ThreadTest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/ThreadTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+.cc.o:
+	$(CXX) $(CXXFLAGS) $(GTEST_HEADERS) $(SRC_HEAD) $< -o $@
 
-WorkerTest.o : $(USER_DIR)/WorkerTest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/WorkerTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
-
-ThreadPoolTest.o : $(USER_DIR)/ThreadPoolTest.cc 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(USER_DIR)/ThreadPoolTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
-
-OBJS = ThreadTest.o WorkerTest.o ThreadPoolTest.o
-
-unittest : $(OBJS) 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(OBJS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
+unittest : $(OBJECTS)
+	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
 
 
 clean :
-	rm -f $(TESTS) *.o
+	rm -f $(TESTS) $(OBJECTS)
 

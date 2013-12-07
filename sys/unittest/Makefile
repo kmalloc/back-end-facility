@@ -3,7 +3,6 @@ SRC_DIR   = ../..
 SRC_HEAD  = -I../
 SRC_HEAD += -I../../
 
-CPPFLAGS  = -I$(GTEST_DIR)/include
 GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 
 XLIB_PATH = -L../../lib
@@ -12,28 +11,26 @@ XLIB    += -lsysutil
 XLIB    += -lmisc
 
 CXX = g++
-CXXFLAGS = -g -Wall -Wextra
+CXXFLAGS = -g -c -Wall -Wextra
 TESTS = unittest
 
 GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest
 GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
+GTEST_HEADERS += -I$(GTEST_DIR)/include
 
+SOURCE=$(CUR_DIR)/LoggerTest.cc
+OBJECTS=$(SOURCE:.cc=.o)
 # House-keeping build targets.
 
 all : $(TESTS)
 
-LoggerTest.o : $(CUR_DIR)/LoggerTest.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/LoggerTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
+.cc.o:
+	$(CXX) $(CXXFLAGS) $(GTEST_HEADERS) $(SRC_HEAD) $< -o $@
 
-SocketPollTest.o : $(CUR_DIR)/SocketPollTest.cc
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(CUR_DIR)/SocketPollTest.cc $(GTEST_HEADERS) $(SRC_HEAD)
-
-OBJS = LoggerTest.o SocketPollTest.o
-
-unittest : $(OBJS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(GTEST_LIB) $(OBJS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
+unittest : $(OBJECTS)
+	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
 
 clean :
-	rm -f $(TESTS) *.o
+	rm -f $(TESTS) $(OBJECTS)
 
 

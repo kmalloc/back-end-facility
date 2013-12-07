@@ -7,8 +7,9 @@ GTEST_LIB = -L$(GTEST_DIR)/lib/.libs
 
 XLIB_PATH = -L../../lib
 XLIB    = -lxthread
-XLIB    += -lmisc
 XLIB    += -lsysutil
+XLIB    += -lmisc
+XLIB    += -lxnet
 
 CXX = g++
 CXXFLAGS = -g -c -Wall -Wextra
@@ -18,7 +19,7 @@ GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest
 GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 GTEST_HEADERS += -I$(GTEST_DIR)/include
 
-SOURCE=$(CUR_DIR)/SpinlockQueueTest.cc $(CUR_DIR)/PerThreadMemoryTest.cc $(CUR_DIR)/LockFreeBufferTest.cc
+SOURCE=$(CUR_DIR)/SocketPollTest.cc
 OBJECTS=$(SOURCE:.cc=.o)
 
 # House-keeping build targets.

@@ -1,6 +1,5 @@
 CC=g++
 CFLAGS=-c -Wall -g
-SOURCES=src/SocketServer.cc src/SocketPoll.cc
 
 RES=../lib
 ROOT=..
@@ -10,6 +9,7 @@ LIBS=-lxthread -lsysutil -lmisc -lpthread -lrt
 INCLUDE=-I./
 INCLUDE+=-I$(ROOT)
 
+SOURCES=src/SocketServer.cc src/SocketPoll.cc
 OBJECTS=$(SOURCES:.cc=.o)
 
 LIBNAME=libxnet.a
@@ -23,9 +23,10 @@ $(LIBNAME): $(OBJECTS)
 	ar rcs $(RES)/$(LIBNAME) $(OBJECTS)
 
 # $(CC) $(LDFLAGS) $(OBJECTS) $(LIBS_PATH) $(LIBS) -o $@
+
 .cc.o:
 	$(CC) $(CFLAGS) $(INCLUDE) $< -o $@
 
 clean:
-	rm src/*.o
+	rm $(OBJECTS) $(RES)/$(LIBNAME)
 

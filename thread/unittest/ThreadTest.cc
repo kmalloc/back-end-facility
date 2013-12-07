@@ -2,13 +2,16 @@
 #include "Thread.h"
 #include "ITask.h"
 
+#include <semaphore.h>
+
 class ThreadTestDummyTask:public ITask
 {
     public:
-        ThreadTestDummyTask():m_stop(false),counter(0) {}
-        virtual ~ThreadTestDummyTask() {}
+        ThreadTestDummyTask():m_stop(false),counter(0) { sem_init(&m_sem, 0, 0); }
+        virtual ~ThreadTestDummyTask() { sem_destroy(&m_sem); }
         virtual void Run()  
         {
+            sem_post(&m_sem);
             while(!m_stop)
             {
                 ++counter; 
@@ -19,6 +22,8 @@ class ThreadTestDummyTask:public ITask
         void stop() { m_stop = true;}
         bool m_stop;
         int counter;
+
+        sem_t m_sem;
 };
 
 
@@ -33,6 +38,7 @@ TEST(operation,threadtest)
     thread1.SetTask(&task);
     EXPECT_TRUE(thread1.Start());
 
+    sem_wait(&task.m_sem);
     EXPECT_TRUE(thread1.IsRunning());
 
 

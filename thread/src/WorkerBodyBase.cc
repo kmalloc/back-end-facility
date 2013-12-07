@@ -41,7 +41,6 @@ WorkerBodyBase::WorkerBodyBase(NotifyerBase* worker)
 
 WorkerBodyBase::~WorkerBodyBase()
 {
-    ClearAllTask();
     sem_destroy(&m_sem);
 }
 

@@ -58,9 +58,12 @@ class LogThread: public ThreadBase
 TEST(LoggerTest, TestLogger)
 {
     Logger logger("files.log");
-    
+
     logger.StopLogging();
     LogThread thread1(logger), thread2(logger), thread3(logger);
+
+    stringstream* fout = new stringstream();
+    logger.SetOutStream(fout);
 
     thread1.Start();
     thread2.Start();
@@ -72,20 +75,19 @@ TEST(LoggerTest, TestLogger)
     thread2.Stop();
     thread3.Stop();
 
-    ostringstream fout;
+    logger.Flush();
 
-    logger.DoFlush(fout);
-
-    string log = fout.str();
+    string log = fout->str();
+    logger.SetOutStream(NULL);
 
     for (int i = 0; i < gs_log_number; ++i)
     {
-       EXPECT_TRUE(string::npos != log.find(gs_random_logs[i])); 
+       EXPECT_TRUE(string::npos != log.find(gs_random_logs[i]));
     }
 
     for (int i = 0; i < gs_other_number; ++i)
     {
-       EXPECT_TRUE(string::npos == log.find(gs_log_other[i])); 
+       EXPECT_TRUE(string::npos == log.find(gs_log_other[i]));
     }
 }
 

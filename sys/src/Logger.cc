@@ -17,7 +17,7 @@ using namespace std;
 
 struct LogEntity
 {
-    string file;
+    ostream* fout;
     char data[0];
 };
 
@@ -28,9 +28,9 @@ class LogWorker: public ThreadBase
         LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time);
         ~LogWorker();
 
-        size_t Log(const char* file, const std::string& msg);
-        size_t Log(const char* file, const char* format,...);
-        size_t Log(const char* file, const char* format, va_list args);
+        size_t Log(ostream* fout, const std::string& msg);
+        size_t Log(ostream* fout, const char* format,...);
+        size_t Log(ostream* fout, const char* format, va_list args);
 
         void Flush();
         void StopLogging();
@@ -102,14 +102,12 @@ void LogWorker::Flush()
     LogEntity* log;
     while (m_pendingMsg.Pop((void**)&log))
     {
-        ofstream fout;
+        ostream* fout = log->fout;
+        if (!fout->good()) continue;
 
-        fout.open(log->file.c_str(), ofstream::out | ofstream::app);
-        if (!fout.good()) continue;
+        *fout << (char*)log->data << std::endl;
 
-        fout << (char*)log->data << std::endl;
-
-        log->~LogEntity();
+        // log->~LogEntity();
         m_buffer.ReleaseBuffer(log);
     }
 }
@@ -162,7 +160,7 @@ size_t LogWorker::DoLog(LogEntity* buffer)
 
 // if lenght of msg is larger than m_granularity.
 // msg will not log completely.
-size_t LogWorker::Log(const char* file, const std::string& msg)
+size_t LogWorker::Log(ostream* fout, const std::string& msg)
 {
     size_t sz = msg.size();
     if (sz == 0) return 0;
@@ -173,9 +171,10 @@ size_t LogWorker::Log(const char* file, const std::string& msg)
     if (addr == NULL) return 0;
 
     // placement new
-    LogEntity* log = new(addr) LogEntity();
+    // LogEntity* log = new(addr) LogEntity();
+    LogEntity* log = (LogEntity*)addr;
 
-    log->file = file;
+    log->fout = fout;
     char* buffer = log->data;
 
     strncpy(buffer, msg.c_str(), sz);
@@ -184,14 +183,15 @@ size_t LogWorker::Log(const char* file, const std::string& msg)
     return DoLog(log);
 }
 
-size_t LogWorker::Log(const char* file, const char* format, va_list args)
+size_t LogWorker::Log(ostream* fout, const char* format, va_list args)
 {
     void* addr = m_buffer.AllocBuffer();
     if (addr == NULL) return 0;
 
-    LogEntity* log = new(addr) LogEntity();
+    // LogEntity* log = new(addr) LogEntity();
+    LogEntity* log = (LogEntity*)addr;
 
-    log->file = file;
+    log->fout = fout;
     char* buffer = log->data;
 
     vsnprintf(buffer, m_granularity - 1, format, args);
@@ -199,11 +199,11 @@ size_t LogWorker::Log(const char* file, const char* format, va_list args)
     return DoLog(log);
 }
 
-size_t LogWorker::Log(const char* file, const char* format,...)
+size_t LogWorker::Log(ostream* fout, const char* format,...)
 {
     va_list args;
     va_start(args, format);
-    size_t ret = Log(file, format, args);
+    size_t ret = Log(fout, format, args);
     va_end(args);
 
     return ret;
@@ -215,12 +215,19 @@ static LogWorker g_worker(LOG_MAX_PENDING, LOG_GRANULARITY, LOG_FLUSH_TIMEOUT);
 
 // definition of logger
 Logger::Logger(const char* file)
-    :m_logFile(file)
+    :fout_(NULL), logfile_(file)
 {
+    ofstream* fout = new ofstream();
+    fout->open(file, ofstream::out | ofstream::app);
+
+    if (!fout->good()) throw "can not open file";
+
+    fout_ = fout;
 }
 
 Logger::~Logger()
 {
+    if (fout_) delete fout_;
 }
 
 void Logger::Flush()
@@ -230,12 +237,12 @@ void Logger::Flush()
 
 size_t Logger::Log(const char* format, va_list args)
 {
-    return g_worker.Log(m_logFile.c_str(), format, args);
+    return g_worker.Log(fout_, format, args);
 }
 
 size_t Logger::Log(const string& msg)
 {
-    return g_worker.Log(m_logFile.c_str(), msg);
+    return g_worker.Log(fout_, msg);
 }
 
 size_t Logger::Log(const char* format, ...)
@@ -256,5 +263,12 @@ void Logger::StopLogging()
 void Logger::RunLogging()
 {
     g_worker.RunWorker();
+}
+
+void Logger::SetOutStream(ostream* fout)
+{
+    if (fout_) delete fout_;
+
+    fout_ = fout;
 }
 

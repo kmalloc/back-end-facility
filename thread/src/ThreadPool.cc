@@ -92,6 +92,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
 
 Dispatcher::~Dispatcher()
 {
+    WorkerBodyBase::ClearAllTask();
     for (int i = 0; i < m_workerNum; ++i)
     {
         m_workers[i]->Cancel();

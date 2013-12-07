@@ -4,12 +4,15 @@
 #include <stdlib.h>
 #include <string>
 #include <stdarg.h>
+#include <iostream>
+
+#include "misc/NonCopyable.h"
 
 #define LOG_MAX_PENDING (64)
 #define LOG_GRANULARITY (256)
 #define LOG_FLUSH_TIMEOUT (23)
 
-class Logger
+class Logger: public noncopyable
 {
     public:
 
@@ -24,13 +27,15 @@ class Logger
 
         // flush all the buffers in memory to disk.
         void Flush();
+        void SetOutStream(std::ostream* fout);
 
         static void RunLogging();
         static void StopLogging();
 
     private:
 
-        const std::string m_logFile;
+        std::ostream* fout_;
+        const std::string logfile_;
 };
 
 #endif
