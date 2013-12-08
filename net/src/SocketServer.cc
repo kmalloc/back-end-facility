@@ -459,7 +459,7 @@ static int TryConnectTo(int fd, struct addrinfo* ai_ptr, void*)
 
 // thread safe
 static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
-        const char* host, const char* port, int* sock_, int* stat, void* data)
+        const char* host, const char* port, int* _sock_, int* stat, void* data)
 {
     int status;
     int sock = -1;
@@ -490,7 +490,7 @@ static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
     if (sock < 0) goto _failed;
 
     if (stat) *stat = status;
-    if (sock_) *sock_ = sock;
+    if (_sock_) *_sock_ = sock;
 
     return ai_ptr;
 

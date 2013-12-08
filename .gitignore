@@ -17,3 +17,4 @@ benchmark/lockfreebenchmark
 */*.s
 slog*.log
 net/server
+tags
