@@ -5,6 +5,8 @@ import threading
 
 def listen_socket(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((ip, port))
     sock.listen(12) #backlog
     return sock
@@ -92,4 +94,6 @@ if __name__ == '__main__':
 
     for i in range(0, len(sockets)):
         sockets[i].close()
+
+    listen_sock.close()
 
