@@ -75,6 +75,7 @@ if __name__ == '__main__':
     accept_thread.start()
 
     for i in range(1, 3):
+        print "send data for the %d(th) round\n" % i
         operate_socket(sockets, "py test client:127.0.0.1:%d:%d" % (listen, i))
 
     time.sleep(1)

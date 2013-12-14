@@ -42,6 +42,36 @@ static SockConn g_conn[65536];
 static volatile int g_stop_sock = -1;
 static volatile int g_stop_code = -1;
 
+static void handle_data(int sock, const char* txt, int size)
+{
+    cout << "socket(" << sock << ") receive data:" << txt << ", size:" << size << endl;
+
+    if (sock == g_stop_sock)
+    {
+        char info[] = "stop listening now!";
+        server.SendBuffer(sock, info, sizeof(info), true);
+    }
+    else if (memcmp(txt, "py test client:", 15) == 0)
+    {
+        vector<string> out;
+        Split(txt, ':', out);
+
+        int op_code = atomic_increment(&g_op);
+        if (out[3] == "no connect")
+        {
+            g_stop_code = op_code;
+        }
+
+        server.Connect(out[1].c_str(), atoi(out[2].c_str()), op_code);
+        // echo msg
+        server.SendBuffer(sock, txt, size, true);
+    }
+    else if (memcmp(txt, "wewe:own", 8))
+    {
+        server.SendBuffer(sock, txt, size, true);
+    }
+}
+
 static void handler(SocketCode code, SocketMessage* msg)
 {
     switch (code)
@@ -82,38 +112,28 @@ static void handler(SocketCode code, SocketMessage* msg)
 
                 char* txt = g_conn[msg->id].stream;
 
-                cout << "socket(" << msg->id << ") receive data:" << txt << ", size:" << size << endl;
-
-                if (msg->id == g_stop_sock)
-                {
-                    char info[] = "stop listening now!";
-                    server.SendBuffer(msg->id, info, sizeof(info), true);
-                }
-                else if (memcmp(txt, "py test client:", 15) == 0)
-                {
-                    vector<string> out;
-                    Split(txt, ':', out);
-
-                    int op_code = atomic_increment(&g_op);
-                    if (out[3] == "no connect")
-                    {
-                        g_stop_code = op_code;
-                    }
-
-                    server.Connect(out[1].c_str(), atoi(out[2].c_str()), op_code);
-                    // echo msg
-                    server.SendBuffer(msg->id, txt, size, true);
-                }
-                else if (memcmp(msg->data, "wewe:own", 8))
-                {
-                    server.SendBuffer(msg->id, txt, size, true);
-                }
+                handle_data(msg->id, txt, size);
 
                 // store the msg that is partial received.
                 left = msg->ud - sz;
                 assert(left >= 0);
 
-                if (left) memcpy(g_conn[msg->id].stream, msg->data + sz, left);
+                while (left)
+                {
+                    int end = strlen((char*)msg->data + sz) + 1;
+
+                    if (end <= left)
+                    {
+                        handle_data(msg->id, (char*)msg->data + sz, end);
+                        left -= end;
+                        sz += end;
+                    }
+                    else
+                    {
+                        memcpy(g_conn[msg->id].stream, msg->data + sz, left);
+                        break;
+                    }
+                }
 
                 g_conn[msg->id].stream[left] = 0;
 
