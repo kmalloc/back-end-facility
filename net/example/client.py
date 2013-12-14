@@ -16,7 +16,6 @@ def open_socket(num, ip, port):
     for i in range(0, num):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-
             sock.connect((ip, port))
             sockets.append(sock)
         except:
@@ -27,26 +26,30 @@ def open_socket(num, ip, port):
 def operate_socket(sockets, msg):
 
     for i in range(0, len(sockets)):
-        sockets[i].send(msg + ":data from socket client:%d" % i)
+        sockets[i].send(msg + ":data from socket client:%d\0" % i)
 
 def accept_proc(sock):
 
+    msg = "py server got you! welcome!\0"
+
     while True:
 
-        conn, adress = sock.accept()
-
-        print "py client accept one socket!"
-
-        msg = "py server got you! welcome!"
-        conn.send(msg)
-
         try:
+            conn, adress = sock.accept()
+            print "py client accept one socket!"
+            conn.send(msg)
+
             buf = conn.recv(1024)
+            conn.close()
+
             if buf == msg:
                 print "py client recv:" + buf
-                conn.close()
+            else:
+                print "rev stop signal from server, stop listening\n"
+                return
         except:
-            print "exception on recv of accepted socket" 
+            print "exception on recv of accepted socket"
+            return
 
 class socket_thread(threading.Thread):
 
@@ -80,9 +83,12 @@ if __name__ == '__main__':
         buf = sockets[i].recv(1024)
         print "recv:" + buf + "\n"
 
+    sockets[0].send("py test client:127.0.0.1:%d:no connect\0" % listen);
+
     accept_thread.join()
+
+    print "exiting, close all socket connections\n"
 
     for i in range(0, len(sockets)):
         sockets[i].close()
-
 

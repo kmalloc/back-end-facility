@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <vector>
 #include <sstream>
@@ -13,8 +14,6 @@ using namespace std;
 
 static int g_op = 0;
 SocketServer server;
-
-
 
 static int Split(const string& str, char delim, vector<string>& out)
 {
@@ -32,6 +31,17 @@ static int Split(const string& str, char delim, vector<string>& out)
     return c;
 }
 
+struct SockConn
+{
+    void* data;
+    char  stream[256];
+};
+
+static SockConn g_conn[65536];
+
+static volatile int g_stop_sock = -1;
+static volatile int g_stop_code = -1;
+
 static void handler(SocketCode code, SocketMessage* msg)
 {
     switch (code)
@@ -45,30 +55,78 @@ static void handler(SocketCode code, SocketMessage* msg)
             cout << "socket(" << msg->id << ") is closing, need to send out pending buffer first" << endl;
             break;
         case SC_CONNECTED:
+
+            if (msg->opaque == g_stop_code) g_stop_sock = msg->id;
+
             cout << "socket(" << msg->id << ") connected, operation id:" << msg->opaque << endl;
             break;
         case SC_DATA:
-            cout << "socket(" << msg->id << ") receive data:" << (char*)msg->data << ", size:" << msg->ud << endl;
-            if (memcmp(msg->data, "py test client:", 15) == 0)
             {
-                vector<string> out;
-                Split(msg->data, ':', out);
-                server.Connect(out[1].c_str(), atoi(out[2].c_str()), g_op);
-                atomic_increment(&g_op);
+                // user better define msg format, including in some fields to indicate the package size.
+                // so that we can elimite the following string operation which can be very time consuming.
+                int sz = strlen((char*)msg->data) + 1;
+                int left = strlen(g_conn[msg->id].stream);
 
-                server.SendBuffer(msg->id, msg->data, msg->ud, true);
-            }
-            else if (memcmp(msg->data, "wewe:own", 8))
-            {
-                server.SendBuffer(msg->id, msg->data, msg->ud, true);
-            }
+                if (sz > msg->ud)
+                {
+                    // package partial received.
+                    memcpy(g_conn[msg->id].stream + left, msg->data, msg->ud);
+                    g_conn[msg->id].stream[left + msg->ud] = 0;
+                    free(msg->data);
+                    break;
+                }
 
-            free(msg->data);
-            break;
+                int size = left + sz;
+
+                strncat(g_conn[msg->id].stream, msg->data, sz);
+
+                char* txt = g_conn[msg->id].stream;
+
+                cout << "socket(" << msg->id << ") receive data:" << txt << ", size:" << size << endl;
+
+                if (msg->id == g_stop_sock)
+                {
+                    char info[] = "stop listening now!";
+                    server.SendBuffer(msg->id, info, sizeof(info), true);
+                }
+                else if (memcmp(txt, "py test client:", 15) == 0)
+                {
+                    vector<string> out;
+                    Split(txt, ':', out);
+
+                    int op_code = atomic_increment(&g_op);
+                    if (out[3] == "no connect")
+                    {
+                        g_stop_code = op_code;
+                    }
+
+                    server.Connect(out[1].c_str(), atoi(out[2].c_str()), op_code);
+                    // echo msg
+                    server.SendBuffer(msg->id, txt, size, true);
+                }
+                else if (memcmp(msg->data, "wewe:own", 8))
+                {
+                    server.SendBuffer(msg->id, txt, size, true);
+                }
+
+                // store the msg that is partial received.
+                left = msg->ud - sz;
+                assert(left >= 0);
+
+                if (left) memcpy(g_conn[msg->id].stream, msg->data + sz, left);
+
+                g_conn[msg->id].stream[left] = 0;
+
+                free(msg->data);
+                break;
+            }
         case SC_ACCEPT:
-            cout << "socket(" << msg->ud << ") accepted, from server id: " << msg->id << endl;
-            server.WatchSocket(msg->ud, g_op);
-            atomic_increment(&g_op);
+            {
+                cout << "socket(" << msg->ud << ") accepted, from server id: " << msg->id << endl;
+
+                int op = atomic_increment(&g_op);
+                server.WatchSocket(msg->ud, op);
+            }
             break;
         case SC_SEND:
             cout << "socket(" << msg->id << ") send buffer done:" << msg->ud << endl;
@@ -104,41 +162,45 @@ int main(int argc, char* argv[])
 
     server.RegisterSocketEventHandler(handler);
 
-    server.StartServer(host, port, g_op);
-    atomic_increment(&g_op);
+    int op = atomic_increment(&g_op);
+    server.StartServer(host, port, op);
 
-    int id = server.Connect(host, port, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    int id = server.Connect(host, port, op);
 
     sleep(1);
     server.SendString(id, "wewe:own,12345678");
 
-    int id2 = server.Connect(host, port, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    int id2 = server.Connect(host, port, op);
 
-    server.ListenTo(host, port + 1, g_op);
-    atomic_increment(&g_op);
-    server.ListenTo(host, port - 1, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    server.ListenTo(host, port + 1, op);
 
-    sleep(1);
-
-    server.ListenTo(host, port + 2, g_op);
-    atomic_increment(&g_op);
-    server.ListenTo(host, port - 2, g_op);
-    atomic_increment(&g_op);
-
-    int id3 = server.Connect(host, port + 1, g_op);
-    atomic_increment(&g_op);
-    int id4 = server.Connect(host, port - 1, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    server.ListenTo(host, port - 1, op);
 
     sleep(1);
 
-    int id5 = server.Connect(host, port + 2, g_op);
-    atomic_increment(&g_op);
-    int id6 = server.Connect(host, port - 2, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    server.ListenTo(host, port + 2, op);
+
+    op = atomic_increment(&g_op);
+    server.ListenTo(host, port - 2, op);
+
+    op = atomic_increment(&g_op);
+    int id3 = server.Connect(host, port + 1, op);
+
+    op = atomic_increment(&g_op);
+    int id4 = server.Connect(host, port - 1, op);
+
+    sleep(1);
+
+    op = atomic_increment(&g_op);
+    int id5 = server.Connect(host, port + 2, op);
+
+    op = atomic_increment(&g_op);
+    int id6 = server.Connect(host, port - 2, op);
 
     sleep(1);
 
@@ -156,8 +218,8 @@ int main(int argc, char* argv[])
     server.SendBuffer(id6, data2, 24);
 
     sleep(1);
-    server.CloseSocket(id4, g_op);
-    atomic_increment(&g_op);
+    op = atomic_increment(&g_op);
+    server.CloseSocket(id4, op);
 
     int i;
     cin >> i;

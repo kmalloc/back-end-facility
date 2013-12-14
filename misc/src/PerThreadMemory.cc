@@ -166,7 +166,6 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
     void* buf;
 
     int no = atomic_decrement(&pHead->node_number);
-
     assert(no);
 
     do
@@ -194,7 +193,7 @@ void* PerThreadMemoryAlloc::GetFreeBufferFromList(NodeHead* pHead) const
 // buffer is allowed to share among threads.
 void PerThreadMemoryAlloc::DoReleaseBuffer(void* buf)
 {
-    //Node* node = (Node*)((char*)buf - sizeof(Node));
+    // Node* node = (Node*)((char*)buf - sizeof(Node));
     Node* node = container_of(buf, PerThreadMemoryAlloc::Node, data);
 
     assert(!IsPaddingCorrupt((unsigned char*)node->padding));
