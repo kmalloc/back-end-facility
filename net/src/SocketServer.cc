@@ -447,6 +447,8 @@ void ServerImpl::ResetSocketSlot(int id)
 
 static int TryConnectTo(int fd, struct addrinfo* ai_ptr, void*)
 {
+    SocketPoll::SetSocketNonBlocking(fd);
+
     int status = connect(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
     if (status != 0 && errno != EINPROGRESS)
     {
@@ -454,7 +456,7 @@ static int TryConnectTo(int fd, struct addrinfo* ai_ptr, void*)
         return -1;
     }
 
-    return status;
+    return 1;
 }
 
 // thread safe
@@ -672,9 +674,6 @@ SocketCode ServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
         goto _failed;
     }
 
-    // epoll
-    poll_.SetSocketNonBlocking(sock);
-
     if (status == 0)
     {
         // convert addr into string
@@ -828,7 +827,7 @@ SocketCode ServerImpl::BindRawSocket(void* buffer, SocketMessage* res)
         return SC_ERROR;
     }
 
-    poll_.SetSocketNonBlocking(req->fd);
+    SocketPoll::SetSocketNonBlocking(req->fd);
     sock->type = SS_BIND;
     res->data = "binding";
     return SC_CONNECTED;
@@ -1006,7 +1005,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
         return SC_ERROR;
     }
 
-    poll_.SetSocketNonBlocking(client_fd);
+    SocketPoll::SetSocketNonBlocking(client_fd);
     SocketEntity* new_sock = SetupSocketEntity(id, client_fd, sock->opaque, false);
 
     if (new_sock == NULL)

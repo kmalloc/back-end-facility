@@ -73,7 +73,7 @@ int SocketPoll::WaitAll(PollEvent* ve, size_t max) const
     return n;
 }
 
-bool SocketPoll::SetSocketNonBlocking(int fd) const
+bool SocketPoll::SetSocketNonBlocking(int fd)
 {
     int flag = fcntl(fd, F_GETFL, 0);
 

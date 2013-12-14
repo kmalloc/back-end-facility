@@ -32,7 +32,7 @@ class SocketPoll: public noncopyable
         bool ModifySocket(int sock, void* data, bool write = false) const;
         int  WaitAll(PollEvent* ve, size_t max = -1) const;
 
-        bool SetSocketNonBlocking(int fd) const;
+        static bool SetSocketNonBlocking(int fd);
 
     private:
 
