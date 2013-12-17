@@ -93,6 +93,10 @@ class SocketServer: public noncopyable
         // to make sure that handler is fast as possible
         void RegisterSocketEventHandler(SocketEventHandler handler);
 
+    public:
+
+        static const int max_conn_id;
+
     private:
 
         ServerImpl* impl_;

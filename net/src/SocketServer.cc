@@ -1333,3 +1333,5 @@ int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
     return impl_->WatchRawSocket(fd, opaque);
 }
 
+const int SocketServer::max_conn_id = MAX_SOCKET;
+
