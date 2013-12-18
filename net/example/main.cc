@@ -72,97 +72,97 @@ static void handle_data(int sock, const char* txt, int size)
     }
 }
 
-static void handler(SocketCode code, SocketMessage* msg)
+static void handler(SocketCode code, SocketMessage msg)
 {
     switch (code)
     {
         case SC_EXIT:
             return;
         case SC_CLOSE:
-            cout << "socket(" << msg->id << ") is closed" << endl;
+            cout << "socket(" << msg.id << ") is closed" << endl;
             break;
         case SC_HALFCLOSE:
-            cout << "socket(" << msg->id << ") is closing, need to send out pending buffer first" << endl;
+            cout << "socket(" << msg.id << ") is closing, need to send out pending buffer first" << endl;
             break;
         case SC_CONNECTED:
 
-            if (msg->opaque == g_stop_code) g_stop_sock = msg->id;
+            if (msg.opaque == g_stop_code) g_stop_sock = msg.id;
 
-            cout << "socket(" << msg->id << ") connected, operation id:" << msg->opaque << endl;
+            cout << "socket(" << msg.id << ") connected, operation id:" << msg.opaque << endl;
             break;
         case SC_DATA:
             {
                 // user better define msg format, including in some fields to indicate the package size.
                 // so that we can elimite the following string operation which can be very time consuming.
-                int sz = strlen((char*)msg->data) + 1;
-                int left = strlen(g_conn[msg->id].stream);
+                int sz = strlen((char*)msg.data) + 1;
+                int left = strlen(g_conn[msg.id].stream);
 
-                if (sz > msg->ud)
+                if (sz > msg.ud)
                 {
                     // package partial received.
-                    memcpy(g_conn[msg->id].stream + left, msg->data, msg->ud);
-                    g_conn[msg->id].stream[left + msg->ud] = 0;
-                    free(msg->data);
+                    memcpy(g_conn[msg.id].stream + left, msg.data, msg.ud);
+                    g_conn[msg.id].stream[left + msg.ud] = 0;
+                    free(msg.data);
                     break;
                 }
 
                 int size = left + sz;
 
-                strncat(g_conn[msg->id].stream, msg->data, sz);
+                strncat(g_conn[msg.id].stream, msg.data, sz);
 
-                char* txt = g_conn[msg->id].stream;
+                char* txt = g_conn[msg.id].stream;
 
-                handle_data(msg->id, txt, size);
+                handle_data(msg.id, txt, size);
 
                 // store the msg that is partial received.
-                left = msg->ud - sz;
+                left = msg.ud - sz;
                 assert(left >= 0);
 
                 while (left)
                 {
-                    int end = strlen((char*)msg->data + sz) + 1;
+                    int end = strlen((char*)msg.data + sz) + 1;
 
                     if (end <= left)
                     {
-                        handle_data(msg->id, (char*)msg->data + sz, end);
+                        handle_data(msg.id, (char*)msg.data + sz, end);
                         left -= end;
                         sz += end;
                     }
                     else
                     {
-                        memcpy(g_conn[msg->id].stream, msg->data + sz, left);
+                        memcpy(g_conn[msg.id].stream, msg.data + sz, left);
                         break;
                     }
                 }
 
-                g_conn[msg->id].stream[left] = 0;
+                g_conn[msg.id].stream[left] = 0;
 
-                free(msg->data);
+                free(msg.data);
                 break;
             }
         case SC_ACCEPT:
             {
-                cout << "socket(" << msg->ud << ") accepted, from server id: " << msg->id << endl;
+                cout << "socket(" << msg.ud << ") accepted, from server id: " << msg.id << endl;
 
                 int op = atomic_increment(&g_op);
-                server.WatchSocket(msg->ud, op);
+                server.WatchSocket(msg.ud, op);
             }
             break;
         case SC_SEND:
-            cout << "socket(" << msg->id << ") send buffer done:" << msg->ud << endl;
+            cout << "socket(" << msg.id << ") send buffer done:" << msg.ud << endl;
             break;
         case SC_HALFSEND:
-            cout << "socket(" << msg->id << ") sending buffer, buffer send:"
-                << msg->ud << "bytes, not finish yet" << endl;
+            cout << "socket(" << msg.id << ") sending buffer, buffer send:"
+                << msg.ud << "bytes, not finish yet" << endl;
             break;
         case SC_LISTEN:
-            cout << "socket(" << msg->id << ") listen, operation id:" << msg->opaque << endl;
+            cout << "socket(" << msg.id << ") listen, operation id:" << msg.opaque << endl;
             break;
         case SC_WATCHED:
-            cout << "socket(" << msg->id << ") is added to be watched, operation:" << msg->opaque << endl;
+            cout << "socket(" << msg.id << ") is added to be watched, operation:" << msg.opaque << endl;
             break;
         default:
-            cout << "enter handler, code:" << code << ", id:" << msg->id << ", opaque:" << msg->opaque << endl;
+            cout << "enter handler, code:" << code << ", id:" << msg.id << ", opaque:" << msg.opaque << endl;
             break;
     }
 }

@@ -16,6 +16,9 @@ class LockFreeBuffer: public noncopyable
         char* AllocBuffer();
         void  ReleaseBuffer(void* buffer);
 
+        size_t Granularity() const { return granularity_; }
+        size_t Capacity() const { return size_; }
+
     private:
 
         void InitList();

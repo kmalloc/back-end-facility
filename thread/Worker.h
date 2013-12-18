@@ -18,7 +18,7 @@ class WorkerBody: public WorkerBodyBase
 
         virtual int GetContainerSize();
 
-        virtual void HandleTask(ITask*);
+        virtual bool HandleTask(ITask*);
         virtual bool HasTask();
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
