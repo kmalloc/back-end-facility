@@ -38,10 +38,10 @@ bool WorkerBody::HasTask()
     return !mailbox_.IsEmpty();
 }
 
-void WorkerBody::HandleTask(ITask* task)
+bool WorkerBody::HandleTask(ITask* task)
 {
     task->Run();
-    delete task;
+    return true;
 }
 
 /*

@@ -40,7 +40,7 @@ class Dispatcher:public WorkerBodyBase
     protected:
 
         virtual void PreHandleTask();
-        virtual void HandleTask(ITask*);
+        virtual bool HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
 
@@ -205,9 +205,12 @@ int Dispatcher::SetWorkerNotify(NotifyerBase* worker)
     return 0;
 }
 
-void Dispatcher::HandleTask(ITask* task)
+bool Dispatcher::HandleTask(ITask* task)
 {
     DispatchTask(task);
+
+    // task not done yet, it is just been dispatched to worker.
+    return false;
 }
 
 

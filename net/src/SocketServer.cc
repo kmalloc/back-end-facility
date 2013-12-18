@@ -139,7 +139,7 @@ class ServerImpl: public ThreadBase
 {
     public:
 
-        ServerImpl();
+        ServerImpl(SocketEventHandler handler);
         ~ServerImpl();
 
         // interface
@@ -263,12 +263,6 @@ const ServerImpl::ActionHandler ServerImpl::actionHandler_[] =
    &ServerImpl::ShutdownServer
 };
 
-static void DummySockEventHandler(SocketCode code, SocketMessage* msg)
-{
-    if (code == SC_DATA)
-        free(msg->data);
-}
-
 static inline void ReleaseFrontBuffer(SocketEntity* sock)
 {
     SocketBuffer* tmp = sock->head;
@@ -324,14 +318,14 @@ int ServerImpl::ReserveSocketSlot()
 }
 
 // ServerImpl
-ServerImpl::ServerImpl()
+ServerImpl::ServerImpl(SocketEventHandler handler)
     :pollEventIndex_(0)
     ,pollEventNum_(0)
     ,allocId_(0)
     ,maxSocket_(MAX_SOCKET)
     ,isRunning_(false)
     ,poll_()
-    ,handler_(&DummySockEventHandler)
+    ,handler_(handler)
 {
 }
 
@@ -1251,7 +1245,7 @@ void ServerImpl::Run()
 
         ret = Poll(&res);
 
-        handler_(ret, &res);
+        handler_(ret, res);
     }
 }
 
@@ -1259,7 +1253,7 @@ void ServerImpl::Run()
 SocketServer::SocketServer()
     :impl_(NULL)
 {
-    impl_ = new ServerImpl();
+    impl_ = new ServerImpl(&DefaultSockEventHandler);
 }
 
 SocketServer::~SocketServer()
@@ -1331,6 +1325,12 @@ void SocketServer::WatchSocket(int id, uintptr_t opaque)
 int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
 {
     return impl_->WatchRawSocket(fd, opaque);
+}
+
+void SocketServer::DefaultSockEventHandler(SocketCode code, SocketMessage msg)
+{
+    if (code == SC_DATA)
+        free(msg.data);
 }
 
 const int SocketServer::max_conn_id = MAX_SOCKET;

@@ -11,7 +11,7 @@
 
 struct SocketMessage
 {
-    int   id;    // socket id associated with the event.
+    int   id; // socket id associated with the event.
     int   opaque;
 
     // for send/halfsend buffer event, ud == buffer size that is sended.
@@ -44,7 +44,7 @@ enum SocketCode
     SC_SUCC
 };
 
-typedef void (*SocketEventHandler)(SocketCode, SocketMessage*);
+typedef void (*SocketEventHandler)(SocketCode, SocketMessage);
 
 class ServerImpl;
 

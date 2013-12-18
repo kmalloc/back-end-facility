@@ -129,7 +129,9 @@ void WorkerBodyBase::Run()
         {
             isRuning_ = true;
 
-            HandleTask(msg);
+            bool done = HandleTask(msg);
+
+            if (done) CleanRunTask(msg);
 
             isRuning_ = false;
 
@@ -144,12 +146,17 @@ void WorkerBodyBase::Run()
     }
 }
 
+void WorkerBodyBase::CleanRunTask(ITask* task)
+{
+    if (task && task->deleteAfterRun_) delete task;
+}
+
 void WorkerBodyBase::ClearAllTask()
 {
     while (HasTask())
     {
         ITask* msg = TryGetTask();
-        if (msg) delete(msg);
+        CleanRunTask(msg);
     }
 }
 
