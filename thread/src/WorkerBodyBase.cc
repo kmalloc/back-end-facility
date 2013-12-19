@@ -122,10 +122,11 @@ void WorkerBodyBase::Run()
     while (1)
     {
         ITask* msg = NULL;
+        bool ret = GetRunTask(msg);
 
-        PreHandleTask();
+        PreHandleTask(msg);
 
-        if (GetRunTask(msg))
+        if (ret)
         {
             isRuning_ = true;
 

@@ -13,7 +13,7 @@ class ITask
 {
     public:
 
-        ITask(bool autoDel = true, TaskPriority prio = TP_NORMAL): deleteAfterRun_(autoDel), priority_(prio){}
+        ITask(bool autoDel = true, TaskPriority prio = TP_NORMAL): affinity_(-1), deleteAfterRun_(autoDel), priority_(prio){}
         virtual ~ITask(){}
         virtual void Run()=0;
 
@@ -25,8 +25,12 @@ class ITask
             return old;
         }
 
+        void SetAffinity(int aff) { affinity_ = aff; }
+        int  GetAffinity() const { return affinity_; }
+
     protected:
 
+        int affinity_; // used to bind Itask to specific worker
         bool deleteAfterRun_;
         TaskPriority priority_;
 };

@@ -42,7 +42,7 @@ class WorkerBodyBase: public ITask, public noncopyable
 
     protected:
 
-        virtual void PreHandleTask() {}
+        virtual void PreHandleTask(ITask*) {}
         virtual bool HandleTask(ITask*) = 0;
         virtual bool HasTask() = 0;
         virtual void CleanRunTask();

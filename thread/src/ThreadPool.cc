@@ -39,7 +39,7 @@ class Dispatcher:public WorkerBodyBase
 
     protected:
 
-        virtual void PreHandleTask();
+        virtual void PreHandleTask(ITask* task);
         virtual bool HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
@@ -178,18 +178,25 @@ Worker* Dispatcher::SelectFreeWorker()
     return NULL;
 }
 
-void Dispatcher::PreHandleTask()
+void Dispatcher::PreHandleTask(ITask* task)
 {
-    Worker* worker;
-
-    do
+    int affinity = task->GetAffinity();
+    if (affinity < 0 || affinity >= workerNum_)
     {
-        sem_wait(&workerNotify_);
-        worker = SelectFreeWorker();
+        Worker* worker;
 
-    } while (worker == NULL);
+        do
+        {
+            sem_wait(&workerNotify_);
+            worker = SelectFreeWorker();
+        } while (worker == NULL);
 
-    freeWorker_ = worker;
+        freeWorker_ = worker;
+    }
+    else
+    {
+        freeWorker_ = workers_[affinity];
+    }
 }
 
 void Dispatcher::DispatchTask(ITask* task)
