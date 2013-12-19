@@ -32,6 +32,8 @@ class Thread: public noncopyable
         ITask* SetTask(ITask*task) { ITask* tmp = task_; task_ = task; return tmp; }
         const ITask* GetTask() const { return task_; }
 
+        pthread_t GetPid() const { return tid_; }
+
     protected:
 
         static void* RunTask(void* arg);

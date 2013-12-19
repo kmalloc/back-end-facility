@@ -11,12 +11,16 @@
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpContext.h"
 
+#include "pthread.h"
+#include "assert.h"
+
 struct ConnMessage
 {
     int code;
     SocketMessage msg;
 };
 
+// bind each connection to one thread.
 class HttpTask: public ITask
 {
     public:
@@ -84,11 +88,45 @@ void HttpTask::ClearMsgQueueWithLockHold()
     }
 }
 
-void HttpTask::InitConnection()
+void HttpTask::InitConnection(ConnMessage* msg)
 {
     pthread_mutex_lock(&contextLock_);
     context_.ResetContext();
     pthread_mutex_unlock(&contextLock_);
+}
+
+void HttpTask::ProcessSocketMessage(ConnMessage* msg)
+{
+    switch (msg->code)
+    {
+        case SC_DATA:
+            {
+                ProcessHttpData(msg->data);
+            }
+            break;
+        case SC_CONNECTED:
+            {
+                int pid = pthread_self();
+                ITask::SetAffinity(pid);
+            }
+            break;
+        default:
+            {
+                // not interested in other event.
+                // make sure server will not throw them here.
+                assert(0);
+            }
+    }
+}
+
+void HttpTask::Run()
+{
+    ConnMessage* msg;
+    while (sockMsgQueue_.Pop(msg))
+    {
+        ProcessSocketMessage(msg);
+        httpServer_->ReleaseMsg(msg);
+    }
 }
 
 class HttpImpl:public ThreadBase
@@ -100,6 +138,8 @@ class HttpImpl:public ThreadBase
 
         void StartServer();
         void StopServer();
+
+        void ReleaseMsg(ConnMessage* msg);
 
     protected:
 

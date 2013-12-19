@@ -31,7 +31,7 @@ class ITask
 
     protected:
 
-        int affinity_; // used to bind Itask to specific worker
+        int affinity_; // pid, used to bind Itask to specific worker
         bool deleteAfterRun_;
         TaskPriority priority_;
 };
