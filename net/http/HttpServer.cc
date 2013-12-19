@@ -94,17 +94,23 @@ void HttpTask::InitConnection(ConnMessage* msg)
     pthread_mutex_unlock(&contextLock_);
 }
 
+void HttpTask::ProcessHttpData(const char* data, size_t sz)
+{
+    
+}
+
 void HttpTask::ProcessSocketMessage(ConnMessage* msg)
 {
     switch (msg->code)
     {
         case SC_DATA:
             {
-                ProcessHttpData(msg->data);
+                ProcessHttpData(msg->msg.data, msg->msg.ud);
             }
             break;
         case SC_CONNECTED:
             {
+                // connection established, bind connection to thread.
                 int pid = pthread_self();
                 ITask::SetAffinity(pid);
             }
