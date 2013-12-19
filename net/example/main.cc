@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include <set>
 #include <vector>
 #include <sstream>
 #include <iostream>
@@ -39,17 +40,21 @@ struct SockConn
 
 static SockConn g_conn[65536];
 
-static volatile int g_stop_sock = -1;
-static volatile int g_stop_code = -1;
+static set<int> g_stop_sock;
+static set<int> g_stop_code;
 
 static void handle_data(int sock, const char* txt, int size)
 {
     cout << "socket(" << sock << ") receive data:" << txt << ", size:" << size << endl;
 
-    if (sock == g_stop_sock)
+    set<int>::const_iterator it = g_stop_sock.find(sock);
+    if (it != g_stop_sock.end())
     {
         char info[] = "stop listening now!";
+        cout << "socket(sock) send stop signal to client" << endl;
         server.SendBuffer(sock, info, sizeof(info), true);
+
+        g_stop_sock.erase(it);
     }
     else if (memcmp(txt, "py test client:", 15) == 0)
     {
@@ -59,7 +64,8 @@ static void handle_data(int sock, const char* txt, int size)
         int op_code = atomic_increment(&g_op);
         if (out[3] == "no connect")
         {
-            g_stop_code = op_code;
+            g_stop_code.insert(op_code);
+            cout << "receive close req:op code: " << endl;
         }
 
         server.Connect(out[1].c_str(), atoi(out[2].c_str()), op_code);
@@ -85,10 +91,17 @@ static void handler(SocketCode code, SocketMessage msg)
             cout << "socket(" << msg.id << ") is closing, need to send out pending buffer first" << endl;
             break;
         case SC_CONNECTED:
+            {
+                set<int>::const_iterator it = g_stop_code.find(msg.opaque);
 
-            if (msg.opaque == g_stop_code) g_stop_sock = msg.id;
+                if (it != g_stop_code.end())
+                {
+                    g_stop_code.erase(it);
+                    g_stop_sock.insert(msg.id);
+                }
 
-            cout << "socket(" << msg.id << ") connected, operation id:" << msg.opaque << endl;
+                cout << "socket(" << msg.id << ") connected, operation id:" << msg.opaque << endl;
+            }
             break;
         case SC_DATA:
             {
