@@ -122,11 +122,10 @@ void WorkerBodyBase::Run()
     while (1)
     {
         ITask* msg = NULL;
-        bool ret = GetRunTask(msg);
 
-        PreHandleTask(msg);
+        PrepareWorker();
 
-        if (ret)
+        if (GetRunTask(msg))
         {
             isRuning_ = true;
 
@@ -134,9 +133,8 @@ void WorkerBodyBase::Run()
 
             if (done) CleanRunTask(msg);
 
-            isRuning_ = false;
-
             ++done_;
+            isRuning_ = false;
         }
         else
         {
@@ -241,6 +239,7 @@ bool WorkerBodyBase::StopRunning()
     return PostExit();
 }
 
+// note, this number is not 100% accurate.
 int WorkerBodyBase::GetTaskNumber()
 {
     return GetContainerSize() + (isRuning_?1:0);

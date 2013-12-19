@@ -39,7 +39,7 @@ class Dispatcher:public WorkerBodyBase
 
     protected:
 
-        virtual void PreHandleTask(ITask* task);
+        virtual void PrepareWorker();
         virtual bool HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
         virtual bool PushTaskToContainer(ITask*);
@@ -178,31 +178,37 @@ Worker* Dispatcher::SelectFreeWorker()
     return NULL;
 }
 
-void Dispatcher::PreHandleTask(ITask* task)
+void Dispatcher::PrepareWorker()
 {
-    int affinity = task->GetAffinity();
-    if (affinity < 0 || affinity >= workerNum_)
-    {
-        Worker* worker;
+    if (freeWorker_) return;
 
-        do
-        {
-            sem_wait(&workerNotify_);
-            worker = SelectFreeWorker();
-        } while (worker == NULL);
+    Worker* worker;
 
-        freeWorker_ = worker;
-    }
-    else
+    do
     {
-        freeWorker_ = workers_[affinity];
-    }
+        sem_wait(&workerNotify_);
+        worker = SelectFreeWorker();
+    } while (worker == NULL);
+
+    freeWorker_ = worker;
 }
 
 void Dispatcher::DispatchTask(ITask* task)
 {
-    assert(freeWorker_);
-    freeWorker_->PostTask(task);
+    int affinity = task->GetAffinity();
+    if (affinity < 0 || affinity >= workerNum_)
+    {
+        assert(freeWorker_);
+        freeWorker_->PostTask(task);
+        freeWorker_ = NULL;
+    }
+    else
+    {
+        Worker* worker = workers_[affinity];
+        if (worker == freeWorker_) freeWorker_ = NULL;
+
+        worker->PostTask(task);
+    }
 }
 
 int Dispatcher::SetWorkerNotify(NotifyerBase* worker)
