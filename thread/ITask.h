@@ -27,6 +27,7 @@ class ITask
 
         void SetAffinity(int aff) { affinity_ = aff; }
         int  GetAffinity() const { return affinity_; }
+        bool ShouldDelete() const { return deleteAfterRun_; }
 
     protected:
 

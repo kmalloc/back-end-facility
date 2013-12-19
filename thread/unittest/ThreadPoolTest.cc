@@ -45,7 +45,7 @@ class NormalTaskForThreadPoolTest:public ITask
 {
     public:
         NormalTaskForThreadPoolTest()
-            :ITask(TP_HIGH), m_busy(false) { sem_init(&m_stopSem, 0, 0); }
+            :ITask(true, TP_HIGH), m_busy(false) { sem_init(&m_stopSem, 0, 0); }
 
         ~NormalTaskForThreadPoolTest() { sem_destroy(&m_stopSem); }
 

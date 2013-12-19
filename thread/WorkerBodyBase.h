@@ -45,7 +45,7 @@ class WorkerBodyBase: public ITask, public noncopyable
         virtual void PreHandleTask(ITask*) {}
         virtual bool HandleTask(ITask*) = 0;
         virtual bool HasTask() = 0;
-        virtual void CleanRunTask();
+        virtual void CleanRunTask(ITask*);
 
         // be aware: this function may block if there is no task
         virtual ITask* GetTaskFromContainer() = 0;

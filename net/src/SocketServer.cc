@@ -1253,7 +1253,7 @@ void ServerImpl::Run()
 SocketServer::SocketServer()
     :impl_(NULL)
 {
-    impl_ = new ServerImpl(&DefaultSockEventHandler);
+    impl_ = new ServerImpl(&SocketServer::DefaultSockEventHandler);
 }
 
 SocketServer::~SocketServer()

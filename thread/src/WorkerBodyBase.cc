@@ -149,7 +149,7 @@ void WorkerBodyBase::Run()
 
 void WorkerBodyBase::CleanRunTask(ITask* task)
 {
-    if (task && task->deleteAfterRun_) delete task;
+    if (task && task->ShouldDelete()) delete task;
 }
 
 void WorkerBodyBase::ClearAllTask()
