@@ -4,6 +4,7 @@
 #include "sys/AtomicOps.h"
 #include "misc/SpinlockQueue.h"
 
+#include <map>
 #include <assert.h>
 #include <memory.h>
 #include <unistd.h>
@@ -54,6 +55,7 @@ class Dispatcher:public WorkerBodyBase
 
         sem_t workerNotify_;
         Worker* freeWorker_;//keep this variable using in dispatch thread only, eliminating volatile
+        std::map<int, int> pid2workerId_;
         std::vector<Worker*> workers_;
         SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > queue_;
 };
@@ -77,6 +79,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
             Worker* worker = new Worker(pool_, i);
             worker->EnableNotify(true);
             workers_.push_back(worker);
+            pid2workerId_[worker->GetPid()] = i;
         }
     }
     catch (...)
@@ -84,6 +87,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         for (int j = 0; j < i; ++j)
             delete workers_[j];
 
+        pid2workerId_.clear();
         throw "out of memory";
     }
 
@@ -99,13 +103,18 @@ Dispatcher::~Dispatcher()
         delete workers_[i];
     }
 
+    pid2workerId_.clear();
     sem_destroy(&workerNotify_);
 }
 
 void Dispatcher::StartWorker()
 {
+    pid2workerId_.clear();
     for (int i = 0; i < workerNum_; ++i)
+    {
         workers_[i]->StartWorking();
+        pid2workerId_[workers_[i]->GetPid()] = i;
+    }
 }
 
 void Dispatcher::KillAllWorker()
@@ -114,6 +123,8 @@ void Dispatcher::KillAllWorker()
     {
         workers_[i]->Cancel();
     }
+
+    pid2workerId_.clear();
 }
 
 void Dispatcher::StopWorker()
@@ -122,6 +133,8 @@ void Dispatcher::StopWorker()
     {
         workers_[i]->StopWorking();
     }
+
+    pid2workerId_.clear();
 }
 
 bool Dispatcher::StopRunning()
@@ -204,7 +217,12 @@ void Dispatcher::DispatchTask(ITask* task)
     }
     else
     {
-        Worker* worker = workers_[affinity];
+        std::map<int, int>::const_iterator it = pid2workerId_.find(affinity);
+        assert(it != pid2workerId_.end());
+
+        int workid = it->second;
+        Worker* worker = workers_[workid];
+
         if (worker == freeWorker_) freeWorker_ = NULL;
 
         worker->PostTask(task);
