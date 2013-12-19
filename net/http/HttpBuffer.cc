@@ -22,6 +22,11 @@ bool HttpBuffer::ResetBuffer()
     start_ = end_ = cur_ = 0;
     buff_ = bufferAlloc_.AllocBuffer();
 
+    if (buff_)
+    {
+        memset(buff_, 0, size_);
+    }
+
     return buff_ != NULL;
 }
 
@@ -40,6 +45,7 @@ void HttpBuffer::Consume(size_t sz)
 
     if (cur_ == end_)
     {
+        memset(buff_, 0, end_);
         start_ = cur_ = end_ = 0;
     }
 }
@@ -67,6 +73,8 @@ void HttpBuffer::Append(const char* data, size_t sz)
         cur_ = cur_ - start_;
         end_ = end_ - start_;
         start_ = 0;
+
+        memset(buff_ + end_, 0, size_ - end_);
     }
 
     memcpy(buff_ + end_, data, sz);

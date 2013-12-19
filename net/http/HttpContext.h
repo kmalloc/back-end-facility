@@ -1,17 +1,22 @@
 #ifndef __HTTP_CONTEXT_H__
 #define __HTTP_CONTEXT_H__
 
+#include <map>
 #include <stdlib.h>
 
 #include "misc/NonCopyable.h"
 #include "misc/LockFreeBuffer.h"
+
 #include "net/http/HttpBuffer.h"
+#include "net/http/HttpConnection.h"
+#include "net/http/HttpRequest.h"
+#include "net/http/HttpCallBack.h"
 
 class HttpContext: public NonCopyable
 {
     public:
 
-        HttpContext(LockFreeBuffer& alloc);
+        HttpContext(LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
         void ResetContext(bool keepalive = false);
@@ -48,11 +53,11 @@ class HttpContext: public NonCopyable
         bool keepalive_;
         int curStage_;
 
-        std::map<std::string, std::string> httpReqLine_;
-        std::map<std::string, std::string> httpHeader_;
-        std::string httpBody_;
-
+        HttpRequest request_;
         HttpBuffer buffer_;
+        HttpConnection conn_;
+
+        const HttpCallBack callBack_;
 };
 
 #endif

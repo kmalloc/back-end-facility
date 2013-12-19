@@ -1,8 +1,10 @@
 #include "HttpContext.h"
 
-HttpContext::HttpContext(LockFreeBuffer& alloc)
+#include "sys/Log.h"
+
+HttpContext::HttpContext(LockFreeBuffer& alloc, HttpCallBack cb)
     : keepalive_(false), curStage_(HS_INVALID)
-    , buffer_(alloc)
+    , buffer_(alloc), callBack_(cb)
 {
 }
 
@@ -21,12 +23,41 @@ void HttpContext::ResetContext(bool keepalive)
 
 void HttpContext::ReleaseContext()
 {
+    httpReqLine_.clear();
+    httpHeader_.clear();
+    httpBody_.clear();
     buffer_.ReleaseBuffer();
 }
 
 void HttpContext::AppendData(const char* data, size_t sz)
 {
-    buffer_.AppendData(data, sz);
+    size_t size = buffer_.AppendData(data, sz);
+
+    if (size < sz)
+    {
+        slog(LOG_WARN, "http request, data lost");
+    }
+}
+
+void HttpContext::CleanUp()
+{
+    httpReqLine_.clear();
+    httpHeader_.clear();
+    httpBody_.clear();
+
+    if (keepalive_ == false)
+    {
+        conn_.CloseConnection();
+    }
+}
+
+void HttpContext::DoResponse()
+{
+    std::string result = callBack_(httpReqLine_);
+    if (!result.empty())
+    {
+        conn_.SendData(result.c_str(), result.size() + 1);
+    }
 }
 
 void HttpContext::RunParser()
@@ -48,10 +79,12 @@ void HttpContext::RunParser()
     }
     else
     {
-        if (keepalive_ == false)
-        {
-            // TODO close connection
-        }
+        DoResponse();
+        CleanUp();
     }
+}
+
+void HttpContext::ParseRequestLine()
+{
 }
 
