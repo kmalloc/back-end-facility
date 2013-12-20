@@ -59,12 +59,6 @@ class Worker: public Thread, public NotifyerBase
 
     protected:
 
-        // disable setting task.
-        // this is a special thread specific to a worker thread.
-        // It should not be changed externally.
-        using Thread::SetTask;
-        using Thread::Start;
-
         const int id_;
         WorkerManagerBase* manager_;
         WorkerBodyBase* WorkerBody_;
