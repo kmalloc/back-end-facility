@@ -20,7 +20,7 @@ class HttpContext: public NonCopyable
         HttpContext(LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
-        void ResetContext(bool keepalive = false);
+        void ResetContext(SocketServer& server, int connid, bool keepalive = false);
         void ReleaseContext();
 
         void AppendData(const char* data, size_t sz);
@@ -28,6 +28,8 @@ class HttpContext: public NonCopyable
         void RunParser();
 
         void CleanUp();
+
+        const HttpRequest& GetRequest() const { return request_; }
 
     private:
 
