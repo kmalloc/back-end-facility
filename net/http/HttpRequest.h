@@ -29,10 +29,10 @@ class HttpRequest
 
         HttpRequest();
 
-        void SetHttpMethod(const char* method) const
+        bool SetHttpMethod(const std::string& method) const
         {
             method_ = HM_INVALID;
-            switch(method_)
+            switch(method)
             {
                 case "GET":
                     method_ = HM_GET;
@@ -52,6 +52,8 @@ class HttpRequest
                 default:
                     break;
             }
+
+            return method_ != HM_INVALID;
         }
 
         const char* GetHttpMethod() const
@@ -80,12 +82,14 @@ class HttpRequest
             return result;
         }
 
-        void SetVersion(const char* version)
+        bool SetVersion(const std::string& version)
         {
             version_ = HV_INVALID;
 
             if (version == "HTTP/1.1") version_ = HV_11;
             else if (version == "HTTP/1.0") version_ = HV_10;
+
+            return version_ != HV_INVALID;
         }
 
         const char* GetVersion()
@@ -94,6 +98,16 @@ class HttpRequest
             else if (version_ == HV_11) return "HTTP/1.1";
 
             return "UNKNOWN";
+        }
+
+        void SetUrl(const std::string& url)
+        {
+            reqUrl_ = url;
+        }
+
+        void SetPostData(const std::string& data)
+        {
+            postData_ = data;
         }
 
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
@@ -110,6 +124,8 @@ class HttpRequest
         HttpMethod method_;
         HttpVersion version_;
 
+        std::string reqUrl_;
+        std::string postData_; // data after url in POST request
         std::string httpBody_;
         std::map<std::string, std::string> httpHeader_;
 }

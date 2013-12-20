@@ -15,10 +15,14 @@ class HttpBuffer:public NonCopyable
         void  Consume(int sz);
         void  Append(const char* data, size_t sz);
 
-        char* Get(size_t offset = 0) const;
+        const char* Get(size_t offset = 0) const;
+        const char* GetStart() const;
+        const char* GetEnd() const;
 
         bool ResetBuffer();
         void ReleaseBuffer();
+
+        static const char CTRL[];
 
     private:
 
