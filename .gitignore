@@ -7,8 +7,6 @@ snippet/exec
 .*.swp
 *.a
 *.o
-test*
-*/unittest/unittest
 filenametags
 cscope.*
 *.swo
