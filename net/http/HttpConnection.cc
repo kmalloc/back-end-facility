@@ -14,6 +14,8 @@ void HttpConnection::SendData(const char* data, size_t sz, bool copy)
 
 void HttpConnection::CloseConnection()
 {
+    if (connId_ == -1) return;
+
     sockServer_.CloseSocket(connId_);
     connId_ = -1;
 }

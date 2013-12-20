@@ -14,12 +14,13 @@ HttpContext::~HttpContext()
     ReleaseContext();
 }
 
-void HttpContext::ResetContext(bool keepalive)
+void HttpContext::ResetContext(SocketServer& server, int connid, bool keepalive)
 {
     keepalive_ = keepalive;
     curStage_ = HS_REQUEST_LINE;
 
     buffer_.ResetBuffer();
+    conn_.ResetConnection(server, connid);
 }
 
 void HttpContext::ReleaseContext()
@@ -163,6 +164,36 @@ bool HttpContext::ParseRequestLine()
 
 bool HttpContext::ParseHeader()
 {
+    const char* start = buffer_.GetStart();
+    const char* end   = buffer_.GetEnd();
 
+    const char* ctrl= HttpBuffer::CTRL;
+    const size_t ctrl_len = strlen(ctrl);
+    const char* end_of_ctrl = ctrl + ctrl_len;
+
+    while (1)
+    {
+        const char* line_end = std::search(start, end, ctrl, end_of_ctrl);
+        if (line_end == end) return true;
+
+        const char* colon = std::find(start, line_end, ':');
+        if (colon == line_end)
+        {
+            // end of headers.
+            buffer_.Consume(line_end - start + ctrl_len);
+            break;
+        }
+
+        std::string key(start, colon);
+        std::string value(colon + 1, line_end);
+
+        request_.AddHeader(key.c_str(), value.c_str());
+
+        buffer_.Consume(line_end - start + ctrl_len);
+        start = buffer_.GetStart();
+    }
+
+    FinishParsingHeader();
+    return true;
 }
 
