@@ -60,7 +60,6 @@ class WorkerBodyBase: public ITask, public noncopyable
 
     private:
 
-        // disable overloading from child
         void Run();
 
         // get task from mailbox or cmd_

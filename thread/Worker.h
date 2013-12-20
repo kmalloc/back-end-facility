@@ -25,7 +25,7 @@ class WorkerBody: public WorkerBodyBase
 
     private:
 
-        // this queue can be replace with other container that supports identical interface.
+        // this queue can be replaced with other container that supports identical interface.
         // better replace it with lock free container/list.
         SpinlockWeakPriorityQueue<ITask*> mailbox_;
 };
@@ -59,11 +59,8 @@ class Worker: public Thread, public NotifyerBase
 
     protected:
 
-        // disable setting task.
-        // this is a special thread specific to a worker thread.
-        // It should not be changed externally.
-        using Thread::SetTask;
         using Thread::Start;
+        using Thread::SetTask;
 
         const int id_;
         WorkerManagerBase* manager_;

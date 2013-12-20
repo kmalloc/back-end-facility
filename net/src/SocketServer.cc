@@ -206,7 +206,6 @@ class ServerImpl: public ThreadBase
 
     private:
 
-        // disable thread interface
         using ThreadBase::Start;
 
         enum

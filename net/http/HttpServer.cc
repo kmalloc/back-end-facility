@@ -20,6 +20,7 @@ struct ConnMessage
     SocketMessage msg;
 };
 
+// bind each connection to one thread.
 class HttpTask: public ITask
 {
     public:
@@ -96,7 +97,6 @@ void HttpTask::InitConnection(ConnMessage* msg)
 
 void HttpTask::ProcessHttpData(const char* data, size_t sz)
 {
-    
 }
 
 void HttpTask::ProcessSocketMessage(ConnMessage* msg)
@@ -115,14 +115,14 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
                 ITask::SetAffinity(pid);
             }
             break;
-        case SC_SEND: // send is asynchronous, when received this msg, we can try to close the http connection if necessary.
+        case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
             }
             break;
         default:
             {
-                // not interested in other event.
-                // make sure server will not throw them here.
+                // not interested in other events.
+                // make sure http server will not throw them here.
                 assert(0);
             }
     }
@@ -168,7 +168,5 @@ class HttpImpl:public ThreadBase
         // connection id to index into it
         HttpTask conn_[];
 };
-
-
 
 
