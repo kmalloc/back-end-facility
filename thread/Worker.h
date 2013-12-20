@@ -25,7 +25,7 @@ class WorkerBody: public WorkerBodyBase
 
     private:
 
-        // this queue can be replace with other container that supports identical interface.
+        // this queue can be replaced with other container that supports identical interface.
         // better replace it with lock free container/list.
         SpinlockWeakPriorityQueue<ITask*> mailbox_;
 };
@@ -58,6 +58,9 @@ class Worker: public Thread, public NotifyerBase
         virtual int Notify();
 
     protected:
+
+        using Thread::Start;
+        using Thread::SetTask;
 
         const int id_;
         WorkerManagerBase* manager_;
