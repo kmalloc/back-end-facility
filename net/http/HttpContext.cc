@@ -23,9 +23,9 @@ void HttpContext::ResetContext(bool keepalive)
 
 void HttpContext::ReleaseContext()
 {
-    httpReqLine_.clear();
-    httpHeader_.clear();
-    httpBody_.clear();
+    request_.CleanUp();
+    response_.CleanUp();
+
     buffer_.ReleaseBuffer();
 }
 
@@ -39,11 +39,11 @@ void HttpContext::AppendData(const char* data, size_t sz)
     }
 }
 
+// in normal case, this should be called after respone is done.
 void HttpContext::CleanUp()
 {
-    httpReqLine_.clear();
-    httpHeader_.clear();
-    httpBody_.clear();
+    request_.CleanUp();
+    response_.CleanUp();
 
     if (keepalive_ == false)
     {
@@ -80,11 +80,11 @@ void HttpContext::RunParser()
     else
     {
         DoResponse();
-        CleanUp();
     }
 }
 
 void HttpContext::ParseRequestLine()
 {
+
 }
 

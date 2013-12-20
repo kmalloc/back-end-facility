@@ -99,6 +99,12 @@ class HttpRequest
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
         const std::map<std::string, std::string>& GetHeader() const { return httpHeader_; }
 
+        void CleanUp()
+        {
+            httpBody_ = "";
+            httpHeader_.clear();
+        }
+
     private:
 
         HttpMethod method_;

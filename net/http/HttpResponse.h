@@ -37,7 +37,7 @@ class HttpResponse
             size_t sz = snprintf(buffer, 32, "HTTP/1.1 %d", statusCode_);
 
             size_t tmp = statusMsg_.size();
-            if (tmp + sz + 32> size) return false;
+            if (tmp + sz + 32 >= size) return false;
 
             memcpy(buffer + sz, statusMsg_.c_str(), tmp + 1);
 
@@ -82,6 +82,13 @@ class HttpResponse
             memcpy(buffer + sz, httpBody_.c_str(), tmp + 1);
 
             return true;
+        }
+
+        void CleanUp()
+        {
+            statusMsg_ = "";
+            httpBody_  = "";
+            httpHeader_.clear();
         }
 
     private:

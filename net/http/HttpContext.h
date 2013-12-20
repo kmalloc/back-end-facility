@@ -10,6 +10,7 @@
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpConnection.h"
 #include "net/http/HttpRequest.h"
+#include "net/http/HttpResponse.h"
 #include "net/http/HttpCallBack.h"
 
 class HttpContext: public NonCopyable
@@ -26,6 +27,8 @@ class HttpContext: public NonCopyable
 
         void RunParser();
 
+        void CleanUp();
+
     private:
 
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
@@ -34,17 +37,20 @@ class HttpContext: public NonCopyable
 
         void FinishParsingRequestLine() { curStage_ = HS_HEADER; }
         void FinishParsingHeader() { curStage_ = HS_BODY; }
-        void FinishParsingBody() { curStage_ = HS_INVALID; }
+        void FinishParsingBody() { curStage_ = HS_RESPONSE; }
+        void FinishResponse() { curStage_ = HS_INVALID; }
 
         void ParseRequestLine();
         void ParseHeader();
         void ParseBody();
+        void DoResponse();
 
         enum
         {
             HS_REQUEST_LINE,
             HS_HEADER,
             HS_BODY,
+            HS_RESPONSE,
             HS_INVALID
         };
 
@@ -54,6 +60,7 @@ class HttpContext: public NonCopyable
         int curStage_;
 
         HttpRequest request_;
+        HttpResponse response_;
         HttpBuffer buffer_;
         HttpConnection conn_;
 

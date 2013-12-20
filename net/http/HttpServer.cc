@@ -115,6 +115,10 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
                 ITask::SetAffinity(pid);
             }
             break;
+        case SC_SEND: // send is asynchronous, when received this msg, we can try to close the http connection if necessary.
+            {
+            }
+            break;
         default:
             {
                 // not interested in other event.
