@@ -31,9 +31,19 @@ class HttpContext: public NonCopyable
 
     private:
 
+        enum
+        {
+            HS_REQUEST_LINE,
+            HS_HEADER,
+            HS_BODY,
+            HS_RESPONSE,
+            HS_INVALID
+        };
+
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
         bool ShouldParseHeader() const { return curStage_ == HS_HEADER; }
         bool ShouldParseBody() const { return curStage_ == HS_BODY; }
+        bool ShouldResponse() const { return  curStage_ == HS_RESPONSE; }
 
         void FinishParsingRequestLine() { curStage_ = HS_HEADER; }
         void FinishParsingHeader() { curStage_ = HS_BODY; }
@@ -44,15 +54,6 @@ class HttpContext: public NonCopyable
         void ParseHeader();
         void ParseBody();
         void DoResponse();
-
-        enum
-        {
-            HS_REQUEST_LINE,
-            HS_HEADER,
-            HS_BODY,
-            HS_RESPONSE,
-            HS_INVALID
-        };
 
     private:
 
