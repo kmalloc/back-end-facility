@@ -5,7 +5,7 @@
 
 class HttpImpl;
 
-class HttpServer: public NonCopyable
+class HttpServer: public noncopyable
 {
     public:
 
@@ -14,6 +14,11 @@ class HttpServer: public NonCopyable
 
         void StartServer();
         void StopServer();
+
+        void SendData(int connid, const char* data, int sz, bool copy = true);
+        void CloseConnection(int connid);
+
+        HttpImpl* GetImpl() {  return impl_; }
 
     private:
 

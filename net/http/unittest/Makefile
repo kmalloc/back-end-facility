@@ -20,7 +20,7 @@ GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest
 GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 GTEST_HEADERS += -I$(GTEST_DIR)/include
 
-SOURCE=$(CUR_DIR)/testHttpContext.cc ../HttpContext.cc ../HttpBuffer.cc ../HttpConnection.cc
+SOURCE=$(CUR_DIR)/testHttpContext.cc ../HttpContext.cc ../HttpBuffer.cc ../HttpConnection.cc ../HttpServer.cc
 OBJECTS=$(SOURCE:.cc=.o)
 
 # House-keeping build targets.

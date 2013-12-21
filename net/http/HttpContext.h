@@ -7,7 +7,7 @@
 #include "misc/NonCopyable.h"
 #include "misc/LockFreeBuffer.h"
 
-#include "net/SocketServer.h"
+#include "net/http/HttpServer.h"
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpConnection.h"
 #include "net/http/HttpRequest.h"
@@ -18,7 +18,7 @@ class HttpContext: public noncopyable
 {
     public:
 
-        HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
+        HttpContext(HttpServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
         void ResetContext(int connid);
@@ -26,15 +26,15 @@ class HttpContext: public noncopyable
 
         void AppendData(const char* data, size_t sz);
 
-        void RunParser();
-
-        void CleanUp();
+        void ProcessHttpRequest();
 
         const HttpRequest& GetRequest() const { return request_; }
 
-    private:
+        bool IsKeepAlive() const { return keepalive_; }
 
-        enum
+        void HandleSendDone();
+
+        enum ParseStage
         {
             HS_REQUEST_LINE,
             HS_HEADER,
@@ -42,6 +42,12 @@ class HttpContext: public noncopyable
             HS_RESPONSE,
             HS_INVALID
         };
+
+        ParseStage ParsingStage() const { return curStage_; }
+
+    private:
+
+        void CleanData();
 
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
         bool ShouldParseHeader() const { return curStage_ == HS_HEADER; }
@@ -58,12 +64,14 @@ class HttpContext: public noncopyable
         bool ParseBody();
         void DoResponse();
 
+        void CleanUp();
+
     private:
 
         void ForceCloseConnection();
 
         bool keepalive_;
-        int curStage_;
+        ParseStage curStage_;
 
         HttpRequest request_;
         HttpResponse response_;
