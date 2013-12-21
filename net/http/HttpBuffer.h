@@ -23,6 +23,7 @@ class HttpBuffer: public noncopyable
         void ReleaseBuffer();
 
         static const char CTRL[];
+        static const char HEADER_DELIM[];
 
     private:
 

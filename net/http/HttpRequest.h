@@ -93,7 +93,7 @@ class HttpRequest
             return version_ != HV_INVALID;
         }
 
-        const char* GetVersion()
+        const char* GetVersionName() const
         {
             if (version_ == HV_10) return "HTTP/1.0";
             else if (version_ == HV_11) return "HTTP/1.1";
@@ -101,14 +101,29 @@ class HttpRequest
             return "UNKNOWN";
         }
 
+        HttpVersion GetVersion() const
+        {
+            return version_;
+        }
+
         void SetUrl(const std::string& url)
         {
             reqUrl_ = url;
         }
 
-        void SetPostData(const std::string& data)
+        const std::string& GetUrl() const
         {
-            postData_ = data;
+            return reqUrl_;
+        }
+
+        void SetUrlData(const std::string& data)
+        {
+            urlData_ = data;
+        }
+
+        const std::string& GetUrlData() const
+        {
+            return urlData_;
         }
 
         void SetBodySize(size_t sz)
@@ -128,6 +143,11 @@ class HttpRequest
             return bodyLen_;
         }
 
+        const std::string& GetHttpBody() const
+        {
+            return httpBody_;
+        }
+
         void AppendBody(const char* data)
         {
             httpBody_.append(data);
@@ -141,7 +161,7 @@ class HttpRequest
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
         const std::map<std::string, std::string>& GetHeader() const { return httpHeader_; }
 
-        std::string GetHeaderValue(const std::string& key) const
+        const std::string& GetHeaderValue(const std::string& key) const
         {
             std::map<std::string, std::string>::const_iterator it = httpHeader_.find(key);
             if (it == httpHeader_.end()) return "";
@@ -153,6 +173,7 @@ class HttpRequest
         {
             httpBody_ = "";
             httpHeader_.clear();
+            bodyLen_ = 0;
         }
 
     private:
@@ -162,7 +183,7 @@ class HttpRequest
         HttpVersion version_;
 
         std::string reqUrl_;
-        std::string postData_; // data after url in POST request
+        std::string urlData_; // data after url in POST request
         std::string httpBody_;
         std::map<std::string, std::string> httpHeader_;
 };

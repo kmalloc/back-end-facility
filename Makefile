@@ -1,4 +1,3 @@
-
 # Where to find user code.
 SRC_DIR = .
 THREAD_DIR = ./thread

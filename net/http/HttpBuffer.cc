@@ -4,6 +4,7 @@
 #include <assert.h>
 
 const char HttpBuffer::CTRL[] = "\r\n";
+const char HttpBuffer::HEADER_DELIM[] = ": ";
 
 HttpBuffer::HttpBuffer(LockFreeBuffer& alloc)
     : buff_(NULL), size_(alloc.Granularity())

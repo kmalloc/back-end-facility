@@ -28,13 +28,11 @@ class HttpContext: public noncopyable
 
         void RunParser();
 
-        void CleanUp();
-
         const HttpRequest& GetRequest() const { return request_; }
 
-    private:
+        bool IsKeepAlive() const { return keepalive_; }
 
-        enum
+        enum ParseStage
         {
             HS_REQUEST_LINE,
             HS_HEADER,
@@ -42,6 +40,10 @@ class HttpContext: public noncopyable
             HS_RESPONSE,
             HS_INVALID
         };
+
+        ParseStage ParsingStage() const { return curStage_; }
+
+    private:
 
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
         bool ShouldParseHeader() const { return curStage_ == HS_HEADER; }
@@ -58,12 +60,14 @@ class HttpContext: public noncopyable
         bool ParseBody();
         void DoResponse();
 
+        void CleanUp();
+
     private:
 
         void ForceCloseConnection();
 
         bool keepalive_;
-        int curStage_;
+        ParseStage curStage_;
 
         HttpRequest request_;
         HttpResponse response_;

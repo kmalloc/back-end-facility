@@ -38,7 +38,7 @@ void HttpContext::AppendData(const char* data, size_t sz)
 
     if (size < sz)
     {
-        slog(LOG_WARN, "http request, data lost");
+        slog(LOG_WARN, "http context append data failed, perhaps buffer is full for the connectioin:%d", conn_.GetConnectionId());
     }
 }
 
@@ -67,6 +67,8 @@ void HttpContext::DoResponse()
     {
         ForceCloseConnection();
     }
+
+    FinishResponse();
 }
 
 void HttpContext::RunParser()
@@ -134,7 +136,7 @@ bool HttpContext::ParseRequestLine()
             request_.SetUrl(url);
 
             std::string data(question_mark + 1, delim);
-            request_.SetPostData(data);
+            request_.SetUrlData(data);
         }
         else
         {
@@ -177,16 +179,27 @@ bool HttpContext::ParseHeader()
     const char* start = buffer_.GetStart();
     const char* end   = buffer_.GetEnd();
 
-    const char* ctrl= HttpBuffer::CTRL;
-    const size_t ctrl_len = strlen(ctrl);
-    const char* end_of_ctrl = ctrl + ctrl_len;
+    if (start == end)
+    {
+        // no header
+        FinishParsingHeader();
+        return true;
+    }
+
+    static const char* ctrl= HttpBuffer::CTRL;
+    static const size_t ctrl_len = strlen(ctrl);
+    static const char* end_of_ctrl = ctrl + ctrl_len;
+
+    static const char* header_delim = HttpBuffer::HEADER_DELIM;
+    static const size_t header_delim_len = strlen(header_delim);
+    static const char* end_of_header_delim = header_delim + header_delim_len;
 
     while (1)
     {
         const char* line_end = std::search(start, end, ctrl, end_of_ctrl);
         if (line_end == end) return true;
 
-        const char* colon = std::find(start, line_end, ':');
+        const char* colon = std::search(start, line_end, header_delim, end_of_header_delim);
         if (colon == line_end)
         {
             // end of headers.
@@ -195,7 +208,7 @@ bool HttpContext::ParseHeader()
         }
 
         std::string key(start, colon);
-        std::string value(colon + 1, line_end);
+        std::string value(colon + 2, line_end);
 
         request_.AddHeader(key.c_str(), value.c_str());
 
@@ -213,7 +226,21 @@ bool HttpContext::ParseHeader()
 
 bool HttpContext::ParseBody()
 {
-   if (request_.GetHttpMethod() != HttpRequest::HM_POST) return false;
+   const char* start = buffer_.GetStart();
+   const char* end   = buffer_.GetEnd();
+
+   if (request_.GetHttpMethod() != HttpRequest::HM_POST)
+   {
+       buffer_.Consume(end - start);
+       FinishParsingBody();
+       return true;
+   }
+
+   if (start == end)
+   {
+       FinishParsingBody();
+       return true;
+   }
 
    size_t contentLen = request_.GetBodyLength();
    if (contentLen == 0)
@@ -233,9 +260,6 @@ bool HttpContext::ParseBody()
    if (len_of_data_received >= contentLen) return true;
 
    size_t left = contentLen - len_of_data_received;
-
-   const char* start = buffer_.GetStart();
-   const char* end   = buffer_.GetEnd();
 
    if (size_t(end - start) > left) return false;
    else if (size_t(end - start) == left) FinishParsingBody();
