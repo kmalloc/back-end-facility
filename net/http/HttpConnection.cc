@@ -1,8 +1,8 @@
 #include "HttpConnection.h"
 
 
-HttpConnection::HttpConnection(SocketServer& server, int id)
-    :sockServer_(server), connId_(id)
+HttpConnection::HttpConnection(SocketServer& server)
+    : connId_(-1), sockServer_(server)
 {
 }
 
@@ -20,9 +20,8 @@ void HttpConnection::CloseConnection()
     connId_ = -1;
 }
 
-void HttpConnection::ResetConnection(SocketServer& server, int id)
+void HttpConnection::ResetConnection(int id)
 {
-    sockServer_ = server;
     connId_ = id;
 }
 

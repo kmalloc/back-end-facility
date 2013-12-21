@@ -7,20 +7,21 @@
 #include "misc/NonCopyable.h"
 #include "misc/LockFreeBuffer.h"
 
+#include "net/SocketServer.h"
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpConnection.h"
 #include "net/http/HttpRequest.h"
 #include "net/http/HttpResponse.h"
 #include "net/http/HttpCallBack.h"
 
-class HttpContext: public NonCopyable
+class HttpContext: public noncopyable
 {
     public:
 
-        HttpContext(LockFreeBuffer& alloc, HttpCallBack cb);
+        HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
-        void ResetContext(SocketServer& server, int connid, bool keepalive = false);
+        void ResetContext(int connid);
         void ReleaseContext();
 
         void AppendData(const char* data, size_t sz);
@@ -52,12 +53,14 @@ class HttpContext: public NonCopyable
         void FinishParsingBody() { curStage_ = HS_RESPONSE; }
         void FinishResponse() { curStage_ = HS_INVALID; }
 
-        void ParseRequestLine();
-        void ParseHeader();
-        void ParseBody();
+        bool ParseRequestLine();
+        bool ParseHeader();
+        bool ParseBody();
         void DoResponse();
 
     private:
+
+        void ForceCloseConnection();
 
         bool keepalive_;
         int curStage_;
@@ -67,6 +70,7 @@ class HttpContext: public NonCopyable
         HttpBuffer buffer_;
         HttpConnection conn_;
 
+        // call cgi program
         const HttpCallBack callBack_;
 };
 

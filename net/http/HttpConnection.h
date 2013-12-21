@@ -1,16 +1,18 @@
 #ifndef __HTTP_CONNECTION_H__
 #define __HTTP_CONNECTION_H__
 
+#include <stdlib.h>
+#include <assert.h>
 #include "net/SocketServer.h"
 #include "misc/NonCopyable.h"
 
-class HttpConnection: public NonCopyable
+class HttpConnection: public noncopyable 
 {
     public:
 
-        HttpConnection(SocketServer& server, int connid);
+        HttpConnection(SocketServer& server);
 
-        void ResetConnection(SocketServer& server, int connid);
+        void ResetConnection(int connid);
 
         void SendData(const char* data, size_t sz, bool copy = true);
         void CloseConnection();

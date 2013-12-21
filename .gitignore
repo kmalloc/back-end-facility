@@ -15,4 +15,8 @@ benchmark/lockfreebenchmark
 */*.s
 slog*.log
 net/server
+*/unittest/unittest
+*/*/unittest/unittest
+*/*.log
+*/*/*.log
 tags
