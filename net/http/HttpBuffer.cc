@@ -3,12 +3,12 @@
 #include <string.h>
 #include <assert.h>
 
-const char* HttpBuffer::CTRL[] = "\r\n";
+const char HttpBuffer::CTRL[] = "\r\n";
 
 HttpBuffer::HttpBuffer(LockFreeBuffer& alloc)
     : buff_(NULL), size_(alloc.Granularity())
     , start_(0), end_(0)
-    , cur_(0), bufferAlloc_(all)
+    , cur_(0), bufferAlloc_(alloc)
 {
 }
 
@@ -71,7 +71,7 @@ const char* HttpBuffer::GetEnd() const
     return buff_ + end_;
 }
 
-void HttpBuffer::Append(const char* data, size_t sz)
+size_t HttpBuffer::Append(const char* data, size_t sz)
 {
     assert(buff_);
 

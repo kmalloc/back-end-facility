@@ -2,7 +2,10 @@
 #define __HTTP_RESPONSE_H__
 
 #include <map>
+#include <string>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 class HttpResponse
 {
@@ -22,10 +25,10 @@ class HttpResponse
 
     public:
 
-        HttpResponse() {}
-
         void SetCloseConn(bool close) { closeConn_ = close; }
         void SetStatusCode(HttpStatusCode code) { statusCode_ = code; }
+
+        bool ShouldCloseConnection() const { return closeConn_; }
 
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
 
@@ -56,20 +59,20 @@ class HttpResponse
                 for (std::map<std::string, std::string>::const_iterator it = httpHeader_.begin();
                         it != httpHeader_.end(); ++it)
                 {
-                    tmp = strlen(it->first);
-                    if (sz + tmp + 1 >= size) return;
+                    tmp = it->first.size();
+                    if (sz + tmp + 1 >= size) return false;
 
-                    memcpy(buffer + sz, it->first, tmp + 1);
+                    memcpy(buffer + sz, it->first.c_str(), tmp + 1);
                     sz += tmp;
 
-                    if (sz + 3 > size) return;
+                    if (sz + 3 > size) return false;
 
                     memcpy(buffer + sz, ": ", 3);
 
-                    tmp = strlen(it->second);
-                    if (sz + tmp + 1 >= size) return;
+                    tmp = it->second.size();
+                    if (sz + tmp + 1 >= size) return false;
 
-                    memcpy(buffer + sz, it->second, tmp + 1);
+                    memcpy(buffer + sz, it->second.c_str(), tmp + 1);
                 }
             }
 
@@ -98,7 +101,7 @@ class HttpResponse
         std::string statusMsg_;
         std::string httpBody_;
         std::map<std::string, std::string> httpHeader_;
-}
+};
 
 #endif
 

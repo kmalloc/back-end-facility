@@ -1,11 +1,13 @@
 #include "HttpContext.h"
 #include "sys/Log.h"
 
+#include <stdlib.h>
 #include <string>
+#include <algorithm>
 
-HttpContext::HttpContext(LockFreeBuffer& alloc, HttpCallBack cb)
+HttpContext::HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
     : keepalive_(false), curStage_(HS_INVALID)
-    , buffer_(alloc), callBack_(cb)
+    , buffer_(alloc), conn_(server), callBack_(cb)
 {
 }
 
@@ -14,13 +16,12 @@ HttpContext::~HttpContext()
     ReleaseContext();
 }
 
-void HttpContext::ResetContext(SocketServer& server, int connid, bool keepalive)
+void HttpContext::ResetContext(int connid)
 {
-    keepalive_ = keepalive;
     curStage_ = HS_REQUEST_LINE;
 
     buffer_.ResetBuffer();
-    conn_.ResetConnection(server, connid);
+    conn_.ResetConnection(connid);
 }
 
 void HttpContext::ReleaseContext()
@@ -33,7 +34,7 @@ void HttpContext::ReleaseContext()
 
 void HttpContext::AppendData(const char* data, size_t sz)
 {
-    size_t size = buffer_.AppendData(data, sz);
+    size_t size = buffer_.Append(data, sz);
 
     if (size < sz)
     {
@@ -53,12 +54,18 @@ void HttpContext::CleanUp()
     }
 }
 
+void HttpContext::ForceCloseConnection()
+{
+    conn_.CloseConnection();
+    ReleaseContext();
+}
+
 void HttpContext::DoResponse()
 {
-    std::string result = callBack_(httpReqLine_);
-    if (!result.empty())
+    callBack_(request_, response_);
+    if (response_.ShouldCloseConnection())
     {
-        conn_.SendData(result.c_str(), result.size() + 1);
+        ForceCloseConnection();
     }
 }
 
@@ -68,7 +75,8 @@ void HttpContext::RunParser()
     {
         if (!ParseRequestLine())
         {
-            // TODO, close the connection, bad format
+            ForceCloseConnection();
+            return;
         }
     }
 
@@ -76,7 +84,8 @@ void HttpContext::RunParser()
     {
         if (!ParseHeader())
         {
-            // TODO, close the connection, bad format
+            ForceCloseConnection();
+            return;
         }
     }
 
@@ -84,7 +93,8 @@ void HttpContext::RunParser()
     {
         if (!ParseBody())
         {
-            // TODO bad data.
+            ForceCloseConnection();
+            return;
         }
     }
 
@@ -151,7 +161,7 @@ bool HttpContext::ParseRequestLine()
 
         std::string version(start, end_of_req);
 
-        if (!buffer_.SetVersion(version)) return false;
+        if (!request_.SetVersion(version)) return false;
 
         buffer_.Consume(sizeof(http_version) - 1 + ctrl_len);
 
@@ -193,7 +203,47 @@ bool HttpContext::ParseHeader()
         start = buffer_.GetStart();
     }
 
+    std::string connection = request_.GetHeaderValue("Connection");
+
+    keepalive_ = (connection == "Keep-Alive");
     FinishParsingHeader();
     return true;
+}
+
+
+bool HttpContext::ParseBody()
+{
+   if (request_.GetHttpMethod() != HttpRequest::HM_POST) return false;
+
+   size_t contentLen = request_.GetBodyLength();
+   if (contentLen == 0)
+   {
+       std::string len = request_.GetHeaderValue("Content-Length");
+       if (len.empty()) return false;
+
+       contentLen = atoi(len.c_str());
+
+       if (contentLen == 0) return true;
+       else if (contentLen >= HttpRequest::MaxBodyLength) return false;
+
+       request_.SetBodySize(contentLen);
+   }
+
+   size_t len_of_data_received = request_.GetCurBodyLength();
+   if (len_of_data_received >= contentLen) return true;
+
+   size_t left = contentLen - len_of_data_received;
+
+   const char* start = buffer_.GetStart();
+   const char* end   = buffer_.GetEnd();
+
+   if (size_t(end - start) > left) return false;
+   else if (size_t(end - start) == left) FinishParsingBody();
+
+   request_.AppendBody(start, end);
+
+   buffer_.Consume(end - start);
+
+   return true;
 }
 

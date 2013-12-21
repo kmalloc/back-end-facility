@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <stdlib.h>
 
 class HttpRequest
 {
@@ -25,40 +26,37 @@ class HttpRequest
             HV_INVALID
         };
 
+        static const size_t MaxBodyLength = 4096; // 4mb
+
     public:
 
-        HttpRequest();
+        HttpRequest()
+            : bodyLen_(0)
+            , method_(HM_INVALID)
+            , version_(HV_INVALID)
+        {
+        }
 
-        bool SetHttpMethod(const std::string& method) const
+        bool SetHttpMethod(const std::string& method)
         {
             method_ = HM_INVALID;
-            switch(method)
-            {
-                case "GET":
-                    method_ = HM_GET;
-                    break;
-                case "POST":
-                    method_ = HM_POST;
-                    break;
-                case "HEAD":
-                    method_ = HM_HEAD;
-                    break;
-                case "PUT":
-                    method_ = HM_PUT;
-                    break;
-                case "DELETE":
-                    method_ = HM_DELETE;
-                    break;
-                default:
-                    break;
-            }
+            if (method == "GET")
+                method_ = HM_GET;
+            else if (method == "POST")
+                method_ = HM_POST;
+            else if (method ==  "HEAD")
+                method_ = HM_HEAD;
+            else if (method == "PUT")
+                method_ = HM_PUT;
+            else if (method == "DELETE")
+                method_ = HM_DELETE;
 
             return method_ != HM_INVALID;
         }
 
-        const char* GetHttpMethod() const
+        std::string GetHttpMethodName() const
         {
-            const char* result = "UNKNOWN";
+            std::string result = "UNKNOWN";
             switch(method_)
             {
                 case HM_GET:
@@ -79,8 +77,11 @@ class HttpRequest
                 default:
                     break;
             }
+
             return result;
         }
+
+        HttpMethod GetHttpMethod() const { return method_; }
 
         bool SetVersion(const std::string& version)
         {
@@ -110,8 +111,43 @@ class HttpRequest
             postData_ = data;
         }
 
+        void SetBodySize(size_t sz)
+        {
+            bodyLen_ = sz;
+            httpBody_.reserve(sz);
+        }
+
+        // length of data received.
+        size_t GetCurBodyLength() const
+        {
+            return httpBody_.size();
+        }
+
+        size_t GetBodyLength() const
+        {
+            return bodyLen_;
+        }
+
+        void AppendBody(const char* data)
+        {
+            httpBody_.append(data);
+        }
+
+        void AppendBody(const char* start, const char* end)
+        {
+            httpBody_.append(start, end);
+        }
+
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
         const std::map<std::string, std::string>& GetHeader() const { return httpHeader_; }
+
+        std::string GetHeaderValue(const std::string& key) const
+        {
+            std::map<std::string, std::string>::const_iterator it = httpHeader_.find(key);
+            if (it == httpHeader_.end()) return "";
+
+            return it->second;
+        }
 
         void CleanUp()
         {
@@ -121,6 +157,7 @@ class HttpRequest
 
     private:
 
+        size_t bodyLen_;
         HttpMethod method_;
         HttpVersion version_;
 
@@ -128,7 +165,7 @@ class HttpRequest
         std::string postData_; // data after url in POST request
         std::string httpBody_;
         std::map<std::string, std::string> httpHeader_;
-}
+};
 
 #endif
 

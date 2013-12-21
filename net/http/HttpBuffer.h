@@ -5,15 +5,15 @@
 #include "misc/NonCopyable.h"
 #include "misc/LockFreeBuffer.h"
 
-class HttpBuffer:public NonCopyable
+class HttpBuffer: public noncopyable 
 {
     public:
 
-        HttpBuffer(bufferAlloc_& alloc);
+        HttpBuffer(LockFreeBuffer& alloc);
         ~HttpBuffer();
 
-        void  Consume(int sz);
-        void  Append(const char* data, size_t sz);
+        void    Consume(size_t sz);
+        size_t  Append(const char* data, size_t sz);
 
         const char* Get(size_t offset = 0) const;
         const char* GetStart() const;
