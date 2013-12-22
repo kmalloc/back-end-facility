@@ -158,6 +158,8 @@ class ServerImpl: public ThreadBase
         // add socket fd to epoll for watching.
         int WatchRawSocket(int fd, uintptr_t opaque);
 
+        void SetWatchAcceptedSock(bool watch) { watchAccepted_ = watch; }
+
         int SendData(int sock_id, const void* buffer, int sz);
 
         void CloseConnection(int sock_id, uintptr_t opaque);
@@ -239,6 +241,8 @@ class ServerImpl: public ThreadBase
         const int maxSocket_;
 
         bool isRunning_;
+
+        bool watchAccepted_;
 
         SocketEntity sockets_[MAX_SOCKET];
         PollEvent pollEvent_[MAX_SOCKET];
@@ -323,6 +327,7 @@ ServerImpl::ServerImpl(SocketEventHandler handler)
     ,allocId_(0)
     ,maxSocket_(MAX_SOCKET)
     ,isRunning_(false)
+    ,watchAccepted_(false)
     ,poll_()
     ,handler_(handler)
 {
@@ -999,7 +1004,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     }
 
     SocketPoll::SetSocketNonBlocking(client_fd);
-    SocketEntity* new_sock = SetupSocketEntity(id, client_fd, sock->opaque, false);
+    SocketEntity* new_sock = SetupSocketEntity(id, client_fd, sock->opaque, watchAccepted_);
 
     if (new_sock == NULL)
     {
@@ -1236,15 +1241,13 @@ void ServerImpl::StopServer()
 
 void ServerImpl::Run()
 {
-    SocketCode ret;
-
     while (1)
     {
-        SocketMessage res;
+        SocketEvent event;
 
-        ret = Poll(&res);
+        event.code = Poll(&event.msg);
 
-        handler_(ret, res);
+        handler_(event);
     }
 }
 
@@ -1326,10 +1329,10 @@ int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
     return impl_->WatchRawSocket(fd, opaque);
 }
 
-void SocketServer::DefaultSockEventHandler(SocketCode code, SocketMessage msg)
+void SocketServer::DefaultSockEventHandler(SocketEvent event)
 {
-    if (code == SC_DATA)
-        free(msg.data);
+    if (event.msg.code == SC_DATA)
+        free(event.msg.data);
 }
 
 const int SocketServer::max_conn_id = MAX_SOCKET;

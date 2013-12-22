@@ -161,7 +161,7 @@ class HttpRequest
         void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
         const std::map<std::string, std::string>& GetHeader() const { return httpHeader_; }
 
-        const std::string& GetHeaderValue(const std::string& key) const
+        std::string GetHeaderValue(const std::string& key) const
         {
             std::map<std::string, std::string>::const_iterator it = httpHeader_.find(key);
             if (it == httpHeader_.end()) return "";
