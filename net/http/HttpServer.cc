@@ -292,12 +292,19 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                     return;
                 }
 
-                int id = (evt.code == SC_ACCEPT)? evt.msg.ud : evt.msg.id;
+                int id = evt.msg.id;
+                if (evt.code == SC_ACCEPT)
+                {
+                    id = evt.msg.ud;
+                    evt.msg.id = id;
+                    impl->conn_[id]->ResetTask(id);
+                }
 
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
 
-                if (!impl->conn_[id]->PostSockMsg(conn_msg))
+                if (!impl->conn_[id]->PostSockMsg(conn_msg)
+                        || !impl->threadPool_.PostTask(impl->conn_[id]))
                 {
                     SocketServer::DefaultSockEventHandler(evt);
                     slog(LOG_ERROR, "connection(%d) msg queue full, drop package", id);
@@ -321,8 +328,8 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
 
 ///////////////////// HTTP SERVER /////////////////////////////
 
-HttpServer::HttpServer(const char* addr)
-    :impl_(new HttpImpl(this, addr))
+HttpServer::HttpServer(const char* addr, int port)
+    :impl_(new HttpImpl(this, addr, port))
 {
 }
 
@@ -330,7 +337,6 @@ HttpServer::~HttpServer()
 {
     delete impl_;
 }
-
 
 void HttpServer::SendData(int connid, const char* data, int sz, bool copy)
 {

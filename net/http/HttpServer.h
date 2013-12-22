@@ -9,7 +9,7 @@ class HttpServer: public noncopyable
 {
     public:
 
-        HttpServer(const char* addr);
+        HttpServer(const char* addr, int port = 80);
         ~HttpServer();
 
         void StartServer();
@@ -18,7 +18,7 @@ class HttpServer: public noncopyable
         void SendData(int connid, const char* data, int sz, bool copy = true);
         void CloseConnection(int connid);
 
-        HttpImpl* GetImpl() {  return impl_; }
+        HttpImpl* GetImpl() const {  return impl_; }
 
     private:
 

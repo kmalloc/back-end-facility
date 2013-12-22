@@ -1,8 +1,8 @@
 CC=g++
 CFLAGS=-c -Wall -g
-SOURCES=main.cc
+SOURCES=main.cc HttpBuffer.cc HttpConnection.cc HttpContext.cc HttpServer.cc
 
-ROOT=../../..
+ROOT=../../
 LIBS_PATH=-L$(ROOT)/lib
 LIBS=-lxnet -lxthread -lsysutil -lmisc -lpthread -lrt
 
