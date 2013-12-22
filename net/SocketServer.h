@@ -12,7 +12,7 @@
 struct SocketMessage
 {
     int   id; // socket id associated with the event.
-    int   opaque;
+    uintptr_t   opaque;
 
     // for send/halfsend buffer event, ud == buffer size that is sended.
     // for read complete event, ud == size of read buffer.
@@ -64,22 +64,22 @@ class SocketServer: public noncopyable
         // start server
         // a) start polling thread.
         // b) setup socket pool.
-        int StartServer(const char* ip, int port, uintptr_t opaque = -1);
+        int StartServer(const char* ip, int port, uintptr_t opaque = 0);
 
         // stop server.
         // a) stop the polling thread.
         // b) sockets are not close.
-        void StopServer();
+        void StopServer(uintptr_t opaque = 0);
 
-        int ListenTo(const char* ip, int port, uintptr_t opaque = -1);
+        int ListenTo(const char* ip, int port, uintptr_t opaque = 0);
 
         // connect to a remote host
         // return value is the connected socket id on success.
         // return -1 on error.
-        int Connect(const char* ip, int port, uintptr_t opaque = -1);
+        int Connect(const char* ip, int port, uintptr_t opaque = 0);
 
         // close the connected socket identified by id.
-        void CloseSocket(int id, uintptr_t opaque = -1);
+        void CloseSocket(int id, uintptr_t opaque = 0);
 
         // send buffer to socket identified by id.
         // param 'copy', control whether we should copy the buff.

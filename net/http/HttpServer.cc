@@ -2,6 +2,7 @@
 
 #include "net/SocketServer.h"
 
+#include "sys/Log.h"
 #include "thread/ITask.h"
 #include "thread/Thread.h"
 #include "thread/ThreadPool.h"
@@ -78,9 +79,7 @@ class HttpImpl:public noncopyable
         void SendData(int connid, const char* data, int sz, bool copy = true);
         void CloseConnection(int connid);
 
-    protected:
-
-        void SocketEventHandler(SocketEvent evt);
+        static void SocketEventHandler(SocketEvent evt);
 
     private:
 
@@ -234,8 +233,8 @@ void HttpImpl::StartServer()
     assert(threadPool_.StartPooling());
 
     tcpServer_.SetWatchAcceptedSock(true);
-    tcpServer_.RegisterSocketEventHandler(std::bind1st(std::mem_fun1(&HttpImpl::SocketEventHandler), this));
-    tcpServer_.StartServer(addr_.c_str(), port_);
+    tcpServer_.RegisterSocketEventHandler(&HttpImpl::SocketEventHandler);
+    tcpServer_.StartServer(addr_.c_str(), port_, (uintptr_t)this);
 }
 
 void HttpImpl::StopServer()
@@ -248,7 +247,7 @@ void HttpImpl::StopServer()
 void HttpImpl::CloseConnection(int connid)
 {
     conn_[connid]->ClearMsgQueue();
-    tcpServer_.CloseSocket(connid);
+    tcpServer_.CloseSocket(connid, (uintptr_t)this);
 }
 
 void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
@@ -265,38 +264,42 @@ void HttpImpl::ReleaseSockMsg(ConnMessage* msg)
 
 void HttpImpl::SocketEventHandler(SocketEvent evt)
 {
+    HttpImpl* impl = (HttpImpl*)evt.msg.opaque;
+
+    assert(impl);
+
     switch (evt.code)
     {
         case SC_EXIT:
             {
-                threadPool_.StopPooling();
+                impl->threadPool_.StopPooling();
             }
             break;
         case SC_CLOSE:
             {
-                conn_[evt.msg.id].ReleaseTask();
+                impl->conn_[evt.msg.id]->ReleaseTask();
             }
             break;
         case SC_ACCEPT:
         case SC_SEND:
         case SC_DATA:
             {
-                ConnMessage* conn_msg = (ConnMessage*)msgPool_.AllocBuffer();
+                ConnMessage* conn_msg = (ConnMessage*)impl->msgPool_.AllocBuffer();
                 if (conn_msg == NULL)
                 {
-                    SocketMessage::DefaultHttpRequestHandler(evt);
+                    SocketServer::DefaultSockEventHandler(evt);
                     slog(LOG_ERROR, "httpserver error, out of msg buffer, dropping package");
                     return;
                 }
 
-                int id = (evt.code == SC_ACCEPT)? evt.msg.ud : evt.msg->id;
+                int id = (evt.code == SC_ACCEPT)? evt.msg.ud : evt.msg.id;
 
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
 
-                if (!conn_[id].PostSockMsg(conn_msg))
+                if (!impl->conn_[id]->PostSockMsg(conn_msg))
                 {
-                    SocketMessage::DefaultSockEventHandler(evt);
+                    SocketServer::DefaultSockEventHandler(evt);
                     slog(LOG_ERROR, "connection(%d) msg queue full, drop package", id);
                     return;
                 }
@@ -305,7 +308,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
         case SC_ERROR:
         case SC_BADSOCK:
             {
-                slog(LOG_ERROR, "socket error, connect id(%d)\n", evt.msg->id);
+                slog(LOG_ERROR, "socket error, connect id(%d)\n", evt.msg.id);
             }
             break;
         default:

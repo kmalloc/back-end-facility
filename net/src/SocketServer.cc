@@ -85,6 +85,11 @@ struct RequestClose
     uintptr_t opaque;
 };
 
+struct RequestExit
+{
+    uintptr_t opaque;
+};
+
 struct RequestListen
 {
     int id;
@@ -120,6 +125,7 @@ struct RequestPackage
         struct RequestConnect connect;
         struct RequestSend send;
         struct RequestClose close;
+        struct RequestExit exit;
         struct RequestListen listen;
         struct RequestEpoll epoll;
         struct RequestBind bind;
@@ -166,7 +172,7 @@ class ServerImpl: public ThreadBase
 
         void StartServer();
 
-        void StopServer();
+        void StopServer(uintptr_t opaque);
 
         int ReserveSocketSlot();
 
@@ -506,6 +512,7 @@ SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res)
 {
     SocketBuffer* buf = NULL;
     res->id = sock->id;
+    res->opaque = sock->opaque;
 
     int sz_send = 0;
     while ((buf = sock->head))
@@ -560,8 +567,10 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
 
     int id  = req->id;
 
-    res->id = id;
     SocketEntity* sock = &sockets_[id % MAX_SOCKET];
+
+    res->id = id;
+    res->opaque = sock->opaque;
 
     if (sock->type == SS_INVALID
             || sock->id != id
@@ -575,7 +584,6 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
     assert(sock->type != SS_LISTEN && sock->type != SS_PLISTEN);
 
     res->id = sock->id;
-    res->opaque = sock->opaque;
 
     if (sock->head)
     {
@@ -731,6 +739,9 @@ SocketCode ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
 
     struct addrinfo* ai_ptr = NULL;
 
+    res->id = id;
+    res->opaque = req->opaque;
+
     sprintf(port, "%d", req->port);
     ai_ptr = AllocSocketFd(&TryListenTo, req->host, port, &listen_fd, &status, req);
 
@@ -754,8 +765,6 @@ SocketCode ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
         ret = SC_SUCC;
     }
 
-    res->opaque = req->opaque;
-    res->id = id;
     res->ud = 0;
     res->data = NULL;
 
@@ -778,6 +787,7 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
     res->id = id;
     res->opaque = req->opaque;
     SocketEntity* sock = &sockets_[id%MAX_SOCKET];
+
     if (sock->type == SS_INVALID || sock->id != id)
     {
         res->ud = 0;
@@ -826,6 +836,7 @@ SocketCode ServerImpl::BindRawSocket(void* buffer, SocketMessage* res)
     }
 
     SocketPoll::SetSocketNonBlocking(req->fd);
+    sock->opaque = req->opaque;
     sock->type = SS_BIND;
     res->data = "binding";
     return SC_CONNECTED;
@@ -869,11 +880,13 @@ SocketCode ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
     return SC_SUCC;
 }
 
-SocketCode ServerImpl::ShutdownServer(void*, SocketMessage* result)
+SocketCode ServerImpl::ShutdownServer(void* buffer, SocketMessage* result)
 {
+    RequestExit* req = (RequestExit*) buffer;
+
     ShutDownAllSockets();
 
-    result->opaque = 0;
+    result->opaque = req.opaque;
     result->id = 0;
     result->ud = 0;
     result->data = NULL;
@@ -956,6 +969,10 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
     int error;
     socklen_t len = sizeof(error);
     int code = getsockopt(sock->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+
+    result->id = sock->id;
+    result->opaque = sock->opaque;
+
     if (code < 0 || error)
     {
         ForceSocketClose(sock, result);
@@ -964,8 +981,6 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
     else
     {
         sock->type = SS_CONNECTED;
-        result->opaque = sock->opaque;
-        result->id = sock->id;
         result->ud = 0;
         poll_.ModifySocket(sock->fd, sock, false);
 
@@ -993,6 +1008,10 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
 {
     union SockAddrAll ua;
     socklen_t len = sizeof(ua);
+
+    result->id = sock->id;
+    result->opaque = sock->opaque;
+
     int client_fd = accept(sock->fd, &ua.s, &len);
     if (client_fd < 0) return SC_ERROR;
 
@@ -1231,12 +1250,13 @@ void ServerImpl::StartServer()
     ThreadBase::Start();
 }
 
-void ServerImpl::StopServer()
+void ServerImpl::StopServer(uintptr_t opaque)
 {
     if (!isRunning_) return;
 
     RequestPackage req;
-    SendInternalCmd(&req, ACTION_STOP_SERVER, 0);
+    req.u.exit.opaque = opaque;
+    SendInternalCmd(&req, ACTION_STOP_SERVER, sizeof(req.u.exit));
 }
 
 void ServerImpl::Run()
@@ -1275,9 +1295,9 @@ int SocketServer::StartServer(const char* ip, int port, uintptr_t opaque)
     return impl_->ListenTo(ip, port, opaque);
 }
 
-void SocketServer::StopServer()
+void SocketServer::StopServer(uintptr_t opaque)
 {
-    impl_->StopServer();
+    impl_->StopServer(opaque);
 }
 
 int SocketServer::Connect(const char* ip, int port , uintptr_t opaque)
