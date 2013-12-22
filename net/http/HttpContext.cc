@@ -64,7 +64,18 @@ void HttpContext::DoResponse()
     callBack_(request_, response_);
     if (response_.ShouldCloseConnection())
     {
-        ForceCloseConnection();
+        keepalive_ = false;
+    }
+
+    if (response_.GetShouldResponse())
+    {
+        size_t sz = response_.GetResponseSize() + 8;
+        char* buf = (char*)malloc(sz);
+        if  (buf)
+        {
+             sz = response_.GenerateResponse(buf, sz);
+             conn_.SendData(buf, sz, false);
+        }
     }
 
     FinishResponse();

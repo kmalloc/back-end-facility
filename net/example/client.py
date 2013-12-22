@@ -95,10 +95,16 @@ if __name__ == '__main__':
     time.sleep(1)
 
     for i in range(0, len(sockets)):
-        buf = sockets[i].recv(1024)
-        print "recv:" + buf + "\n"
+        try:
+            buf = sockets[i].recv(1024)
+            print "recv:" + buf + "\n"
+        except:
+            pass
 
-    sockets[0].send("py test client:127.0.0.1:%d:no connect:testID(%d)\0" % (listen, id));
+    try:
+        sockets[0].send("py test client:127.0.0.1:%d:no connect:testID(%d)\0" % (listen, id));
+    except:
+        pass
 
     accept_thread.join()
 

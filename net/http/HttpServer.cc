@@ -12,6 +12,7 @@
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpContext.h"
 
+#include "stdio.h"
 #include "pthread.h"
 #include "assert.h"
 
@@ -24,8 +25,41 @@ struct ConnMessage
     SocketMessage msg;
 };
 
-static void DefaultHttpRequestHandler(const HttpRequest&, HttpResponse& response)
+static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& response)
 {
+    response.SetShouldResponse(true);
+    response.SetStatusCode(HttpResponse::HSC_200);
+    response.SetStatusMessage("from miliao http server, default generated message");
+
+    using namespace std;
+
+    const map<string, string>& headers = req.GetHeader();
+    map<string, string>::const_iterator it = headers.begin();
+
+    string body ;
+    body.reserve(128);
+
+    body = "auto generated from request header:";
+    while (it != headers.end())
+    {
+        body += it->first;
+        body += ":";
+        body += it->second;
+        body += "\n";
+
+        ++it;
+    }
+
+    body += "body from request:" + req.GetHttpBody();
+
+    response.SetBody(body.c_str());
+
+    char bodylen[32] = {0};
+    snprintf(bodylen, 32, "%d", body.size());
+
+    response.AddHeader("Content-Type", "text/html;charset=UTF-8");
+    response.AddHeader("Content-Length", bodylen);
+
     response.SetCloseConn(true);
 }
 
@@ -50,12 +84,15 @@ class HttpTask: public ITask
 
         void ClearMsgQueue();
 
+        void CloseTask();
+
     private:
 
         void ProcessHttpData(const char* data, size_t sz);
         void OnConnectionClose();
         void ProcessSocketMessage(ConnMessage* msg);
 
+        bool taskClosed_;
         HttpServer* httpServer_;
         HttpContext context_;
 
@@ -98,6 +135,7 @@ class HttpImpl:public noncopyable
 
 HttpTask::HttpTask(HttpServer* server, LockFreeBuffer& alloc)
     : ITask(false)
+    , taskClosed_(false)
     , httpServer_(server)
     , context_(*server, alloc, &DefaultHttpRequestHandler)
     , sockMsgQueue_(64)
@@ -112,6 +150,14 @@ HttpTask::~HttpTask()
 void HttpTask::ReleaseTask()
 {
     context_.ReleaseContext();
+    ClearMsgQueue();
+    taskClosed_ = true;
+    SetAffinity(-1);
+}
+
+void HttpTask::CloseTask()
+{
+    taskClosed_ = true;
     ClearMsgQueue();
 }
 
@@ -137,6 +183,7 @@ void HttpTask::ClearMsgQueue()
 void HttpTask::ResetTask(int connid)
 {
     context_.ResetContext(connid);
+    taskClosed_ = false;
 }
 
 void HttpTask::ProcessHttpData(const char* data, size_t sz)
@@ -166,6 +213,11 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
                 context_.HandleSendDone();
             }
             break;
+        case SC_CLOSE:
+            {
+                ReleaseTask();
+            }
+            break;
         default:
             {
                 // not interested in other events.
@@ -180,7 +232,8 @@ void HttpTask::Run()
     ConnMessage* msg;
     while (sockMsgQueue_.Pop((void**)&msg))
     {
-        ProcessSocketMessage(msg);
+        if (taskClosed_ == false) ProcessSocketMessage(msg);
+
         httpServer_->GetImpl()->ReleaseSockMsg(msg);
     }
 }
@@ -246,7 +299,7 @@ void HttpImpl::StopServer()
 
 void HttpImpl::CloseConnection(int connid)
 {
-    conn_[connid]->ClearMsgQueue();
+    conn_[connid]->CloseTask();
     tcpServer_.CloseSocket(connid, (uintptr_t)this);
 }
 
@@ -276,10 +329,6 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
             }
             break;
         case SC_CLOSE:
-            {
-                impl->conn_[evt.msg.id]->ReleaseTask();
-            }
-            break;
         case SC_ACCEPT:
         case SC_SEND:
         case SC_DATA:

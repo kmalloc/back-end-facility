@@ -1031,7 +1031,9 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
         return SC_ERROR;
     }
 
-    new_sock->type = SS_PACCEPT;
+    if (watchAccepted_) new_sock->type = SS_CONNECTED;
+    else new_sock->type = SS_PACCEPT;
+
     result->opaque = sock->opaque;
     result->id = sock->id;
     result->ud = id; // newly accepted socket id.
@@ -1070,7 +1072,7 @@ SocketCode ServerImpl::Poll(SocketMessage* result)
     while (1)
     {
         int ret = 0;
-        if ((ret = WaitEpollIfNecessary()) < 0) return SC_NONE;
+        if ((ret = WaitEpollIfNecessary()) < 0) continue;
 
         PollEvent* event = &pollEvent_[pollEventIndex_++];
         SocketEntity* sock = (SocketEntity*)event->data;

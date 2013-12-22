@@ -25,55 +25,70 @@ class HttpResponse
 
     public:
 
+        HttpResponse(): response_(false)
+        {
+            msgLen_ = 13 + 2; //HTTP/1.1 404\r\n
+        }
+
+        void SetShouldResponse(bool respone) { response_ = respone; }
+        bool GetShouldResponse() const { return response_; }
+
         void SetCloseConn(bool close) { closeConn_ = close; }
         void SetStatusCode(HttpStatusCode code) { statusCode_ = code; }
 
         bool ShouldCloseConnection() const { return closeConn_; }
 
-        void AddHeader(const char* key, const char* value) { httpHeader_[key] = value; }
+        void AddHeader(const char* key, const char* value)
+        {
+            msgLen_ += strlen(key);
+            msgLen_ += 2; //": "
+            msgLen_ += strlen(value);
+            msgLen_ += 2; //"\r\n"
 
-        void SetStatusMessage(const char* msg) { statusMsg_ = msg; }
+            httpHeader_[key] = value;
+        }
+
+        void SetStatusMessage(const char* msg)
+        {
+            statusMsg_ = msg;
+        }
+
         void SetBody(const char* body) { httpBody_ = body; }
 
-        bool GenerateResponse(char* buffer, size_t size) const
+        size_t GenerateResponse(char* buffer, size_t size) const
         {
-            size_t sz = snprintf(buffer, 32, "HTTP/1.1 %d", statusCode_);
-
+            size_t sz = snprintf(buffer, 32, "HTTP/1.1 %d ", statusCode_);
             size_t tmp = statusMsg_.size();
-            if (tmp + sz + 32 >= size) return false;
+
+            if (tmp + sz + 2 >= size) return false;
 
             memcpy(buffer + sz, statusMsg_.c_str(), tmp + 1);
 
             strcat(buffer, "\r\n");
-            if (closeConn_)
+
+            sz += tmp + 2;
+
+            for (std::map<std::string, std::string>::const_iterator it = httpHeader_.begin();
+                    it != httpHeader_.end(); ++it)
             {
-                const char* close_info = "Connection close\r\n";
+                tmp = it->first.size();
+                if (sz + tmp + 1 >= size) return false;
 
-                tmp = strlen(close_info);
-                memcpy(buffer + sz, close_info, tmp + 1);
-
+                memcpy(buffer + sz, it->first.c_str(), tmp + 1);
                 sz += tmp;
-            }
-            else
-            {
-                for (std::map<std::string, std::string>::const_iterator it = httpHeader_.begin();
-                        it != httpHeader_.end(); ++it)
-                {
-                    tmp = it->first.size();
-                    if (sz + tmp + 1 >= size) return false;
 
-                    memcpy(buffer + sz, it->first.c_str(), tmp + 1);
-                    sz += tmp;
+                if (sz + 3 > size) return false;
 
-                    if (sz + 3 > size) return false;
+                memcpy(buffer + sz, ": ", 3);
+                sz += 2;
 
-                    memcpy(buffer + sz, ": ", 3);
+                tmp = it->second.size();
+                if (sz + tmp + 3 >= size) return false;
 
-                    tmp = it->second.size();
-                    if (sz + tmp + 1 >= size) return false;
+                memcpy(buffer + sz, it->second.c_str(), tmp + 1);
+                memcpy(buffer + sz + tmp, "\r\n", 3);
 
-                    memcpy(buffer + sz, it->second.c_str(), tmp + 1);
-                }
+                sz += tmp + 2;
             }
 
             memcpy(buffer + sz, "\r\n", 3);
@@ -84,7 +99,9 @@ class HttpResponse
 
             memcpy(buffer + sz, httpBody_.c_str(), tmp + 1);
 
-            return true;
+            sz += tmp;
+
+            return sz;
         }
 
         void CleanUp()
@@ -94,9 +111,15 @@ class HttpResponse
             httpHeader_.clear();
         }
 
+        size_t GetResponseSize() const { return msgLen_ + statusMsg_.size() + 2 + httpBody_.size() + 2; }
+
     private:
 
+        bool response_;
         bool closeConn_;
+
+        size_t msgLen_;
+
         HttpStatusCode statusCode_;
         std::string statusMsg_;
         std::string httpBody_;
