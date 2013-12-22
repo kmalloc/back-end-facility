@@ -7,7 +7,7 @@
 #include "misc/NonCopyable.h"
 #include "misc/LockFreeBuffer.h"
 
-#include "net/SocketServer.h"
+#include "net/http/HttpServer.h"
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpConnection.h"
 #include "net/http/HttpRequest.h"
@@ -18,7 +18,7 @@ class HttpContext: public noncopyable
 {
     public:
 
-        HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
+        HttpContext(HttpServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
         void ResetContext(int connid);
@@ -26,11 +26,13 @@ class HttpContext: public noncopyable
 
         void AppendData(const char* data, size_t sz);
 
-        void RunParser();
+        void ProcessHttpRequest();
 
         const HttpRequest& GetRequest() const { return request_; }
 
         bool IsKeepAlive() const { return keepalive_; }
+
+        void HandleSendDone();
 
         enum ParseStage
         {
@@ -44,6 +46,8 @@ class HttpContext: public noncopyable
         ParseStage ParsingStage() const { return curStage_; }
 
     private:
+
+        void CleanData();
 
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
         bool ShouldParseHeader() const { return curStage_ == HS_HEADER; }

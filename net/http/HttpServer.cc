@@ -6,7 +6,7 @@
 #include "thread/Thread.h"
 #include "thread/ThreadPool.h"
 #include "misc/LockFreeBuffer.h"
-#include "misc/LockFreeListQueue.h"
+#include "misc/LockFreeList.h"
 
 #include "net/http/HttpBuffer.h"
 #include "net/http/HttpContext.h"
@@ -14,21 +14,27 @@
 #include "pthread.h"
 #include "assert.h"
 
+
 struct ConnMessage
 {
     int code;
     SocketMessage msg;
 };
 
+static void DefaultHttpRequestHandler(const HttpRequest&, HttpResponse& response)
+{
+    response.SetCloseConn(true);
+}
+
 // bind each connection to one thread.
 class HttpTask: public ITask
 {
     public:
 
-        HttpTask(HttpImpl* server, LockFreeBuffer& alloc);
+        HttpTask(HttpServer* server, LockFreeBuffer& alloc);
         ~HttpTask();
 
-        void ResetTask();
+        void ResetTask(int connid);
         void PostSockMsg(SocketMessage* msg);
 
         // release only when connectioin is close
@@ -37,15 +43,17 @@ class HttpTask: public ITask
         // initial on socket connected.
         void InitConnection();
 
-        void ClearMsgQueueWithLockHold();
-
         virtual void Run();
+
+        void ClearMsgQueue();
 
     private:
 
-        pthread_mutex_t contextLock_;
+        void ProcessHttpData(const char* data, size_t sz);
+        void OnConnectionClose();
+        void ProcessSocketMessage(ConnMessage* msg);
 
-        HttpImpl* httpServer_;
+        HttpServer* httpServer_;
         HttpContext context_;
 
         // one http connection can only be handled in one thread
@@ -53,50 +61,83 @@ class HttpTask: public ITask
         LockFreeListQueue sockMsgQueue_;
 };
 
-HttpTask::HttpTask(HttpImpl* server, LockFreeBuffer& alloc)
-    : Itask(false)
+class HttpImpl:public ThreadBase
+{
+    public:
+
+        HttpImpl(HttpServer* host, const char* addr);
+        ~HttpImpl();
+
+        void StartServer();
+        void StopServer();
+
+        void ReleaseSockMsg(ConnMessage* msg);
+
+        void SendData(int connid, const char* data, int sz, bool copy = true);
+        void CloseConnection(int connid);
+
+    protected:
+
+        virtual void Run();
+
+        bool ParseRequestLine(HttpBuffer& buffer) const;
+        bool ParseHeader(HttpBuffer& buffer, std::map<std::string, std::string>& output) const;
+        std::string ParseBody(HttpBuffer& buffer) const;
+
+    private:
+
+        std::string addr_;
+        SocketServer tcpServer_;
+
+        ThreadPool threadPool_;
+        LockFreeBuffer bufferPool_;
+
+        // connection id to index into it
+        HttpTask** conn_;
+};
+
+HttpTask::HttpTask(HttpServer* server, LockFreeBuffer& alloc)
+    : ITask(false)
     , httpServer_(server)
-    , context_(alloc)
+    , context_(*server, alloc, &DefaultHttpRequestHandler)
     , sockMsgQueue_(64)
 {
-    pthread_mutex_init(&contextLock_, NULL);
 }
 
 HttpTask::~HttpTask()
 {
     ReleaseTask();
-    pthread_mutex_destroy(&contextLock_);
 }
 
 void HttpTask::ReleaseTask()
 {
-    pthread_mutex_lock(&contextLock_);
-
     context_.ReleaseContext();
-    ClearMsgQueueWithLockHold();
-
-    pthread_mutex_unlock(&contextLock_);
+    ClearMsgQueue();
 }
 
-void HttpTask::ClearMsgQueueWithLockHold()
+void HttpTask::OnConnectionClose()
+{
+    context_.ReleaseContext();
+}
+
+void HttpTask::ClearMsgQueue()
 {
     ConnMessage* msg;
-    while (sockMsgQueue_.Pop(&(void*)msg))
+    while (sockMsgQueue_.Pop((void**)&msg))
     {
-        SocketServer::DefaultSockEventHandler(msg->code, msg->msg);
-        httpServer_->ReleaseSockMsg(msg);
+        httpServer_->GetImpl()->ReleaseSockMsg(msg);
     }
 }
 
-void HttpTask::InitConnection(ConnMessage* msg)
+void HttpTask::ResetTask(int connid)
 {
-    pthread_mutex_lock(&contextLock_);
-    context_.ResetContext();
-    pthread_mutex_unlock(&contextLock_);
+    context_.ResetContext(connid);
 }
 
 void HttpTask::ProcessHttpData(const char* data, size_t sz)
 {
+    context_.AppendData(data, sz);
+    context_.ProcessHttpRequest();
 }
 
 void HttpTask::ProcessSocketMessage(ConnMessage* msg)
@@ -117,6 +158,7 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
             break;
         case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
+                context_.HandleSendDone();
             }
             break;
         default:
@@ -131,42 +173,97 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
 void HttpTask::Run()
 {
     ConnMessage* msg;
-    while (sockMsgQueue_.Pop(msg))
+    while (sockMsgQueue_.Pop((void**)&msg))
     {
         ProcessSocketMessage(msg);
-        httpServer_->ReleaseMsg(msg);
+        httpServer_->GetImpl()->ReleaseSockMsg(msg);
     }
 }
 
-class HttpImpl:public ThreadBase
+HttpImpl::HttpImpl(HttpServer* host, const char* addr)
+    :addr_(addr)
+    ,tcpServer_()
+    ,threadPool_(3)
+    ,bufferPool_(2048, 512)
 {
-    public:
+    int i = 0;
 
-        HttpImpl(const char* addr);
-        ~HttpImpl();
+    try
+    {
+        conn_ = new HttpTask*[SocketServer::max_conn_id];
 
-        void StartServer();
-        void StopServer();
+        while (i < SocketServer::max_conn_id)
+        {
+            conn_[i] = new HttpTask(host, bufferPool_);
+            ++i;
+        }
+    }
+    catch (...)
+    {
+        for (int j = 0; j < i; ++j)
+        {
+            delete conn_[j];
+        }
 
-        void ReleaseMsg(ConnMessage* msg);
+        delete[] conn_;
 
-    protected:
+        throw "out of memory";
+    }
+}
 
-        virtual void Run();
+HttpImpl::~HttpImpl()
+{
+    for (int i = 0; i < SocketServer::max_conn_id; ++i)
+        delete conn_[i];
 
-        bool ParseRequestLine(HttpBuffer& buffer) const;
-        bool ParseHeader(HttpBuffer& buffer, map<string, string>& output) const;
-        string ParseBody(HttpBuffer& buffer) const;
+    delete[] conn_;
+}
 
-    private:
+void HttpImpl::CloseConnection(int connid)
+{
+    conn_[connid]->ClearMsgQueue();
+    tcpServer_.CloseSocket(connid);
+}
 
-        SocketServer tcpServer_;
+void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
+{
+    tcpServer_.SendBuffer(connid, data, sz, copy);
+}
 
-        LockFreeBuffer bufferPool_;
-        ThreadPool threadPool_;
 
-        // connection id to index into it
-        HttpTask conn_[];
-};
+void HttpImpl::ReleaseSockMsg(ConnMessage* msg)
+{
+    bufferPool_.ReleaseBuffer(msg);
+}
 
+
+void HttpImpl::Run()
+{
+    // TODO
+}
+
+///////////////////// HTTP SERVER /////////////////////////////
+
+
+
+HttpServer::HttpServer(const char* addr)
+    :impl_(new HttpImpl(this, addr))
+{
+}
+
+HttpServer::~HttpServer()
+{
+    delete impl_;
+}
+
+
+void HttpServer::SendData(int connid, const char* data, int sz, bool copy)
+{
+    impl_->SendData(connid, data, sz, copy);
+}
+
+void HttpServer::CloseConnection(int connid)
+{
+    impl_->CloseConnection(connid);
+}
 

@@ -5,7 +5,7 @@
 #include <string>
 #include <algorithm>
 
-HttpContext::HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
+HttpContext::HttpContext(HttpServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
     : keepalive_(false), curStage_(HS_INVALID)
     , buffer_(alloc), conn_(server), callBack_(cb)
 {
@@ -18,7 +18,7 @@ HttpContext::~HttpContext()
 
 void HttpContext::ResetContext(int connid)
 {
-    curStage_ = HS_REQUEST_LINE;
+    ReleaseContext();
 
     buffer_.ResetBuffer();
     conn_.ResetConnection(connid);
@@ -26,10 +26,14 @@ void HttpContext::ResetContext(int connid)
 
 void HttpContext::ReleaseContext()
 {
+    keepalive_ = false;
+    curStage_ = HS_REQUEST_LINE;
+
     request_.CleanUp();
     response_.CleanUp();
 
     buffer_.ReleaseBuffer();
+    conn_.CloseConnection();
 }
 
 void HttpContext::AppendData(const char* data, size_t sz)
@@ -43,20 +47,15 @@ void HttpContext::AppendData(const char* data, size_t sz)
 }
 
 // in normal case, this should be called after respone is done.
-void HttpContext::CleanUp()
+void HttpContext::CleanData()
 {
     request_.CleanUp();
     response_.CleanUp();
-
-    if (keepalive_ == false)
-    {
-        conn_.CloseConnection();
-    }
+    curStage_ = HS_INVALID;
 }
 
 void HttpContext::ForceCloseConnection()
 {
-    conn_.CloseConnection();
     ReleaseContext();
 }
 
@@ -69,9 +68,18 @@ void HttpContext::DoResponse()
     }
 
     FinishResponse();
+    CleanData();
 }
 
-void HttpContext::RunParser()
+void HttpContext::HandleSendDone()
+{
+    if (!keepalive_)
+    {
+        ForceCloseConnection();
+    }
+}
+
+void HttpContext::ProcessHttpRequest()
 {
     if (ShouldParseRequestLine())
     {
@@ -179,13 +187,6 @@ bool HttpContext::ParseHeader()
     const char* start = buffer_.GetStart();
     const char* end   = buffer_.GetEnd();
 
-    if (start == end)
-    {
-        // no header
-        FinishParsingHeader();
-        return true;
-    }
-
     static const char* ctrl= HttpBuffer::CTRL;
     static const size_t ctrl_len = strlen(ctrl);
     static const char* end_of_ctrl = ctrl + ctrl_len;
@@ -236,17 +237,11 @@ bool HttpContext::ParseBody()
        return true;
    }
 
-   if (start == end)
-   {
-       FinishParsingBody();
-       return true;
-   }
-
    size_t contentLen = request_.GetBodyLength();
    if (contentLen == 0)
    {
        std::string len = request_.GetHeaderValue("Content-Length");
-       if (len.empty()) return false;
+       if (len.empty()) return true; // no body
 
        contentLen = atoi(len.c_str());
 
