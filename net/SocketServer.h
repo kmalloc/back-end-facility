@@ -27,16 +27,16 @@ struct SocketMessage
 enum SocketCode
 {
     SC_NONE,
-    SC_BADSOCK, // SocketMessage::id denotes the bad socket
-    SC_DATA, // SocketMessage::id is the socket that receive data, note: user is responsible to free SocketMessage::data
-    SC_CLOSE, // SocketMessage::id is the socket that been close
-    SC_HALFCLOSE, // SocketMessage::id denotes the corresponding socket
-    SC_LISTEN, // SocketMessage::id denotes the corresponding socket
-    SC_CONNECTED, // SocketMessage::id denotes the corresponding socket
-    SC_ACCEPT, // SocketMessage::ud denotes the accepted socket, SocketMessage::id denotes the corresponding socket that is listening.
-    SC_HALFSEND, // SocketMessage::id denotes the socket, SocketMessage::ud denotes the size of data been send.
-    SC_SEND,  // SocketMessage::id denotes the socket , SocketMessage::ud denotes the size of data been send
-    SC_WATCHED, // socket is added to be watched, SocketMessage::id is the corresponding socket
+    SC_BADSOCK, // SocketEvent::id denotes the bad socket
+    SC_DATA, // SocketEvent::id is the socket that receive data, note: user is responsible to free SocketEvent::data
+    SC_CLOSE, // SocketEvent::id is the socket that been close
+    SC_HALFCLOSE, // SocketEvent::id denotes the corresponding socket
+    SC_LISTEN, // SocketEvent::id denotes the corresponding socket
+    SC_CONNECTED, // SocketEvent::id denotes the corresponding socket
+    SC_ACCEPT, // SocketEvent::ud denotes the accepted socket, SocketEvent::id denotes the corresponding socket that is listening.
+    SC_HALFSEND, // SocketEvent::id denotes the socket, SocketEvent::ud denotes the size of data been send.
+    SC_SEND,  // SocketEvent::id denotes the socket , SocketEvent::ud denotes the size of data been send
+    SC_WATCHED, // socket is added to be watched, SocketEvent::id is the corresponding socket
     SC_ERROR,  // out of resource: socket fd or memory
     SC_IERROR, // error ignored
     SC_EXIT,
@@ -44,7 +44,13 @@ enum SocketCode
     SC_SUCC
 };
 
-typedef void (*SocketEventHandler)(SocketCode, SocketMessage);
+struct SocketEvent
+{
+    SocketCode code;
+    SocketMessage msg;
+};
+
+typedef void (*SocketEventHandler)(SocketEvent);
 
 class ServerImpl;
 
@@ -88,12 +94,18 @@ class SocketServer: public noncopyable
 
         int WatchRawSocket(int fd, uintptr_t opaque);
 
+        // by default, newly accepted socket is not watched by epoll.
+        // call SetWatchAcceptedSock() to change this behavior.
+        // function is not thread safe.
+        void SetWatchAcceptedSock(bool watch);
+
         // handler will be called in the polling thread whenever I/O is ready, make sure it is thread safe.
         // and since the polling thread is responsible for all socket I/O events, it is also critical
         // to make sure that handler is fast as possible
         void RegisterSocketEventHandler(SocketEventHandler handler);
 
-        static void DefaultSockEventHandler(SocketCode code, SocketMessage msg);
+        static void DefaultSockEventHandler(SocketEvent msg);
+
     public:
 
         static const int max_conn_id;

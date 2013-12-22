@@ -78,8 +78,11 @@ static void handle_data(int sock, const char* txt, int size)
     }
 }
 
-static void handler(SocketCode code, SocketMessage msg)
+static void handler(SocketEvent evt)
 {
+    SocketCode code = evt.code;
+    SocketMessage msg = evt.msg;
+
     switch (code)
     {
         case SC_EXIT:
