@@ -93,6 +93,8 @@ class HttpResponse
 
             memcpy(buffer + sz, "\r\n", 3);
 
+            sz += 2;
+
             tmp = httpBody_.size();
 
             if (sz + tmp + 1 >= size) return false;

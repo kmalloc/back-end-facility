@@ -10,7 +10,7 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
 {
     response.SetShouldResponse(true);
     response.SetStatusCode(HttpResponse::HSC_200);
-    response.SetStatusMessage("from miliao http server, default generated message");
+    response.SetStatusMessage("OK");
 
     using namespace std;
 
@@ -20,25 +20,43 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
     string body ;
     body.reserve(128);
 
-    body = "auto generated from request header:";
+    body = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 1.0 Frameset//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-Frameset.dtd\">\
+<html>\
+<head>\
+    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=gb2312\" />\
+    <title>miliao http server</title>\
+</head>\
+<body>\
+ <p>";
+
+    body += "Page auto-generated from http request header:\r\n";
+    body += "</p>";
+    body += "<p>";
     while (it != headers.end())
     {
         body += it->first;
         body += ":";
         body += it->second;
-        body += "\n";
+        body += "</p>";
 
         ++it;
     }
 
-    body += "body from request:" + req.GetHttpBody();
+    body += "</p>";
+    body += "Body from request: </p> " + req.GetHttpBody();
+
+    body += "</p>\
+             </body>\
+             </html>";
 
     response.SetBody(body.c_str());
 
     char bodylen[32] = {0};
     snprintf(bodylen, 32, "%d", body.size());
 
-    response.AddHeader("Content-Type", "text/html;charset=UTF-8");
+    response.AddHeader("Connection", "close");
+    response.AddHeader("Host", "miliao server");
+    response.AddHeader("Content-Type", "text/html;charset=utf-8");
     response.AddHeader("Content-Length", bodylen);
 
     response.SetCloseConn(true);
