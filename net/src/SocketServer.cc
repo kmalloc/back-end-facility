@@ -315,7 +315,7 @@ int ServerImpl::ReserveSocketSlot()
         if (sock->type == SS_INVALID)
         {
             int ret = atomic_cas(&sock->type, SS_INVALID, SS_RESERVED);
-            if (ret) return id;
+            if (ret) return id%MAX_SOCKET;
 
             continue;
         }
@@ -1019,6 +1019,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     if (id < 0)
     {
         close(client_fd);
+        slog(LOG_ERROR, "out of fd, accept socket failed");
         return SC_ERROR;
     }
 
@@ -1150,6 +1151,12 @@ int ServerImpl::ConnectTo(const char* addr, int port, uintptr_t opaque)
     }
 
     int id = ReserveSocketSlot();
+    if (id < 0)
+    {
+        slog(LOG_ERROR, "out of socket fd, connect to fail.");
+        return 0;
+    }
+
     req.u.connect.opaque = opaque;
     req.u.connect.id     = id;
     req.u.connect.port   = port;
@@ -1175,6 +1182,12 @@ int ServerImpl::ListenTo(const char* addr, int port, uintptr_t opaque, int backl
     }
 
     int id = ReserveSocketSlot();
+    if (id < 0)
+    {
+        slog(LOG_ERROR, "out of socket fd, listen to fail.");
+        return 0;
+    }
+
     req.u.listen.opaque = opaque;
     req.u.listen.id = id;
     req.u.listen.port = port;
@@ -1217,6 +1230,13 @@ int ServerImpl::WatchRawSocket(int sock_fd, uintptr_t opaque)
 {
     RequestPackage req;
     int id = ReserveSocketSlot();
+
+    if (id < 0)
+    {
+        slog(LOG_ERROR, "out of socket fd, watch socket fail.");
+        return 0;
+    }
+
     req.u.bind.opaque = opaque;
     req.u.bind.id = id;
     req.u.bind.fd = sock_fd;
