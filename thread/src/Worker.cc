@@ -28,7 +28,7 @@ bool WorkerBody::PushTaskToContainer(ITask* task)
     return mailbox_.PushBack(task);
 }
 
-int WorkerBody::GetContainerSize()
+int WorkerBody::GetContainerSize() const
 {
     return mailbox_.Size();
 }

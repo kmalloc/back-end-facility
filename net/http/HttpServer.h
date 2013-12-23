@@ -2,8 +2,15 @@
 #define __HTTP_SERVER_H__
 
 #include "misc/NonCopyable.h"
+#include "net/SocketServer.h"
 
 class HttpImpl;
+
+struct ConnMessage
+{
+    int code;
+    SocketMessage msg;
+};
 
 class HttpServer: public noncopyable
 {
@@ -17,6 +24,8 @@ class HttpServer: public noncopyable
 
         void SendData(int connid, const char* data, int sz, bool copy = true);
         void CloseConnection(int connid);
+
+        void ReleaseSockMsg(ConnMessage* msg);
 
         HttpImpl* GetImpl() const {  return impl_; }
 
