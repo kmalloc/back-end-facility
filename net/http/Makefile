@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-c -Wall -g
-SOURCES=main.cc HttpBuffer.cc HttpConnection.cc HttpContext.cc HttpServer.cc
+SOURCES=main.cc HttpTask.cc HttpBuffer.cc HttpConnection.cc HttpContext.cc HttpServer.cc
 
 ROOT=../../
 LIBS_PATH=-L$(ROOT)/lib

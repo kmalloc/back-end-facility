@@ -9,7 +9,6 @@
 #include <memory.h>
 #include <unistd.h>
 
-
 struct CompareTaskPriority
 {
     inline bool operator()(ITask*& x, ITask*&y) const
@@ -28,9 +27,10 @@ class Dispatcher:public WorkerBodyBase
         void StartWorker();
         void StopWorker();
         void KillAllWorker();
+        int  PickIdleWorker() const;
         virtual bool HasTask();
         virtual bool StopRunning();
-        virtual int  GetContainerSize();
+        virtual int  GetContainerSize() const;
 
         /*
          * worker calls this function to require task to Run
@@ -46,7 +46,7 @@ class Dispatcher:public WorkerBodyBase
         virtual bool PushTaskToContainer(ITask*);
 
         void DispatchTask(ITask*);
-        Worker* SelectFreeWorker();
+        Worker* SelectFreeWorker() const;
 
     private:
 
@@ -55,7 +55,6 @@ class Dispatcher:public WorkerBodyBase
 
         sem_t workerNotify_;
         Worker* freeWorker_;//keep this variable using in dispatch thread only, eliminating volatile
-        std::map<int, int> pid2workerId_;
         std::vector<Worker*> workers_;
         SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > queue_;
 };
@@ -79,7 +78,6 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
             Worker* worker = new Worker(pool_, i);
             worker->EnableNotify(true);
             workers_.push_back(worker);
-            pid2workerId_[worker->GetPid()] = i;
         }
     }
     catch (...)
@@ -87,7 +85,6 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         for (int j = 0; j < i; ++j)
             delete workers_[j];
 
-        pid2workerId_.clear();
         throw "out of memory";
     }
 
@@ -103,17 +100,14 @@ Dispatcher::~Dispatcher()
         delete workers_[i];
     }
 
-    pid2workerId_.clear();
     sem_destroy(&workerNotify_);
 }
 
 void Dispatcher::StartWorker()
 {
-    pid2workerId_.clear();
     for (int i = 0; i < workerNum_; ++i)
     {
         workers_[i]->StartWorking();
-        pid2workerId_[workers_[i]->GetPid()] = i;
     }
 }
 
@@ -123,8 +117,6 @@ void Dispatcher::KillAllWorker()
     {
         workers_[i]->Cancel();
     }
-
-    pid2workerId_.clear();
 }
 
 void Dispatcher::StopWorker()
@@ -133,8 +125,6 @@ void Dispatcher::StopWorker()
     {
         workers_[i]->StopWorking();
     }
-
-    pid2workerId_.clear();
 }
 
 bool Dispatcher::StopRunning()
@@ -159,7 +149,7 @@ ITask* Dispatcher::GetTaskFromContainer()
     return NULL;
 }
 
-int Dispatcher::GetContainerSize()
+int Dispatcher::GetContainerSize() const
 {
     return queue_.Size();
 }
@@ -177,7 +167,7 @@ bool Dispatcher::HasTask()
  * maintain the worker list.
  * just avoiding premptive operation and use brute-search is enough.
  */
-Worker* Dispatcher::SelectFreeWorker()
+Worker* Dispatcher::SelectFreeWorker() const
 {
     for (int i = 0; i < workerNum_; ++i)
     {
@@ -189,6 +179,21 @@ Worker* Dispatcher::SelectFreeWorker()
     }
 
     return NULL;
+}
+
+int Dispatcher::PickIdleWorker() const
+{
+    int miniTask = ((unsigned int)-1) >> 1;
+    for (int i = 0; miniTask && i < workerNum_; ++i)
+    {
+        int sz = workers_[i]->GetTaskNumber();
+        if (sz < miniTask)
+        {
+            miniTask = sz;
+        }
+    }
+
+    return miniTask;
 }
 
 void Dispatcher::PrepareWorker()
@@ -217,10 +222,7 @@ void Dispatcher::DispatchTask(ITask* task)
     }
     else
     {
-        std::map<int, int>::const_iterator it = pid2workerId_.find(affinity);
-        assert(it != pid2workerId_.end());
-
-        int workid = it->second;
+        int workid = affinity;
         Worker* worker = workers_[workid];
 
         if (worker == freeWorker_) freeWorker_ = NULL;
@@ -326,5 +328,10 @@ int ThreadPool::GetTaskNumber()
 bool ThreadPool::PostTask(ITask* task)
 {
     return worker_->PostTask(task);
+}
+
+int ThreadPool::PickIdleWorker() const
+{
+    return dispatcher_->PickIdleWorker();
 }
 

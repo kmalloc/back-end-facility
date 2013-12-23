@@ -30,6 +30,8 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
         //killing all workers.
         void ForceShutdown();
 
+        int PickIdleWorker() const;
+
     protected:
 
         virtual int SetWorkerNotify(NotifyerBase* notifyer);

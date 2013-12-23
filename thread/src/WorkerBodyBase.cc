@@ -240,7 +240,7 @@ bool WorkerBodyBase::StopRunning()
 }
 
 // note, this number is not 100% accurate.
-int WorkerBodyBase::GetTaskNumber()
+int WorkerBodyBase::GetTaskNumber() const
 {
     return GetContainerSize() + (isRuning_?1:0);
 }

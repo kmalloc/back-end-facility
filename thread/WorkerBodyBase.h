@@ -25,8 +25,8 @@ class WorkerBodyBase: public ITask, public noncopyable
         bool PostTask(ITask*);
         void ClearAllTask();
 
-        int GetTaskNumber();
-        virtual int GetContainerSize() = 0;
+        int GetTaskNumber() const;
+        virtual int GetContainerSize() const = 0;
 
         virtual bool StopRunning();
 

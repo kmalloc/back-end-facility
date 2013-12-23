@@ -159,7 +159,7 @@ class SpinlockQueue
             pthread_spin_unlock(&lock_);
         }
 
-        int  Size()
+        int  Size() const
         {
             int count = -1;
 
@@ -170,7 +170,7 @@ class SpinlockQueue
             return count;
         }
 
-        bool IsEmpty()
+        bool IsEmpty() const
         {
             bool ret;
 
@@ -184,7 +184,7 @@ class SpinlockQueue
     protected:
 
         const size_t maxSz_;
-        volatile pthread_spinlock_t lock_;
+        mutable pthread_spinlock_t lock_;
         QUEUE queue_;
 };
 

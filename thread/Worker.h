@@ -16,7 +16,7 @@ class WorkerBody: public WorkerBodyBase
 
     protected:
 
-        virtual int GetContainerSize();
+        virtual int GetContainerSize() const;
 
         virtual bool HandleTask(ITask*);
         virtual bool HasTask();
@@ -45,7 +45,7 @@ class Worker: public Thread, public NotifyerBase
         bool StopWorking(bool join = true);
         bool PostTask(ITask* msg) { return WorkerBody_->PostTask(msg); }
 
-        virtual int GetTaskNumber() { return WorkerBody_->GetTaskNumber(); }
+        virtual int GetTaskNumber() const { return WorkerBody_->GetTaskNumber(); }
 
         void EnableNotify(bool enable = true) { WorkerBody_->EnableNotify(enable); }
 
