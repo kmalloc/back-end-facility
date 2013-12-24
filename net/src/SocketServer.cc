@@ -315,7 +315,7 @@ int ServerImpl::ReserveSocketSlot()
         if (sock->type == SS_INVALID)
         {
             int ret = atomic_cas(&sock->type, SS_INVALID, SS_RESERVED);
-            if (ret) return id/%MAX_SOCKET;
+            if (ret) return id%MAX_SOCKET;
 
             continue;
         }

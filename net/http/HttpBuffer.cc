@@ -25,10 +25,8 @@ bool HttpBuffer::ResetBuffer()
     start_ = end_ = cur_ = 0;
     buff_ = bufferAlloc_.AllocBuffer();
 
-    if (buff_)
-    {
-        memset(buff_, 0, size_);
-    }
+    assert(buff_);
+    memset(buff_, 0, size_);
 
     return buff_ != NULL;
 }

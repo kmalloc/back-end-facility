@@ -11,4 +11,3 @@ extract_souce_file | wc -l
 echo "total lines of code:"
 extract_souce_file | xargs cat | sed -e '/^$/d' -e '/^[[:space:]]*$/d' | wc -l
 
-

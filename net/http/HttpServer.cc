@@ -43,7 +43,7 @@ class HttpImpl:public noncopyable
         LockFreeBuffer msgPool_;
 
         // connection id to index into it
-        HttpTask** conn_;
+        HttpTask** tasks_;
 };
 
 //-----------------------HTTP-IMPLE------------------------
@@ -60,11 +60,11 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
 
     try
     {
-        conn_ = new HttpTask*[SocketServer::max_conn_id];
+        tasks_ = new HttpTask*[SocketServer::max_conn_id];
 
         while (i < SocketServer::max_conn_id)
         {
-            conn_[i] = new HttpTask(host, bufferPool_);
+            tasks_[i] = new HttpTask(host, bufferPool_);
             ++i;
         }
     }
@@ -72,10 +72,10 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
     {
         for (int j = 0; j < i; ++j)
         {
-            delete conn_[j];
+            delete tasks_[j];
         }
 
-        delete[] conn_;
+        delete[] task_;
 
         throw "out of memory";
     }
@@ -84,9 +84,9 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
 HttpImpl::~HttpImpl()
 {
     for (int i = 0; i < SocketServer::max_conn_id; ++i)
-        delete conn_[i];
+        delete tasks_[i];
 
-    delete[] conn_;
+    delete[] tasks_;
 }
 
 void HttpImpl::StartServer()
@@ -107,7 +107,7 @@ void HttpImpl::StopServer()
 
 void HttpImpl::CloseConnection(int connid)
 {
-    conn_[connid]->CloseTask();
+    tasks_[connid]->CloseTask();
     tcpServer_.CloseSocket(connid, (uintptr_t)this);
 }
 
@@ -118,6 +118,7 @@ void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
 
 void HttpImpl::ReleaseSockMsg(ConnMessage* msg)
 {
+    SocketServer::DefaultSockEventHandler(msg->msg);
     msgPool_.ReleaseBuffer(msg);
 }
 
@@ -139,8 +140,8 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 int id = evt.msg.ud;
                 int affinity = impl->threadPool_.PickIdleWorker();
 
-                impl->conn_[id]->ResetTask(id);
-                impl->conn_[id]->SetAffinity(affinity);
+                impl->tasks_[id]->ResetTask(id);
+                impl->tasks_[id]->SetAffinity(affinity);
             }
             break;
         case SC_CLOSE:
@@ -160,10 +161,10 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
 
-                if (!impl->conn_[id]->PostSockMsg(conn_msg)
-                        || !impl->threadPool_.PostTask(impl->conn_[id]))
+                if (!impl->tasks_[id]->PostSockMsg(conn_msg)
+                        || !impl->threadPool_.PostTask(impl->tasks_[id]))
                 {
-                    SocketServer::DefaultSockEventHandler(evt);
+                    ReleaseSockMsg(conn_msg);
                     slog(LOG_ERROR, "connection(%d) msg queue full, drop package", id);
                     return;
                 }

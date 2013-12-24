@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <time.h>
 
 static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& response)
 {
@@ -58,6 +59,16 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
     response.AddHeader("Host", "miliao server");
     response.AddHeader("Content-Type", "text/html;charset=utf-8");
     response.AddHeader("Content-Length", bodylen);
+
+    time_t now;
+    struct tm gm;
+    char tmp[64];
+
+    now = time(NULL);
+    gm = *gmtime(&now);
+
+    strftime(tmp, sizeof(tmp), "%a, %d %b %Y %H:%S %Z", &gm);
+    response.AddHeader("Date", tmp);
 
     response.SetCloseConn(true);
 }

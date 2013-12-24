@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 
     int port = 80;
 
-    if (argc >= 2) port = atoi(argv[2]);
+    if (argc >= 3) port = atoi(argv[2]);
 
     HttpServer server(addr, port);
 
