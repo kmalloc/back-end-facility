@@ -54,7 +54,7 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
     :addr_(addr)
     ,port_(port)
     ,tcpServer_()
-    ,threadPool_(3)
+    ,threadPool_()
     ,bufferPool_(4096, 512)
     ,msgPool_(4096, sizeof(SocketEvent))
 {
@@ -154,7 +154,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                     return;
                 }
 
-                int id = evt.msg.id;
+                int id = evt.msg.fd;
 
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
@@ -171,7 +171,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
         case SC_ERROR:
         case SC_BADSOCK:
             {
-                slog(LOG_ERROR, "socket error, connect id(%d)\n", evt.msg.id);
+                slog(LOG_ERROR, "socket error, connect id(%d)\n", evt.msg.fd);
             }
             break;
         default:

@@ -12,7 +12,7 @@
 
 struct SocketMessage
 {
-    int   id; // socket id associated with the event.
+    int   fd; // socket id associated with the event.
     uintptr_t   opaque;
 
     // for send/halfsend buffer event, ud == buffer size that is sended.
