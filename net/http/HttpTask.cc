@@ -101,14 +101,14 @@ void HttpTask::CloseTask()
     ClearMsgQueue();
 }
 
-bool HttpTask::PostSockMsg(ConnMessage* msg)
+bool HttpTask::PostSockMsg(SocketEvent* msg)
 {
     return sockMsgQueue_.Push(msg);
 }
 
 void HttpTask::ClearMsgQueue()
 {
-    ConnMessage* msg;
+    SocketEvent* msg;
     while (sockMsgQueue_.Pop((void**)&msg))
     {
         httpServer_->ReleaseSockMsg(msg);
@@ -127,7 +127,7 @@ void HttpTask::ProcessHttpData(const char* data, size_t sz)
     context_.ProcessHttpRequest();
 }
 
-void HttpTask::ProcessSocketMessage(ConnMessage* msg)
+void HttpTask::ProcessSocketMessage(SocketEvent* msg)
 {
     switch (msg->code)
     {
@@ -157,7 +157,7 @@ void HttpTask::ProcessSocketMessage(ConnMessage* msg)
 
 void HttpTask::Run()
 {
-    ConnMessage* msg;
+    SocketEvent* msg;
     while (sockMsgQueue_.Pop((void**)&msg))
     {
         if (taskClosed_ == false) ProcessSocketMessage(msg);

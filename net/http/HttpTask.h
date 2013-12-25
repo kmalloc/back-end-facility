@@ -16,7 +16,7 @@ class HttpTask: public ITask
         ~HttpTask();
 
         void ResetTask(int connid);
-        bool PostSockMsg(ConnMessage* msg);
+        bool PostSockMsg(SocketEvent* msg);
 
         // release only when connectioin is close
         void ReleaseTask();
@@ -33,7 +33,7 @@ class HttpTask: public ITask
     private:
 
         void ProcessHttpData(const char* data, size_t sz);
-        void ProcessSocketMessage(ConnMessage* msg);
+        void ProcessSocketMessage(SocketEvent* msg);
 
         bool taskClosed_;
         HttpServer* httpServer_;

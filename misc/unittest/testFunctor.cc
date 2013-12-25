@@ -2,6 +2,7 @@
 #include <iostream>
 
 using namespace std;
+using namespace misc;
 
 class dummy
 {

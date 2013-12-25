@@ -1,6 +1,7 @@
 #ifndef __SOCKET_SERVER_H__
 #define __SOCKET_SERVER_H__
 
+#include "misc/functor.h"
 #include "misc/NonCopyable.h"
 #include <stdint.h>
 
@@ -50,7 +51,7 @@ struct SocketEvent
     SocketMessage msg;
 };
 
-typedef void (*SocketEventHandler)(SocketEvent);
+typedef misc::function<void, SocketEvent> SocketEventHandler;
 
 class ServerImpl;
 

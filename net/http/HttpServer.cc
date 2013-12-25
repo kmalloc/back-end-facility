@@ -4,6 +4,8 @@
 #include "thread/ITask.h"
 #include "thread/Thread.h"
 #include "thread/ThreadPool.h"
+
+#include "misc/functor.h"
 #include "misc/LockFreeBuffer.h"
 #include "misc/LockFreeList.h"
 
@@ -25,12 +27,12 @@ class HttpImpl:public noncopyable
         void StartServer();
         void StopServer();
 
-        void ReleaseSockMsg(ConnMessage* msg);
+        void ReleaseSockMsg(SocketEvent* msg);
 
         void SendData(int connid, const char* data, int sz, bool copy = true);
         void CloseConnection(int connid);
 
-        static void SocketEventHandler(SocketEvent evt);
+        void SocketEventHandler(SocketEvent evt);
 
     private:
 
@@ -54,7 +56,7 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
     ,tcpServer_()
     ,threadPool_(3)
     ,bufferPool_(4096, 512)
-    ,msgPool_(4096, sizeof(ConnMessage))
+    ,msgPool_(4096, sizeof(SocketEvent))
 {
     int i = 0;
 
@@ -75,7 +77,7 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
             delete tasks_[j];
         }
 
-        delete[] task_;
+        delete[] tasks_;
 
         throw "out of memory";
     }
@@ -94,7 +96,7 @@ void HttpImpl::StartServer()
     assert(threadPool_.StartPooling());
 
     tcpServer_.SetWatchAcceptedSock(true);
-    tcpServer_.RegisterSocketEventHandler(&HttpImpl::SocketEventHandler);
+    tcpServer_.RegisterSocketEventHandler(misc::bind(&HttpImpl::SocketEventHandler, this));
     tcpServer_.StartServer(addr_.c_str(), port_, (uintptr_t)this);
 }
 
@@ -116,39 +118,35 @@ void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
     tcpServer_.SendBuffer(connid, data, sz, copy);
 }
 
-void HttpImpl::ReleaseSockMsg(ConnMessage* msg)
+void HttpImpl::ReleaseSockMsg(SocketEvent* msg)
 {
-    SocketServer::DefaultSockEventHandler(msg->msg);
+    SocketServer::DefaultSockEventHandler(*msg);
     msgPool_.ReleaseBuffer(msg);
 }
 
 void HttpImpl::SocketEventHandler(SocketEvent evt)
 {
-    HttpImpl* impl = (HttpImpl*)evt.msg.opaque;
-
-    assert(impl);
-
     switch (evt.code)
     {
         case SC_EXIT:
             {
-                impl->threadPool_.StopPooling();
+                threadPool_.StopPooling();
             }
             break;
         case SC_ACCEPT:
             {
                 int id = evt.msg.ud;
-                int affinity = impl->threadPool_.PickIdleWorker();
+                int affinity = threadPool_.PickIdleWorker();
 
-                impl->tasks_[id]->ResetTask(id);
-                impl->tasks_[id]->SetAffinity(affinity);
+                tasks_[id]->ResetTask(id);
+                tasks_[id]->SetAffinity(affinity);
             }
             break;
         case SC_CLOSE:
         case SC_SEND:
         case SC_DATA:
             {
-                ConnMessage* conn_msg = (ConnMessage*)impl->msgPool_.AllocBuffer();
+                SocketEvent* conn_msg = (SocketEvent*)msgPool_.AllocBuffer();
                 if (conn_msg == NULL)
                 {
                     SocketServer::DefaultSockEventHandler(evt);
@@ -161,8 +159,8 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
 
-                if (!impl->tasks_[id]->PostSockMsg(conn_msg)
-                        || !impl->threadPool_.PostTask(impl->tasks_[id]))
+                if (!tasks_[id]->PostSockMsg(conn_msg)
+                        || !threadPool_.PostTask(tasks_[id]))
                 {
                     ReleaseSockMsg(conn_msg);
                     slog(LOG_ERROR, "connection(%d) msg queue full, drop package", id);
@@ -216,7 +214,7 @@ void HttpServer::StopServer()
     impl_->StopServer();
 }
 
-void HttpServer::ReleaseSockMsg(ConnMessage* msg)
+void HttpServer::ReleaseSockMsg(SocketEvent* msg)
 {
     impl_->ReleaseSockMsg(msg);
 }
