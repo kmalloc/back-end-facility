@@ -34,7 +34,7 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 
     protected:
 
-        virtual int SetWorkerNotify(NotifyerBase* notifyer);
+        virtual int SetWorkerNotify(NotifyerBase* notifyer, int type = 0);
 
         virtual int CalcDefaultThreadNum() const;
 

@@ -88,36 +88,37 @@ void HttpContext::ProcessHttpRequest(const char* data, size_t sz)
 {
     if (status_ != HS_CONNECTED) return;
 
-    size_t size = buffer_.Append(data, sz);
-    if (size < sz)
-    {
-        slog(LOG_WARN, "http context append data failed, perhaps buffer is full for the connectioin:%d", conn_.GetConnectionId());
-    }
+    size_t size = 0;
 
-    if (ShouldParseRequestLine())
+    while (size < sz)
     {
-        if (!ParseRequestLine())
+        size += buffer_.Append(data + size, sz - size);
+
+        if (ShouldParseRequestLine())
         {
-            ForceCloseConnection();
-            return;
+            if (!ParseRequestLine())
+            {
+                ForceCloseConnection();
+                return;
+            }
         }
-    }
 
-    if (ShouldParseHeader())
-    {
-        if (!ParseHeader())
+        if (ShouldParseHeader())
         {
-            ForceCloseConnection();
-            return;
+            if (!ParseHeader())
+            {
+                ForceCloseConnection();
+                return;
+            }
         }
-    }
 
-    if (ShouldParseBody())
-    {
-        if (!ParseBody())
+        if (ShouldParseBody())
         {
-            ForceCloseConnection();
-            return;
+            if (!ParseBody())
+            {
+                ForceCloseConnection();
+                return;
+            }
         }
     }
 

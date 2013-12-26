@@ -12,7 +12,7 @@ class NotifyerBase
 {
     public:
 
-        virtual int Notify() = 0;
+        virtual int Notify(int type = 0) = 0;
 };
 
 class WorkerBodyBase: public ITask, public noncopyable
@@ -61,6 +61,7 @@ class WorkerBodyBase: public ITask, public noncopyable
     private:
 
         void Run();
+        int NotifyDone();
 
         // get task from mailbox or cmd_
         // may block when there is no task.
@@ -116,7 +117,7 @@ class WorkerManagerBase
 
     protected:
 
-        virtual int SetWorkerNotify(NotifyerBase*) = 0;
+        virtual int SetWorkerNotify(NotifyerBase*, int type = 0) = 0;
 
         friend class Worker;
 };

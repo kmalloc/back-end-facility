@@ -466,10 +466,15 @@ static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
 
     for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next)
     {
+#ifdef SOCK_NONBLOCK
+        sock = socket(ai_ptr->ai_family, ai_ptr->ai_socktype | SOCK_NONBLOCK, ai_ptr->ai_protocol);
+        if (sock < 0) continue;
+#else
         sock = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol);
         if (sock < 0) continue;
-
         SocketPoll::SetSocketNonBlocking(sock);
+#endif
+
         status = proc(sock, ai_ptr, data);
         if (status >= 0) break;
 
@@ -974,10 +979,16 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     result->fd = sock->fd;
     result->opaque = sock->opaque;
 
+#ifdef _GNU_SOURCE
+    int client_fd = accept4(sock->fd, &ua.s, &len, SOCK_NONBLOCK);
+    if (client_fd < 0) return SC_ERROR;
+#else
     int client_fd = accept(sock->fd, &ua.s, &len);
     if (client_fd < 0) return SC_ERROR;
 
     SocketPoll::SetSocketNonBlocking(client_fd);
+#endif
+
     SocketEntity* new_sock = SetupSocketEntity(client_fd, sock->opaque, watchAccepted_);
 
     if (watchAccepted_) new_sock->type = SS_CONNECTED;

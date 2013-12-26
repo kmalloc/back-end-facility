@@ -55,7 +55,7 @@ class Worker: public Thread, public NotifyerBase
 
         int TaskDone() const { return WorkerBody_->TaskDone(); }
 
-        virtual int Notify();
+        virtual int Notify(int type);
 
     protected:
 

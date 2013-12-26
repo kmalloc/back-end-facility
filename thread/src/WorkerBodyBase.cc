@@ -114,6 +114,13 @@ bool WorkerBodyBase::GetRunTask(ITask*& msg)
     return true;
 }
 
+int WorkerBodyBase::NotifyDone()
+{
+    if (!notify_ || !notifyer_) return true;
+
+    notifyer_->Notify(-1);
+}
+
 void WorkerBodyBase::Run()
 {
     isRuning_ = false;
@@ -135,6 +142,7 @@ void WorkerBodyBase::Run()
 
             ++done_;
             isRuning_ = false;
+
         }
         else
         {
@@ -142,6 +150,8 @@ void WorkerBodyBase::Run()
         }
 
         if (ShouldStop_) break;
+
+        NotifyDone();
     }
 }
 

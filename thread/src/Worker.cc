@@ -71,11 +71,11 @@ bool Worker::StartWorking()
     return Thread::Start();
 }
 
-int Worker::Notify()
+int Worker::Notify(int type)
 {
     if (manager_)
     {
-        return manager_->SetWorkerNotify(this);
+        return manager_->SetWorkerNotify(this, type);
     }
 
     return 0;

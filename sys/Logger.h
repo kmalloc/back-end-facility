@@ -28,9 +28,9 @@ class Logger: public noncopyable
         size_t Log(const char* format, va_list args);
 
         // flush all the buffers in memory to disk.
-        void Flush();
         void SetOutStream(std::ostream* fout);
 
+        static void Flush();
         static void RunLogging();
         static void StopLogging();
 

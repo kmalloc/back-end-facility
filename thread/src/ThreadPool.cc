@@ -36,7 +36,7 @@ class Dispatcher:public WorkerBodyBase
          * worker calls this function to require task to Run
          * keep in mind that this function will be called in different threads
          */
-        int SetWorkerNotify(NotifyerBase* worker);
+        int SetWorkerNotify(NotifyerBase* worker, int type = 0);
 
     protected:
 
@@ -51,6 +51,7 @@ class Dispatcher:public WorkerBodyBase
     private:
 
         ThreadPool* pool_;
+        unsigned long long freeWorkerBit_;
         const int workerNum_;
 
         sem_t workerNotify_;
@@ -59,10 +60,10 @@ class Dispatcher:public WorkerBodyBase
         SpinlockQueue<ITask*, PriorityQueue<ITask*,CompareTaskPriority> > queue_;
 };
 
-
 Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
     :WorkerBodyBase()
     ,pool_(pool)
+    ,freeWorkerBit_(0)
     ,workerNum_(workerNum)
     ,freeWorker_(NULL)
 {
@@ -87,6 +88,9 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
 
         throw "out of memory";
     }
+
+    freeWorkerBit_ = (~(unsigned long long)1) << (sizeof(unsigned long long) << 3) - workerNum_;
+    freeWorkerBit_ >>= (sizeof(unsigned long long) << 3) - workerNum_;
 
     sem_init(&workerNotify_,0,workerNum_);
 }
@@ -167,8 +171,11 @@ bool Dispatcher::HasTask()
  * maintain the worker list.
  * just avoiding premptive operation and use brute-search is enough.
  */
+
+
 Worker* Dispatcher::SelectFreeWorker() const
 {
+    /*
     for (int i = 0; i < workerNum_; ++i)
     {
         int sz = workers_[i]->GetTaskNumber();
@@ -176,6 +183,47 @@ Worker* Dispatcher::SelectFreeWorker() const
         {
             return workers_[i];
         }
+    }
+    n = 010011
+    n+1 = 010100
+    ~(n+1) = 101011
+
+    n & ~(n+1) = 000 011
+
+    */
+
+    unsigned long long sel = (freeWorkerBit_ & (~freeWorkerBit_ + 1));
+
+    if (sel)
+    {
+        int s = 0, e = workerNum_ - 1;
+        int m;
+
+        int c = -1;
+        unsigned long long i = 0;
+
+        while (s <= e)
+        {
+            m = (s + e) >> 1;
+            i = ((unsigned long long)1 << m);
+
+            if (i == sel)
+            {
+                c = m;
+                break;
+            }
+            else if (i < sel)
+            {
+                s = m + 1;
+            }
+            else
+            {
+                e = m - 1;
+            }
+        }
+
+        assert(c >= 0 && c < workerNum_);
+        return workers_[c];
     }
 
     return NULL;
@@ -218,7 +266,11 @@ void Dispatcher::DispatchTask(ITask* task)
     {
         assert(freeWorker_);
 
-        task->SetThreadId(freeWorker_->GetWorkerId());
+        int id = freeWorker_->GetWorkerId();
+        atomic_fetch_and_and(&freeWorkerBit_, ~(1 << id));
+
+        task->SetThreadId(id);
+
         freeWorker_->PostTask(task);
         freeWorker_ = NULL;
     }
@@ -229,14 +281,29 @@ void Dispatcher::DispatchTask(ITask* task)
 
         if (worker == freeWorker_) freeWorker_ = NULL;
 
-        task->SetThreadId(worker->GetWorkerId());
+        atomic_fetch_and_and(&freeWorkerBit_, ~(1 << workid));
+        task->SetThreadId(workid);
+
         worker->PostTask(task);
     }
 }
 
-int Dispatcher::SetWorkerNotify(NotifyerBase* worker)
+int Dispatcher::SetWorkerNotify(NotifyerBase* worker, int type)
 {
-    if (worker) return sem_post(&workerNotify_);
+    if (worker)
+    {
+         if (type < 0)
+         {
+             Worker* work = dynamic_cast<Worker*>(worker);
+             if (work == NULL) return 0;
+
+             atomic_fetch_and_or(&freeWorkerBit_, (1 << work->GetWorkerId()));
+         }
+         else
+         {
+             sem_post(&workerNotify_);
+         }
+    }
 
     return 0;
 }
@@ -290,6 +357,8 @@ int ThreadPool::CalcDefaultThreadNum() const
     slog(LOG_DEBUG, "threadpool, cpu number:%d\n", num);
     if (num <= 0) num = 2;
 
+    if (num > (sizeof(long long) << 3)) num = (sizeof(long long) << 3);
+
     return num;
 }
 
@@ -313,9 +382,9 @@ void ThreadPool::ForceShutdown()
     dispatcher_->KillAllWorker();
 }
 
-int ThreadPool::SetWorkerNotify(NotifyerBase* worker)
+int ThreadPool::SetWorkerNotify(NotifyerBase* worker, int type)
 {
-    return dispatcher_->SetWorkerNotify(worker);
+    return dispatcher_->SetWorkerNotify(worker, type);
 }
 
 bool ThreadPool::IsRunning() const
