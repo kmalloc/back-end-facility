@@ -4,25 +4,26 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "misc/NonCopyable.h"
-#include "net/http/HttpServer.h"
+#include "net/SocketServer.h"
 
 class HttpConnection: public noncopyable
 {
     public:
 
-        HttpConnection(HttpServer& server);
+        HttpConnection(SocketServer& server);
 
         void ResetConnection(int connid);
 
         void SendData(const char* data, size_t sz, bool copy = true);
         void CloseConnection();
+        void ReleaseConnection();
 
         int GetConnectionId() const { return connId_; }
 
     private:
 
         int connId_;
-        HttpServer& sockServer_;
+        SocketServer& sockServer_;
 };
 
 #endif

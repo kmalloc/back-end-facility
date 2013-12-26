@@ -15,6 +15,7 @@ class LockFreeListQueue: public noncopyable
         bool Push(void* data);
         bool Pop(void*& data);
         bool Pop(void** data);
+
         size_t Size() const { return no_; }
         bool IsEmpty() const { return no_ == 0; }
 

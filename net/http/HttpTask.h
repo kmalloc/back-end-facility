@@ -3,41 +3,43 @@
 
 #include "thread/ITask.h"
 #include "misc/LockFreeList.h"
+#include "misc/LockFreeBuffer.h"
 
 #include "net/SocketServer.h"
 #include "net/http/HttpContext.h"
+
+#include <pthread.h>
+
 
 // bind each connection to one thread.
 class HttpTask: public ITask
 {
     public:
 
-        HttpTask(HttpServer* server, LockFreeBuffer& alloc);
+        HttpTask(SocketServer* server, LockFreeBuffer& alloc, LockFreeBuffer& msgPool);
         ~HttpTask();
 
-        void ResetTask(int connid);
         bool PostSockMsg(SocketEvent* msg);
 
-        // release only when connectioin is close
-        void ReleaseTask();
-
-        // initial on socket connected.
-        void InitConnection();
+    private:
 
         virtual void Run();
 
-        void ClearMsgQueue();
+        void ResetTask(int connid, int affinity);
 
-        void CloseTask();
+        // release only when connectioin is close
+        void ReleaseTask();
 
     private:
 
         void ProcessHttpData(const char* data, size_t sz);
         void ProcessSocketMessage(SocketEvent* msg);
 
-        bool taskClosed_;
-        HttpServer* httpServer_;
+        SocketServer* tcpServer_;
         HttpContext context_;
+        LockFreeBuffer& msgPool_;
+
+        pthread_mutex_t lock_;
 
         // one http connection can only be handled in one thread
         // so need to queue the msg

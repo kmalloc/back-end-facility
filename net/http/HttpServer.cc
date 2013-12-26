@@ -16,12 +16,11 @@
 #include "pthread.h"
 #include "assert.h"
 
-
 class HttpImpl:public noncopyable
 {
     public:
 
-        HttpImpl(HttpServer* host, const char* addr, int port = 80);
+        HttpImpl(const char* addr, int port = 80);
         ~HttpImpl();
 
         void StartServer();
@@ -30,7 +29,6 @@ class HttpImpl:public noncopyable
         void ReleaseSockMsg(SocketEvent* msg);
 
         void SendData(int connid, const char* data, int sz, bool copy = true);
-        void CloseConnection(int connid);
 
         void SocketEventHandler(SocketEvent evt);
 
@@ -50,12 +48,12 @@ class HttpImpl:public noncopyable
 
 //-----------------------HTTP-IMPLE------------------------
 //
-HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
+HttpImpl::HttpImpl(const char* addr, int port)
     :addr_(addr)
     ,port_(port)
     ,tcpServer_()
     ,threadPool_()
-    ,bufferPool_(4096, 512)
+    ,bufferPool_(SocketServer::max_conn_id, 512)
     ,msgPool_(4096, sizeof(SocketEvent))
 {
     int i = 0;
@@ -66,7 +64,7 @@ HttpImpl::HttpImpl(HttpServer* host, const char* addr, int port)
 
         while (i < SocketServer::max_conn_id)
         {
-            tasks_[i] = new HttpTask(host, bufferPool_);
+            tasks_[i] = new HttpTask(&tcpServer_, bufferPool_, msgPool_);
             ++i;
         }
     }
@@ -107,12 +105,6 @@ void HttpImpl::StopServer()
     // handle it in SocketEventHandler
 }
 
-void HttpImpl::CloseConnection(int connid)
-{
-    tasks_[connid]->CloseTask();
-    tcpServer_.CloseSocket(connid, (uintptr_t)this);
-}
-
 void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
 {
     tcpServer_.SendBuffer(connid, data, sz, copy);
@@ -133,16 +125,8 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 threadPool_.StopPooling();
             }
             break;
-        case SC_ACCEPT:
-            {
-                int id = evt.msg.ud;
-                int affinity = threadPool_.PickIdleWorker();
-
-                tasks_[id]->ResetTask(id);
-                tasks_[id]->SetAffinity(affinity);
-            }
-            break;
         case SC_CLOSE:
+        case SC_ACCEPT:
         case SC_SEND:
         case SC_DATA:
             {
@@ -155,6 +139,10 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 }
 
                 int id = evt.msg.fd;
+                if (SC_ACCEPT == evt.code)
+                {
+                    id = evt.msg.ud;
+                }
 
                 conn_msg->code = evt.code;
                 conn_msg->msg  = evt.msg;
@@ -185,7 +173,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
 ///////////////////// HTTP SERVER /////////////////////////////
 
 HttpServer::HttpServer(const char* addr, int port)
-    :impl_(new HttpImpl(this, addr, port))
+    :impl_(new HttpImpl(addr, port))
 {
 }
 
@@ -197,11 +185,6 @@ HttpServer::~HttpServer()
 void HttpServer::SendData(int connid, const char* data, int sz, bool copy)
 {
     impl_->SendData(connid, data, sz, copy);
-}
-
-void HttpServer::CloseConnection(int connid)
-{
-    impl_->CloseConnection(connid);
 }
 
 void HttpServer::StartServer()

@@ -42,6 +42,8 @@ class LogWorker: public ThreadBase
         virtual void Run();
         size_t DoLog(LogEntity* log);
 
+        size_t PatchTimeStamp(char* buff);
+
     private:
 
         sem_t sig_;
@@ -50,6 +52,7 @@ class LogWorker: public ThreadBase
 
         const size_t size_; // total piece of buffers cached in memory.
         const size_t granularity_; // size of per buffer.
+        unsigned long long counter_;
 
         // buffer Pool
         LockFreeBuffer buffer_;
@@ -61,6 +64,7 @@ class LogWorker: public ThreadBase
 LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time)
     :size_(max_pending_log)
     ,granularity_(granularity)
+    ,counter_(0)
     ,buffer_(size_, granularity_ + sizeof(LogEntity))
     ,pendingMsg_(size_ + 1)
     ,timeout_(flush_time)
@@ -120,7 +124,11 @@ void LogWorker::Run()
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
             continue;
 
+#ifndef LOG_NO_PENDING
+        ts.tv_nsec =  100;
+#else
         ts.tv_sec += timeout_;
+#endif
 
         while (sem_timedwait(&sig_,&ts) == -1 && errno == EINTR)
             continue;
@@ -158,6 +166,21 @@ size_t LogWorker::DoLog(LogEntity* buffer)
     return granularity_ - 1;
 }
 
+
+size_t LogWorker::PatchTimeStamp(char* buff)
+{
+    long long c = atomic_increment(&counter_);
+    time_t now;
+    struct tm timeinfo;
+
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    size_t tl = sprintf(buff, "[%llu]", c);
+    tl += strftime(buff + tl, 32, "[%X %x]", &timeinfo);
+    return tl;
+}
+
 // if lenght of msg is larger than granularity_.
 // msg will not log completely.
 size_t LogWorker::Log(ostream* fout, const std::string& msg)
@@ -177,8 +200,8 @@ size_t LogWorker::Log(ostream* fout, const std::string& msg)
     log->fout = fout;
     char* buffer = log->data;
 
-    strncpy(buffer, msg.c_str(), sz);
-    buffer[sz] = 0;
+    size_t tl = PatchTimeStamp(buffer);
+    strncpy(buffer + tl, msg.c_str(), sz);
 
     return DoLog(log);
 }
@@ -194,7 +217,8 @@ size_t LogWorker::Log(ostream* fout, const char* format, va_list args)
     log->fout = fout;
     char* buffer = log->data;
 
-    vsnprintf(buffer, granularity_ - 1, format, args);
+    size_t tl = PatchTimeStamp(buffer);
+    vsnprintf(buffer + tl, granularity_ - 1, format, args);
 
     return DoLog(log);
 }

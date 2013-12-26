@@ -82,7 +82,7 @@ static void requestHandler(const HttpRequest& req, HttpResponse& response)
 
 TEST(testParsingRequest, HttpContextTest)
 {
-    HttpServer server("127.0.0.1");
+    SocketServer server;
     LockFreeBuffer buff_alloc(32, 512);
 
     int fake_conn_id = 12;
@@ -92,8 +92,7 @@ TEST(testParsingRequest, HttpContextTest)
 
     // test GET
     context.ResetContext(fake_conn_id);
-    context.AppendData(fake_http_req_get, strlen(fake_http_req_get));
-    context.ProcessHttpRequest();
+    context.ProcessHttpRequest(fake_http_req_get, strlen(fake_http_req_get));
 
     EXPECT_EQ(HttpContext::HS_INVALID, context.ParsingStage());
     EXPECT_FALSE(context.IsKeepAlive());
@@ -113,18 +112,13 @@ TEST(testParsingRequest, HttpContextTest)
     int half_header = header_len/2;
     int half_body = body_len/2;
 
-    context.AppendData(fake_http_req_post_req, req_len);
-    context.ProcessHttpRequest();
+    context.ProcessHttpRequest(fake_http_req_post_req, req_len);
 
-    context.AppendData(fake_http_req_post_header, half_header);
-    context.ProcessHttpRequest();
-    context.AppendData(fake_http_req_post_header + half_header, header_len - half_header);
-    context.ProcessHttpRequest();
+    context.ProcessHttpRequest(fake_http_req_post_header, half_header);
+    context.ProcessHttpRequest(fake_http_req_post_header + half_header, header_len - half_header);
 
-    context.AppendData(fake_http_req_post_body, half_body);
-    context.ProcessHttpRequest();
-    context.AppendData(fake_http_req_post_body + half_body, body_len - half_body);
-    context.ProcessHttpRequest();
+    context.ProcessHttpRequest(fake_http_req_post_body, half_body);
+    context.ProcessHttpRequest(fake_http_req_post_body + half_body, body_len - half_body);
 
     EXPECT_EQ(HttpContext::HS_INVALID, context.ParsingStage());
     EXPECT_TRUE(context.IsKeepAlive());

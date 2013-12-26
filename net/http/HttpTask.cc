@@ -3,6 +3,8 @@
 #include "net/http/HttpRequest.h"
 #include "net/http/HttpRequest.h"
 
+#include "sys/Log.h"
+
 #include <map>
 #include <string>
 #include <time.h>
@@ -70,35 +72,31 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
     strftime(tmp, sizeof(tmp), "%a, %d %b %Y %H:%S %Z", &gm);
     response.AddHeader("Date", tmp);
 
-    response.SetCloseConn(true);
+    response.SetCloseConn(false);
 }
 
-HttpTask::HttpTask(HttpServer* server, LockFreeBuffer& alloc)
+static const int msg_queue_sz = 64;
+
+HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& alloc, LockFreeBuffer& msgPool)
     : ITask(false)
-    , taskClosed_(false)
-    , httpServer_(server)
+    , tcpServer_(server)
     , context_(*server, alloc, &DefaultHttpRequestHandler)
-    , sockMsgQueue_(64)
+    , msgPool_(msgPool)
+    , sockMsgQueue_(msg_queue_sz)
 {
+    pthread_mutex_init(&lock_, NULL);
 }
 
 HttpTask::~HttpTask()
 {
     ReleaseTask();
+    pthread_mutex_destroy(&lock_);
 }
 
 void HttpTask::ReleaseTask()
 {
     context_.ReleaseContext();
-    ClearMsgQueue();
-    taskClosed_ = true;
     SetAffinity(-1);
-}
-
-void HttpTask::CloseTask()
-{
-    taskClosed_ = true;
-    ClearMsgQueue();
 }
 
 bool HttpTask::PostSockMsg(SocketEvent* msg)
@@ -106,44 +104,48 @@ bool HttpTask::PostSockMsg(SocketEvent* msg)
     return sockMsgQueue_.Push(msg);
 }
 
-void HttpTask::ClearMsgQueue()
-{
-    SocketEvent* msg;
-    while (sockMsgQueue_.Pop((void**)&msg))
-    {
-        httpServer_->ReleaseSockMsg(msg);
-    }
-}
-
-void HttpTask::ResetTask(int connid)
+void HttpTask::ResetTask(int connid, int affinity)
 {
     context_.ResetContext(connid);
-    taskClosed_ = false;
+    SetAffinity(affinity);
 }
 
 void HttpTask::ProcessHttpData(const char* data, size_t sz)
 {
-    context_.AppendData(data, sz);
-    context_.ProcessHttpRequest();
+    context_.ProcessHttpRequest(data, sz);
 }
 
 void HttpTask::ProcessSocketMessage(SocketEvent* msg)
 {
     switch (msg->code)
     {
+        case SC_ACCEPT:
+            {
+                int id = msg->msg.ud;
+                int affinity = ITask::GetThreadId();
+
+                ResetTask(id, affinity);
+
+                slog(LOG_INFO, "httptask accept(%d)", id);
+            }
+            break;
+        case SC_CLOSE:
+            {
+                int id = msg->msg.fd;
+                slog(LOG_INFO, "httptask closed(%d)", msg->msg.fd);
+                ReleaseTask();
+            }
+            break;
         case SC_DATA:
             {
+                slog(LOG_INFO, "httptask data(%d)", msg->msg.fd);
                 ProcessHttpData(msg->msg.data, msg->msg.ud);
             }
             break;
         case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
+                slog(LOG_INFO, "httptask send done(%d)", msg->msg.fd);
                 context_.HandleSendDone();
-            }
-            break;
-        case SC_CLOSE:
-            {
-                ReleaseTask();
             }
             break;
         default:
@@ -157,13 +159,17 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
 
 void HttpTask::Run()
 {
+    if (pthread_mutex_trylock(&lock_)) return;
+
     SocketEvent* msg;
     while (sockMsgQueue_.Pop((void**)&msg))
     {
-        if (taskClosed_ == false) ProcessSocketMessage(msg);
-
-        httpServer_->ReleaseSockMsg(msg);
+        ProcessSocketMessage(msg);
+        SocketServer::DefaultSockEventHandler(*msg);
+        msgPool_.ReleaseBuffer(msg);
     }
+
+    pthread_mutex_unlock(&lock_);
 }
 
 

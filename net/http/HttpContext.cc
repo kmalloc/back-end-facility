@@ -5,8 +5,8 @@
 #include <string>
 #include <algorithm>
 
-HttpContext::HttpContext(HttpServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
-    : keepalive_(false), curStage_(HS_INVALID)
+HttpContext::HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
+    : keepalive_(false), status_(HS_CLOSED), curStage_(HS_INVALID)
     , buffer_(alloc), conn_(server), callBack_(cb)
 {
 }
@@ -20,30 +20,23 @@ void HttpContext::ResetContext(int connid)
 {
     ReleaseContext();
 
+    status_ = HS_CONNECTED;
     buffer_.ResetBuffer();
     conn_.ResetConnection(connid);
 }
 
+// call this function only when connection is already closed
 void HttpContext::ReleaseContext()
 {
+    status_ = HS_CLOSED;
     keepalive_ = false;
     curStage_ = HS_REQUEST_LINE;
 
     request_.CleanUp();
     response_.CleanUp();
 
+    conn_.ReleaseConnection();
     buffer_.ReleaseBuffer();
-    conn_.CloseConnection();
-}
-
-void HttpContext::AppendData(const char* data, size_t sz)
-{
-    size_t size = buffer_.Append(data, sz);
-
-    if (size < sz)
-    {
-        slog(LOG_WARN, "http context append data failed, perhaps buffer is full for the connectioin:%d", conn_.GetConnectionId());
-    }
 }
 
 // in normal case, this should be called after respone is done.
@@ -56,7 +49,8 @@ void HttpContext::CleanData()
 
 void HttpContext::ForceCloseConnection()
 {
-    ReleaseContext();
+    status_ = HS_CLOSING;
+    conn_.CloseConnection();
 }
 
 void HttpContext::DoResponse()
@@ -86,12 +80,20 @@ void HttpContext::HandleSendDone()
 {
     if (!keepalive_)
     {
-        ForceCloseConnection();
+       // ForceCloseConnection();
     }
 }
 
-void HttpContext::ProcessHttpRequest()
+void HttpContext::ProcessHttpRequest(const char* data, size_t sz)
 {
+    if (status_ != HS_CONNECTED) return;
+
+    size_t size = buffer_.Append(data, sz);
+    if (size < sz)
+    {
+        slog(LOG_WARN, "http context append data failed, perhaps buffer is full for the connectioin:%d", conn_.GetConnectionId());
+    }
+
     if (ShouldParseRequestLine())
     {
         if (!ParseRequestLine())

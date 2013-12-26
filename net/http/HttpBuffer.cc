@@ -20,22 +20,17 @@ HttpBuffer::~HttpBuffer()
 
 bool HttpBuffer::ResetBuffer()
 {
-    if (buff_) bufferAlloc_.ReleaseBuffer(buff_);
-
     start_ = end_ = cur_ = 0;
-    buff_ = bufferAlloc_.AllocBuffer();
+    if (buff_ == NULL) buff_ = bufferAlloc_.AllocBuffer();
 
     assert(buff_);
-    memset(buff_, 0, size_);
+    memset(buff_, 0, 2);
 
     return buff_ != NULL;
 }
 
 void HttpBuffer::ReleaseBuffer()
 {
-    if (buff_) bufferAlloc_.ReleaseBuffer(buff_);
-
-    buff_ = NULL;
     start_ = end_ = cur_ = 0;
 }
 

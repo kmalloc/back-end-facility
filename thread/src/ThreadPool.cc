@@ -217,6 +217,8 @@ void Dispatcher::DispatchTask(ITask* task)
     if (affinity < 0 || affinity >= workerNum_)
     {
         assert(freeWorker_);
+
+        task->SetThreadId(freeWorker_->GetWorkerId());
         freeWorker_->PostTask(task);
         freeWorker_ = NULL;
     }
@@ -227,6 +229,7 @@ void Dispatcher::DispatchTask(ITask* task)
 
         if (worker == freeWorker_) freeWorker_ = NULL;
 
+        task->SetThreadId(worker->GetWorkerId());
         worker->PostTask(task);
     }
 }

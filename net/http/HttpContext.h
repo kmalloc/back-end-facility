@@ -14,19 +14,24 @@
 #include "net/http/HttpResponse.h"
 #include "net/http/HttpCallBack.h"
 
+enum HttpStatus
+{
+    HS_CLOSING,
+    HS_CLOSED,
+    HS_CONNECTED,
+};
+
 class HttpContext: public noncopyable
 {
     public:
 
-        HttpContext(HttpServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
+        HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
         ~HttpContext();
 
         void ResetContext(int connid);
         void ReleaseContext();
 
-        void AppendData(const char* data, size_t sz);
-
-        void ProcessHttpRequest();
+        void ProcessHttpRequest(const char* data ,size_t sz);
 
         const HttpRequest& GetRequest() const { return request_; }
 
@@ -71,6 +76,8 @@ class HttpContext: public noncopyable
         void ForceCloseConnection();
 
         bool keepalive_;
+        HttpStatus status_;
+
         ParseStage curStage_;
 
         HttpRequest request_;

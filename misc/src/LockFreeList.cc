@@ -164,10 +164,14 @@ bool LockFreeListQueue::Pop(void*& data)
 
     while (1)
     {
+        // out points to the first node, this a dummy node.
         out.val  = atomic_read_double(&out_);
         in.val   = atomic_read_double(&in_);
 
+        // read the dummy node
         LockFreeListNode* node_head = (LockFreeListNode*)atomic_read(&out.vals[1]);
+
+        // get next node, which is a real node if exists
         next.val = atomic_read_double(&node_head->next);
 
         if (IsDoublePointerNull(next)) return false;

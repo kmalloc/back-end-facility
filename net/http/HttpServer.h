@@ -17,7 +17,6 @@ class HttpServer: public noncopyable
         void StopServer();
 
         void SendData(int connid, const char* data, int sz, bool copy = true);
-        void CloseConnection(int connid);
 
         void ReleaseSockMsg(SocketEvent* msg);
 
