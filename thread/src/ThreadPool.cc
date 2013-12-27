@@ -392,7 +392,7 @@ bool ThreadPool::IsRunning() const
     return running_;
 }
 
-int ThreadPool::GetTaskNumber()
+int ThreadPool::GetTaskNumber() const
 {
     return worker_->GetTaskNumber();
 }
@@ -400,10 +400,5 @@ int ThreadPool::GetTaskNumber()
 bool ThreadPool::PostTask(ITask* task)
 {
     return worker_->PostTask(task);
-}
-
-int ThreadPool::PickIdleWorker() const
-{
-    return dispatcher_->PickIdleWorker();
 }
 

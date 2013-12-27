@@ -17,7 +17,7 @@ void HttpConnection::CloseConnection()
 {
     if (connId_ == -1) return;
 
-    slog(LOG_INFO, "http connection close, (%d)", connId_);
+    slog(LOG_VERB, "http connection close, (%d)", connId_);
 
     sockServer_.CloseSocket(connId_);
     connId_ = -1;

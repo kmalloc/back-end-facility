@@ -159,7 +159,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
         case SC_ERROR:
         case SC_BADSOCK:
             {
-                slog(LOG_ERROR, "socket error, connect id(%d)\n", evt.msg.fd);
+                slog(LOG_WARN, "socket error, connect id(%d)\n", evt.msg.fd);
             }
             break;
         default:
@@ -182,11 +182,6 @@ HttpServer::~HttpServer()
     delete impl_;
 }
 
-void HttpServer::SendData(int connid, const char* data, int sz, bool copy)
-{
-    impl_->SendData(connid, data, sz, copy);
-}
-
 void HttpServer::StartServer()
 {
     impl_->StartServer();
@@ -196,10 +191,4 @@ void HttpServer::StopServer()
 {
     impl_->StopServer();
 }
-
-void HttpServer::ReleaseSockMsg(SocketEvent* msg)
-{
-    impl_->ReleaseSockMsg(msg);
-}
-
 

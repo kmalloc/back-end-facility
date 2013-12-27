@@ -49,9 +49,18 @@ void slog_fatal(const char* format, va_list arg)
 
 // TODO specify log level to filter log
 // the smaller the value is the the fewer log get filterred.
+
+
+static volatile int g_logLevel = LOG_ERROR;
+
 int slog_level()
 {
-    return LOG_LEVELS;
+    return g_logLevel;
+}
+
+void SetLogLevel(int level)
+{
+   g_logLevel = level;
 }
 
 #endif

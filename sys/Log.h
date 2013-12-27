@@ -14,8 +14,9 @@
 enum LogLevel
 {
     LOG_ALL = 0,
-    LOG_DEBUG,
+    LOG_VERB, // verbose
     LOG_INFO,
+    LOG_DEBUG,
     LOG_WARN,
     LOG_ERROR,
     LOG_FATAL,
@@ -32,11 +33,14 @@ void slog_fatal(const char* format, va_list va);
 
 int  slog_level();
 
+// not thread safe
+void SetLogLevel();
+
 inline void slog(LogLevel level, const char* format, ...)
 {
     int threshold = slog_level();
 
-    if (level < 0 || level >= threshold) return;
+    if (level < 0 || level < threshold) return;
 
     typedef void (* proc)(const char*, va_list);
     static const proc arr[LOG_LEVELS] =

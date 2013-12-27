@@ -387,7 +387,7 @@ void ServerImpl::ForceSocketClose(SocketEntity* sock, SocketMessage* result) con
     poll_.RemoveSocket(sock->fd);
     close(sock->fd);
 
-    slog(LOG_INFO, "force closing socket:%d", sock->fd);
+    slog(LOG_VERB, "force closing socket:%d", sock->fd);
     sock->type = SS_INVALID;
 }
 
@@ -425,7 +425,7 @@ SocketEntity* ServerImpl::SetupSocketEntity(int fd, uintptr_t opaque, bool poll)
         return NULL;
     }
 
-    slog(LOG_INFO, "setup socket:%d", fd);
+    slog(LOG_VERB, "setup socket:%d", fd);
     return so;
 }
 
@@ -762,7 +762,7 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
     {
         res->ud = 0;
         res->data = NULL;
-        slog(LOG_ERROR, "try to close bad socket, fd(%d)", fd);
+        slog(LOG_WARN, "try to close bad socket, fd(%d)", fd);
         return SC_BADSOCK;
     }
 
@@ -897,7 +897,7 @@ SocketCode ServerImpl::HandleReadReady(SocketEntity* sock, SocketMessage* result
             case EINTR:
                 break;
             case EAGAIN:
-                slog(LOG_ERROR, "server: read sock done:EAGAIN\n");
+                slog(LOG_DEBUG, "server: read sock done:EAGAIN\n");
                 break;
             default:
                 slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
@@ -1058,7 +1058,7 @@ SocketCode ServerImpl::Poll(SocketMessage* result)
                 // suppose socket is busy receiving data, and the user decides to shutdown the socket
                 // then epoll may catch the stop command and read buffer event at the same epoll() function call.
                 // no harm in this case
-                slog(LOG_ERROR, "server: invalid socket, fd(%d)", sock->fd);
+                slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd);
                 break;
             default:
                 if (event->write)

@@ -125,27 +125,27 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
                 int affinity = ITask::GetThreadId();
 
                 ResetTask(id, affinity);
-
-                slog(LOG_INFO, "httptask accept(%d)", id);
+                slog(LOG_VERB, "httptask accept(%d)", id);
             }
             break;
         case SC_CLOSE:
             {
                 int id = msg->msg.fd;
-                slog(LOG_INFO, "httptask closed(%d)", msg->msg.fd);
+
                 ReleaseTask();
+                slog(LOG_VERB, "httptask closed(%d)", msg->msg.fd);
             }
             break;
         case SC_DATA:
             {
-                slog(LOG_INFO, "httptask data(%d)", msg->msg.fd);
+                slog(LOG_VERB, "httptask data(%d)", msg->msg.fd);
                 ProcessHttpData(msg->msg.data, msg->msg.ud);
             }
             break;
         case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
-                slog(LOG_INFO, "httptask send done(%d)", msg->msg.fd);
                 context_.HandleSendDone();
+                slog(LOG_VERB, "httptask send done(%d)", msg->msg.fd);
             }
             break;
         default:

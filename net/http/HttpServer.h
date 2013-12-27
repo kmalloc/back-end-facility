@@ -16,12 +16,6 @@ class HttpServer: public noncopyable
         void StartServer();
         void StopServer();
 
-        void SendData(int connid, const char* data, int sz, bool copy = true);
-
-        void ReleaseSockMsg(SocketEvent* msg);
-
-        HttpImpl* GetImpl() const {  return impl_; }
-
     private:
 
         HttpImpl* impl_;

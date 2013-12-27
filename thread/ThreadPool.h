@@ -16,7 +16,7 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 
         bool PostTask(ITask*);
         bool IsRunning() const;
-        int GetTaskNumber();
+        int GetTaskNumber() const;
         bool StartPooling();
 
         //calling this function will shutdown threadpool in an elegant way.
@@ -29,8 +29,6 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
         //shutdown threadpool immediately.
         //killing all workers.
         void ForceShutdown();
-
-        int PickIdleWorker() const;
 
     protected:
 
