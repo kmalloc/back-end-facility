@@ -25,13 +25,13 @@ class HttpContext: public noncopyable
 {
     public:
 
-        HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb);
+        HttpContext(SocketServer& server, HttpCallBack cb);
         ~HttpContext();
 
         void ResetContext(int connid);
         void ReleaseContext();
 
-        void ProcessHttpRequest(const char* data ,size_t sz);
+        void ProcessHttpRequest(char* data ,short off, short sz);
 
         const HttpRequest& GetRequest() const { return request_; }
 

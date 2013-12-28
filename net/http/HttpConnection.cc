@@ -28,6 +28,12 @@ void HttpConnection::ReleaseConnection()
     connId_ = -1;
 }
 
+void HttpConnection::WatchConnection(uintptr_t opaque, short off)
+{
+    assert(connId_ >= 0);
+    sockServer_.WatchSocket(connId_, opaque, off);
+}
+
 void HttpConnection::ResetConnection(int id)
 {
     connId_ = id;

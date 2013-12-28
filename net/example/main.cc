@@ -110,62 +110,68 @@ static void handler(SocketEvent evt)
             {
                 // user better define msg format, including in some fields to indicate the package size.
                 // so that we can elimite the following string operation which can be very time consuming.
-                int sz = strlen((char*)msg.data) + 1;
+
+                if (msg.u.d[1] == 0)
+                {
+                    server.WatchSocket(msg.fd, NULL, 0);
+                    break;
+                }
+
+                char* data = msg.data + msg.u.d[0];
+
+                int sz = strlen(data) + 1;
                 int left = strlen(g_conn[msg.fd].stream);
 
-                if (sz > msg.ud)
+                if (sz > msg.u.d[1])
                 {
-                    // package partial received.
-                    memcpy(g_conn[msg.fd].stream + left, msg.data, msg.ud);
-                    g_conn[msg.fd].stream[left + msg.ud] = 0;
-                    free(msg.data);
+                    // in this case, package partially received.
+                    memcpy(g_conn[msg.fd].stream + left, data, msg.u.d[1]);
+                    g_conn[msg.fd].stream[left + msg.u.d[1]] = 0;
                     break;
                 }
 
                 int size = left + sz;
 
-                strncat(g_conn[msg.fd].stream, msg.data, sz);
+                strncat(g_conn[msg.fd].stream, data, sz);
 
                 char* txt = g_conn[msg.fd].stream;
 
                 handle_data(msg.fd, txt, size);
 
                 // store the msg that is partial received.
-                left = msg.ud - sz;
+                left = msg.u.d[1] - sz;
                 assert(left >= 0);
 
                 while (left)
                 {
-                    int end = strlen((char*)msg.data + sz) + 1;
+                    int end = strlen(data + sz) + 1;
 
                     if (end <= left)
                     {
-                        handle_data(msg.fd, (char*)msg.data + sz, end);
+                        handle_data(msg.fd, data + sz, end);
                         left -= end;
                         sz += end;
                     }
                     else
                     {
-                        memcpy(g_conn[msg.fd].stream, msg.data + sz, left);
+                        memcpy(g_conn[msg.fd].stream, data + sz, left);
                         break;
                     }
                 }
 
                 g_conn[msg.fd].stream[left] = 0;
-
-                free(msg.data);
                 break;
             }
         case SC_ACCEPT:
             {
-                cout << "socket(" << msg.ud << ") accepted, from server id: " << msg.fd << endl;
+                cout << "socket(" << msg.u.ud << ") accepted, from server id: " << msg.fd << endl;
 
                 int op = atomic_increment(&g_op);
-                server.WatchSocket(msg.ud, op);
+                server.WatchSocket(msg.u.ud, op);
             }
             break;
         case SC_SEND:
-            cout << "socket(" << msg.fd << ") send buffer done:" << msg.ud << endl;
+            cout << "socket(" << msg.fd << ") send buffer done:" << msg.u.d[0] << endl;
             break;
         case SC_HALFSEND:
             cout << "socket(" << msg.fd << ") sending buffer, buffer send:"

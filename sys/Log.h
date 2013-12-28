@@ -27,6 +27,7 @@ enum LogLevel
 void slog_all(const char* format, va_list va);
 void slog_debug(const char* format, va_list va);
 void slog_info(const char* format, va_list va);
+void slog_verb(const char* format, va_list va);
 void slog_warn(const char* format, va_list va);
 void slog_error(const char* format, va_list va);
 void slog_fatal(const char* format, va_list va);
@@ -46,8 +47,9 @@ inline void slog(LogLevel level, const char* format, ...)
     static const proc arr[LOG_LEVELS] =
     {
         slog_all,
-        slog_debug,
+        slog_verb,
         slog_info,
+        slog_debug,
         slog_warn,
         slog_error,
         slog_fatal

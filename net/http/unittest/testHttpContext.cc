@@ -3,10 +3,10 @@
 #include "net/http/HttpContext.h"
 
 // only request line.
-static const char* fake_http_req_get = "GET http://my.localhost.hl?test=v&name=miliao HTTP/1.1\r\n\r\n";
+static char fake_http_req_get[] = "GET http://my.localhost.hl?test=v&name=miliao HTTP/1.1\r\n\r\n";
 
-static const char* fake_http_req_post_req = "POST http://my.localhost.cc?test=p&name=miliao2 HTTP/1.1\r\n";
-static const char* fake_http_req_post_header =
+static char fake_http_req_post_req[] = "POST http://my.localhost.cc?test=p&name=miliao2 HTTP/1.1\r\n";
+static char fake_http_req_post_header[] =
 "Accept: image/git, image/x-xbitmap, image/jpeg\r\n\
 Referer: xxxx.xxx\r\n\
 Accept-Language: en-us\r\n\
@@ -18,7 +18,7 @@ Host: www.xmalloc.com\r\n\
 Cookie: utmc=226521935; utma=226521935.31911776\r\n\
 \r\n";
 
-static const char* fake_http_req_post_body = "abcdabcdabcdabcdabcdabcdabcdabcd";
+static char fake_http_req_post_body[] = "abcdabcdabcdabcdabcdabcdabcdabcd";
 
 static int g_curr_req = 0;
 
@@ -88,11 +88,11 @@ TEST(testParsingRequest, HttpContextTest)
     int fake_conn_id = 12;
 
     g_curr_req = 0;
-    HttpContext context(server, buff_alloc, &requestHandler);
+    HttpContext context(server, &requestHandler);
 
     // test GET
     context.ResetContext(fake_conn_id);
-    context.ProcessHttpRequest(fake_http_req_get, strlen(fake_http_req_get));
+    context.ProcessHttpRequest(fake_http_req_get, 0, strlen(fake_http_req_get));
 
     EXPECT_EQ(HttpContext::HS_INVALID, context.ParsingStage());
     EXPECT_FALSE(context.IsKeepAlive());
@@ -112,13 +112,13 @@ TEST(testParsingRequest, HttpContextTest)
     int half_header = header_len/2;
     int half_body = body_len/2;
 
-    context.ProcessHttpRequest(fake_http_req_post_req, req_len);
+    context.ProcessHttpRequest(fake_http_req_post_req, 0, req_len);
 
-    context.ProcessHttpRequest(fake_http_req_post_header, half_header);
-    context.ProcessHttpRequest(fake_http_req_post_header + half_header, header_len - half_header);
+    context.ProcessHttpRequest(fake_http_req_post_header, 0, half_header);
+    context.ProcessHttpRequest(fake_http_req_post_header, half_header, header_len - half_header);
 
-    context.ProcessHttpRequest(fake_http_req_post_body, half_body);
-    context.ProcessHttpRequest(fake_http_req_post_body + half_body, body_len - half_body);
+    context.ProcessHttpRequest(fake_http_req_post_body, 0, half_body);
+    context.ProcessHttpRequest(fake_http_req_post_body, half_body, body_len - half_body);
 
     EXPECT_EQ(HttpContext::HS_INVALID, context.ParsingStage());
     EXPECT_TRUE(context.IsKeepAlive());

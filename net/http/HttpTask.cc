@@ -77,10 +77,10 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
 
 static const int msg_queue_sz = 64;
 
-HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& alloc, LockFreeBuffer& msgPool)
+HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& msgPool)
     : ITask(false)
     , tcpServer_(server)
-    , context_(*server, alloc, &DefaultHttpRequestHandler)
+    , context_(*server, &DefaultHttpRequestHandler)
     , msgPool_(msgPool)
     , sockMsgQueue_(msg_queue_sz)
 {
@@ -110,9 +110,9 @@ void HttpTask::ResetTask(int connid, int affinity)
     SetAffinity(affinity);
 }
 
-void HttpTask::ProcessHttpData(const char* data, size_t sz)
+void HttpTask::ProcessHttpData(char* data, short off, short sz)
 {
-    context_.ProcessHttpRequest(data, sz);
+    context_.ProcessHttpRequest(data, off, sz);
 }
 
 void HttpTask::ProcessSocketMessage(SocketEvent* msg)
@@ -121,7 +121,7 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
     {
         case SC_ACCEPT:
             {
-                int id = msg->msg.ud;
+                int id = msg->msg.u.ud;
                 int affinity = ITask::GetThreadId();
 
                 ResetTask(id, affinity);
@@ -130,8 +130,6 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
             break;
         case SC_CLOSE:
             {
-                int id = msg->msg.fd;
-
                 ReleaseTask();
                 slog(LOG_VERB, "httptask closed(%d)", msg->msg.fd);
             }
@@ -139,7 +137,7 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
         case SC_DATA:
             {
                 slog(LOG_VERB, "httptask data(%d)", msg->msg.fd);
-                ProcessHttpData(msg->msg.data, msg->msg.ud);
+                ProcessHttpData(msg->msg.data, msg->msg.u.d[0], msg->msg.u.d[1]);
             }
             break;
         case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
@@ -165,7 +163,6 @@ void HttpTask::Run()
     while (sockMsgQueue_.Pop((void**)&msg))
     {
         ProcessSocketMessage(msg);
-        SocketServer::DefaultSockEventHandler(*msg);
         msgPool_.ReleaseBuffer(msg);
     }
 

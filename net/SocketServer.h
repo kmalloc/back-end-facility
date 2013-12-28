@@ -15,10 +15,17 @@ struct SocketMessage
     int   fd; // socket id associated with the event.
     uintptr_t   opaque;
 
-    // for send/halfsend buffer event, ud == buffer size that is sended.
-    // for read complete event, ud == size of read buffer.
-    // for socket accept event, this the socket that is accepted.
-    int   ud;
+    // 1) for send/halfsend buffer event, ud == buffer size that is sended.
+    // 2) for read complete event, d[0] == buffer offset, d[1] == size of read buffer.
+    //    if d[1] == 0, then socket buffer is full, socket is removed from watch list,
+    //    enable it, user must call WatchSocket()
+    //
+    // 3) for socket accept event, this the socket that is accepted.
+    union
+    {
+        int  ud;
+        short d[2];
+    }u;
 
     // for socket connected event, this is the hostname of the connected socket.
     // for read socket event, this the data received, size is denoted by ud.
@@ -91,7 +98,7 @@ class SocketServer: public noncopyable
         int SendString(int id, const char* buff);
 
         // add the corresponding socket to be watched.
-        void WatchSocket(int id, uintptr_t opaque);
+        void WatchSocket(int id, uintptr_t opaque = 0, short offset = -1);
 
         int WatchRawSocket(int fd, uintptr_t opaque);
 

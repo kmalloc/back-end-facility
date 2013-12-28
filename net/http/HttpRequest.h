@@ -155,6 +155,8 @@ class HttpRequest
 
         void AppendBody(const char* start, const char* end)
         {
+            if (end - start >= httpBody_.capacity()) return;
+
             httpBody_.append(start, end);
         }
 

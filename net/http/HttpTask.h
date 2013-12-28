@@ -16,7 +16,7 @@ class HttpTask: public ITask
 {
     public:
 
-        HttpTask(SocketServer* server, LockFreeBuffer& alloc, LockFreeBuffer& msgPool);
+        HttpTask(SocketServer* server, LockFreeBuffer& msgPool);
         ~HttpTask();
 
         bool PostSockMsg(SocketEvent* msg);
@@ -32,7 +32,7 @@ class HttpTask: public ITask
 
     private:
 
-        void ProcessHttpData(const char* data, size_t sz);
+        void ProcessHttpData(char* data, short off, short sz);
         void ProcessSocketMessage(SocketEvent* msg);
 
         SocketServer* tcpServer_;

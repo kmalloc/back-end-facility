@@ -28,8 +28,6 @@ class HttpImpl:public noncopyable
 
         void ReleaseSockMsg(SocketEvent* msg);
 
-        void SendData(int connid, const char* data, int sz, bool copy = true);
-
         void SocketEventHandler(SocketEvent evt);
 
     private:
@@ -39,7 +37,6 @@ class HttpImpl:public noncopyable
         SocketServer tcpServer_;
 
         ThreadPool threadPool_;
-        LockFreeBuffer bufferPool_;
         LockFreeBuffer msgPool_;
 
         // connection id to index into it
@@ -53,7 +50,6 @@ HttpImpl::HttpImpl(const char* addr, int port)
     ,port_(port)
     ,tcpServer_()
     ,threadPool_()
-    ,bufferPool_(SocketServer::max_conn_id, 512)
     ,msgPool_(4096, sizeof(SocketEvent))
 {
     int i = 0;
@@ -64,7 +60,7 @@ HttpImpl::HttpImpl(const char* addr, int port)
 
         while (i < SocketServer::max_conn_id)
         {
-            tasks_[i] = new HttpTask(&tcpServer_, bufferPool_, msgPool_);
+            tasks_[i] = new HttpTask(&tcpServer_, msgPool_);
             ++i;
         }
     }
@@ -105,14 +101,8 @@ void HttpImpl::StopServer()
     // handle it in SocketEventHandler
 }
 
-void HttpImpl::SendData(int connid, const char* data, int sz, bool copy)
-{
-    tcpServer_.SendBuffer(connid, data, sz, copy);
-}
-
 void HttpImpl::ReleaseSockMsg(SocketEvent* msg)
 {
-    SocketServer::DefaultSockEventHandler(*msg);
     msgPool_.ReleaseBuffer(msg);
 }
 
@@ -133,7 +123,6 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 SocketEvent* conn_msg = (SocketEvent*)msgPool_.AllocBuffer();
                 if (conn_msg == NULL)
                 {
-                    SocketServer::DefaultSockEventHandler(evt);
                     slog(LOG_ERROR, "httpserver error, out of msg buffer, dropping package");
                     return;
                 }
@@ -141,7 +130,7 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 int id = evt.msg.fd;
                 if (SC_ACCEPT == evt.code)
                 {
-                    id = evt.msg.ud;
+                    id = evt.msg.u.ud;
                 }
 
                 conn_msg->code = evt.code;
@@ -164,7 +153,6 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
             break;
         default:
             {
-                SocketServer::DefaultSockEventHandler(evt);
             }
             break;
     }

@@ -5,9 +5,9 @@
 #include <string>
 #include <algorithm>
 
-HttpContext::HttpContext(SocketServer& server, LockFreeBuffer& alloc, HttpCallBack cb)
+HttpContext::HttpContext(SocketServer& server, HttpCallBack cb)
     : keepalive_(false), status_(HS_CLOSED), curStage_(HS_INVALID)
-    , buffer_(alloc), conn_(server), callBack_(cb)
+    , buffer_(), conn_(server), callBack_(cb)
 {
 }
 
@@ -21,7 +21,7 @@ void HttpContext::ResetContext(int connid)
     ReleaseContext();
 
     status_ = HS_CONNECTED;
-    buffer_.ResetBuffer();
+    buffer_.ReleaseBuffer();
     conn_.ResetConnection(connid);
 }
 
@@ -84,41 +84,44 @@ void HttpContext::HandleSendDone()
     }
 }
 
-void HttpContext::ProcessHttpRequest(const char* data, size_t sz)
+void HttpContext::ProcessHttpRequest(char* buff, short off, short sz)
 {
     if (status_ != HS_CONNECTED) return;
 
-    size_t size = 0;
-
-    while (size < sz)
+    if (sz == 0)
     {
-        size += buffer_.Append(data + size, sz - size);
+        // buffer is full, move the existing to data front.
+        short off = buffer_.MoveData();
+        conn_.WatchConnection(NULL, off);
+        return;
+    }
 
-        if (ShouldParseRequestLine())
+    buffer_.SetBuffer(buff, off, sz);
+
+    if (ShouldParseRequestLine())
+    {
+        if (!ParseRequestLine())
         {
-            if (!ParseRequestLine())
-            {
-                ForceCloseConnection();
-                return;
-            }
+            ForceCloseConnection();
+            return;
         }
+    }
 
-        if (ShouldParseHeader())
+    if (ShouldParseHeader())
+    {
+        if (!ParseHeader())
         {
-            if (!ParseHeader())
-            {
-                ForceCloseConnection();
-                return;
-            }
+            ForceCloseConnection();
+            return;
         }
+    }
 
-        if (ShouldParseBody())
+    if (ShouldParseBody())
+    {
+        if (!ParseBody())
         {
-            if (!ParseBody())
-            {
-                ForceCloseConnection();
-                return;
-            }
+            ForceCloseConnection();
+            return;
         }
     }
 

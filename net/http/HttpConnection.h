@@ -15,7 +15,9 @@ class HttpConnection: public noncopyable
         void ResetConnection(int connid);
 
         void SendData(const char* data, size_t sz, bool copy = true);
+
         void CloseConnection();
+        void WatchConnection(uintptr_t opaque, short off);
         void ReleaseConnection();
 
         int GetConnectionId() const { return connId_; }
