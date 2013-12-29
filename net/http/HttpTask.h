@@ -8,8 +8,6 @@
 #include "net/SocketServer.h"
 #include "net/http/HttpContext.h"
 
-#include <pthread.h>
-
 
 // bind each connection to one thread.
 class HttpTask: public ITask
@@ -25,21 +23,18 @@ class HttpTask: public ITask
 
         virtual void Run();
 
-        void ResetTask(int connid, int affinity);
+        void ResetTask(int connid);
 
         // release only when connectioin is close
         void ReleaseTask();
 
     private:
 
-        void ProcessHttpData(char* data, short off, short sz);
         void ProcessSocketMessage(SocketEvent* msg);
 
         SocketServer* tcpServer_;
         HttpContext context_;
         LockFreeBuffer& msgPool_;
-
-        pthread_mutex_t lock_;
 
         // one http connection can only be handled in one thread
         // so need to queue the msg

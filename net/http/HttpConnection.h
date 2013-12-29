@@ -14,10 +14,11 @@ class HttpConnection: public noncopyable
 
         void ResetConnection(int connid);
 
-        void SendData(const char* data, size_t sz, bool copy = true);
+        int SendBuffer(const char* data, size_t sz) const;
+        int ReadBuffer(char* buffer, int sz) const;
+        void WatchConnection() const;
 
         void CloseConnection();
-        void WatchConnection(uintptr_t opaque, short off);
         void ReleaseConnection();
 
         int GetConnectionId() const { return connId_; }

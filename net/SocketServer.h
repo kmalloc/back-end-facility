@@ -25,9 +25,8 @@ struct SocketMessage
 enum SocketCode
 {
     SC_CLOSE, // SocketEvent::fd is the socket that been close
-    SC_BADSOCK, // SocketEvent::fd denotes the bad socket
-    SC_READREADY, // socket is ready to send data, SocketEvent::fd denotes corresponding fd
-    SC_WRITEREADY, // SocketEvent::fd denotes the socket, SocketEvent::ud denotes the size of data been send.
+    SC_READREADY, // socket is ready to read data, SocketEvent::fd denotes corresponding fd, note: corresponding fd will be removed poller
+    SC_WRITEREADY, // socket is ready to send data, note: corresponding fd is removed from poller.
     SC_LISTENED, // SocketEvent::fd denotes the corresponding socket
     SC_CONNECTED, // SocketEvent::fd denotes the corresponding socket
     SC_ACCEPTED, // SocketEvent::ud denotes the accepted socket, SocketEvent::id denotes the corresponding socket that is listening.
@@ -72,17 +71,17 @@ class SocketServer: public noncopyable
         // return -1 on error.
         int ConnectTo(const char* ip, int port, uintptr_t opaque = 0);
 
-        // close the connected socket identified by id.
-        void CloseSocket(int id, uintptr_t opaque = 0);
-
         // send buffer to socket identified by id.
         // return val denotes the size of data been send.
         // param "watch" decides whether to watch the socket when send is not finished.
         int SendBuffer(int id, const void* buff, int sz, bool watch = true);
         int ReadBuffer(int fd, void* data, int sz, bool watch = true);
 
+        // close the connected socket identified by id.
+        bool CloseSocket(int id);
+
         // add the corresponding socket to be watched.
-        void WatchSocket(int id, uintptr_t opaque = 0);
+        bool WatchSocket(int id);
 
         // by default, newly accepted socket is not watched by epoll.
         // call SetWatchAcceptedSock() to change this behavior.

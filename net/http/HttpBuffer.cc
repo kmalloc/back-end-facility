@@ -17,24 +17,20 @@ HttpBuffer::~HttpBuffer()
     ReleaseBuffer();
 }
 
-void HttpBuffer::ReleaseBuffer()
+void HttpBuffer::ReleaseReadBuffer()
 {
-    buff_ = NULL;
-    end_ = cur_ = 0;
+    endRead_ = curRead_ = 0;
 }
 
-void HttpBuffer::SetBuffer(char* buff, short off, short size)
+void HttpBuffer::MoveReadEndCursor(int off)
 {
-    cur_ = (buff_ == buff)? cur_ : off;
-
-    buff_ = buff;
-    end_  = off + size;
+    endRead_ += off;
 }
 
-void HttpBuffer::Consume(size_t sz)
+void HttpBuffer::ConsumeRead(size_t sz)
 {
-    cur_ += sz;
-    cur_ = (cur_ >= end_)? end_ : cur_;
+    curRead_ += sz;
+    curRead_ = (curRead_ >= endRead_)? endRead_ : curRead_;
 }
 
 const char* HttpBuffer::Get(size_t off) const
@@ -54,7 +50,7 @@ const char* HttpBuffer::GetEnd() const
     return buff_ + end_;
 }
 
-short HttpBuffer::MoveData()
+short HttpBuffer::MoveDataToFront()
 {
     assert(buff_);
 

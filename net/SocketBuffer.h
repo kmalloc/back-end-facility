@@ -1,6 +1,8 @@
 #ifndef __SOCKET_BUFFER_H__
 #define __SOCKET_BUFFER_H__
 
+#define MINI_SOCKET_READ_SIZE (64)
+
 struct SocketBufferNode
 {
     int size_;

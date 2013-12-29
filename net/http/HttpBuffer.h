@@ -3,6 +3,13 @@
 
 #include <stdlib.h>
 #include "misc/NonCopyable.h"
+#include "net/SocketBuffer.h"
+
+struct HttpBufferEntity
+{
+    char* buff;
+    int   size;
+};
 
 class HttpBuffer: public noncopyable
 {
@@ -11,25 +18,29 @@ class HttpBuffer: public noncopyable
         HttpBuffer();
         ~HttpBuffer();
 
-        const char* Get(size_t offset = 0) const;
-        const char* GetStart() const;
-        const char* GetEnd() const;
+        const char* GetRead(size_t offset = 0) const;
+        const char* GetReadStart() const;
+        const char* GetReadEnd() const;
 
-        void Consume(size_t sz);
-        void ReleaseBuffer();
-        void SetBuffer(char* buff, short off, short size);
+        void ConsumeRead(size_t sz);
+        void ReleaseReadBuffer();
+        void ReleaseWriteBuffer();
 
-        short MoveData();
+        bool GetReadBuffer(HttpBufferEntity& entity);
+        bool GetWriteBuffer(HttpBufferEntity& entity);
+
+        short MoveReadDataToFront();
 
         static const char CTRL[];
         static const char HEADER_DELIM[];
 
     private:
 
-        int cur_;
-        int end_;
+        int curRead_;
+        int endRead_;
 
-        char* buff_; // allocate from lockfree buffer pool
+        SocketBufferList readList_;
+        SocketBufferList writeList_;
 };
 
 #endif

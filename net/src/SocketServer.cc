@@ -122,17 +122,15 @@ class ServerImpl: public ThreadBase
         int ListenTo(const char* addr, int port, uintptr_t opaque, int backlog = 64, bool poll = true);
 
         // add socket denoted by fd to epoll for watching.
-        void WatchSocket(int fd, uintptr_t opaque);
+        bool WatchSocket(int fd);
+        bool CloseSocket(int fd);
 
         void SetWatchAcceptedSock(bool watch) { watchAccepted_ = watch; }
 
         int ReadBuffer(int fd, void* buffer, int sz, bool watch);
         int SendBuffer(int fd, const void* buffer, int sz, bool watch);
 
-        void CloseConnection(int sock_id, uintptr_t opaque);
-
         void StartServer();
-
         void StopServer(uintptr_t opaque);
 
     private:
@@ -152,8 +150,6 @@ class ServerImpl: public ThreadBase
         // function that is called in epoll_wait() handler.
         SocketCode ShutdownServer(void* buf, SocketMessage* result);
         SocketCode ConnectSocket(void* buf, SocketMessage* result);
-        SocketCode CloseSocket(void* buf, SocketMessage* result);
-        SocketCode WatchSocket(void* buf, SocketMessage* result);
         SocketCode ListenSocket(void* buf, SocketMessage* result);
 
         // call epoll_wait, and handle the event accordingly
@@ -177,8 +173,6 @@ class ServerImpl: public ThreadBase
         {
             ACTION_CONNECT,
             ACTION_LISTEN,
-            ACTION_WATCH,
-            ACTION_CLOSE,
             ACTION_STOP_SERVER,
 
             ACTION_NONE
@@ -218,8 +212,6 @@ const ServerImpl::ActionHandler ServerImpl::actionHandler_[] =
 {
    &ServerImpl::ConnectSocket,
    &ServerImpl::ListenSocket,
-   &ServerImpl::WatchSocket,
-   &ServerImpl::CloseSocket,
    &ServerImpl::ShutdownServer
 };
 
@@ -306,6 +298,7 @@ void ServerImpl::SetupServer()
 }
 
 // release all pending send-buffer, and close socket.
+// make sure this function is thread safe.
 void ServerImpl::ForceSocketClose(SocketEntity* sock, SocketMessage* result) const
 {
     assert(sock);
@@ -448,8 +441,8 @@ int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
         {
             slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", fd, sock->fd);
 
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
+            // SocketMessage dummy;
+            // ForceSocketClose(sock, &dummy);
             return -1;
         }
     }
@@ -476,8 +469,8 @@ int ServerImpl::ReadBuffer(int fd, void* buffer, int sz, bool watch)
         else
         {
             slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
+            // SocketMessage dummy;
+            // ForceSocketClose(sock, &dummy);
             return -1;
         }
     }
@@ -598,64 +591,46 @@ SocketCode ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
     return ret;
 }
 
-SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
+// make sure this function is thread safe
+bool ServerImpl::CloseSocket(int fd)
 {
-    RequestClose* req = (RequestClose*)buffer;
-
-    int fd = req->fd;
-
-    res->fd = fd;
-    res->ud = SC_CLOSE;
-    res->opaque = req->opaque;
     SocketEntity* sock = &sockets_[fd];
 
     if (sock->type == SS_INVALID || sock->fd != fd)
     {
-        res->data = NULL;
         slog(LOG_WARN, "try to close bad socket, fd(%d)", fd);
-        return SC_BADSOCK;
+        return false;
     }
 
-    ForceSocketClose(sock, res);
+    SocketMessage res;
+    ForceSocketClose(sock, &res);
 }
 
-// add pending socket(acceptted, or open to listen) to epoll
-SocketCode ServerImpl::WatchSocket(void* buffer, SocketMessage* res)
+// make sure this function thread safe.
+bool ServerImpl::WatchSocket(int fd)
 {
-    RequestWatch* req = (RequestWatch*)buffer;
-
-    int fd = req->fd;
-
-    res->fd = fd;
-    res->opaque = req->opaque;
-    res->ud = SC_WATCHED;
-    res->data = NULL;
-
     SocketEntity* sock = &sockets_[fd];
     if (sock->type == SS_PACCEPT || sock->type == SS_PLISTEN || sock->type == SS_PWATCH)
     {
         if (!poll_.AddSocket(sock->fd, sock))
         {
             ResetSocketSlot(sock);
-            return SC_ERROR;
+            return false;
         }
 
-        sock->opaque = req->opaque;
         if (sock->type == SS_PWATCH || sock->type == SS_PACCEPT)
         {
             sock->type = SS_CONNECTED;
-            res->data = "accepted";
         }
         else
         {
             sock->type = SS_LISTEN;
-            res->data = "listen done";
         }
 
-        return SC_WATCHED;
+        return true;
     }
 
-    return SC_BADSOCK;
+    return false;
 }
 
 SocketCode ServerImpl::ShutdownServer(void* buffer, SocketMessage* result)
@@ -697,6 +672,8 @@ SocketCode ServerImpl::HandleReadReady(SocketEntity* sock, SocketMessage* result
     // socket may already closed before read event is handled
     if (sock->type == SS_INVALID) return SC_IERROR;
 
+    // remove from poller.
+    poll_.RemoveSocket(sock->fd);
     return SC_READREADY;
 }
 
@@ -708,6 +685,8 @@ SocketCode ServerImpl::HandleWriteReady(SocketEntity* sock, SocketMessage* resul
     // socket may already closed before read event is handled
     if (sock->type == SS_INVALID) return SC_IERROR;
 
+    // remove from poller.
+    poll_.RemoveSocket(sock->fd);
     return SC_WRITEREADY;
 }
 
@@ -940,24 +919,6 @@ int ServerImpl::ListenTo(const char* addr, int port, uintptr_t opaque, int backl
     return 0;
 }
 
-void ServerImpl::WatchSocket(int fd, uintptr_t opaque)
-{
-    RequestPackage req;
-    req.u.epoll.fd = fd;
-    req.u.epoll.opaque = opaque;
-
-    SendInternalCmd(&req, ACTION_WATCH, sizeof(req.u.epoll));
-}
-
-void ServerImpl::CloseConnection(int sock_id, uintptr_t opaque)
-{
-    RequestPackage req;
-    req.u.close.fd = sock_id;
-    req.u.close.opaque = opaque;
-
-    SendInternalCmd(&req, ACTION_CLOSE, sizeof(req.u.close));
-}
-
 void ServerImpl::StartServer()
 {
     if (isRunning_) return;
@@ -1036,14 +997,14 @@ int SocketServer::ReadBuffer(int fd, void* data, int sz, bool watch)
     return impl_->ReadBuffer(fd, data, sz, watch);
 }
 
-void SocketServer::CloseSocket(int fd, uintptr_t opaque)
+bool SocketServer::CloseSocket(int fd)
 {
-    impl_->CloseConnection(fd, opaque);
+    return impl_->CloseSocket(fd);
 }
 
-void SocketServer::WatchSocket(int fd, uintptr_t opaque)
+bool SocketServer::WatchSocket(int fd)
 {
-    impl_->WatchSocket(fd, opaque);
+    return impl_->WatchSocket(fd);
 }
 
 void SocketServer::DefaultSockEventHandler(SocketEvent event)

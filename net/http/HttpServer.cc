@@ -116,9 +116,9 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
             }
             break;
         case SC_CLOSE:
-        case SC_ACCEPT:
-        case SC_SEND:
-        case SC_DATA:
+        case SC_ACCEPTED:
+        case SC_WRITEREADY:
+        case SC_READREADY:
             {
                 SocketEvent* conn_msg = (SocketEvent*)msgPool_.AllocBuffer();
                 if (conn_msg == NULL)
@@ -128,9 +128,9 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 }
 
                 int id = evt.msg.fd;
-                if (SC_ACCEPT == evt.code)
+                if (SC_ACCEPTED == evt.code)
                 {
-                    id = evt.msg.u.ud;
+                    id = evt.msg.ud;
                 }
 
                 conn_msg->code = evt.code;
@@ -146,7 +146,6 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
             }
             break;
         case SC_ERROR:
-        case SC_BADSOCK:
             {
                 slog(LOG_WARN, "socket error, connect id(%d)\n", evt.msg.fd);
             }

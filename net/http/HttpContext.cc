@@ -65,7 +65,7 @@ void HttpContext::DoResponse()
     {
         size_t sz = response_.GetResponseSize() + 8;
         char* buf = (char*)malloc(sz);
-        if  (buf)
+        if (buf)
         {
              sz = response_.GenerateResponse(buf, sz);
              conn_.SendData(buf, sz, false);
@@ -84,17 +84,9 @@ void HttpContext::HandleSendDone()
     }
 }
 
-void HttpContext::ProcessHttpRequest(char* buff, short off, short sz)
+void HttpContext::ProcessHttpRequest()
 {
     if (status_ != HS_CONNECTED) return;
-
-    if (sz == 0)
-    {
-        // buffer is full, move the existing to data front.
-        short off = buffer_.MoveData();
-        conn_.WatchConnection(NULL, off);
-        return;
-    }
 
     buffer_.SetBuffer(buff, off, sz);
 

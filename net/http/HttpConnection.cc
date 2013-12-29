@@ -7,10 +7,15 @@ HttpConnection::HttpConnection(SocketServer& server)
 {
 }
 
-void HttpConnection::SendData(const char* data, size_t sz, bool copy)
+int HttpConnection::SendBuffer(const char* data, size_t sz) const
 {
     assert(connId_ != -1);
-    sockServer_.SendBuffer(connId_, data, sz, copy);
+    return sockServer_.SendBuffer(connId_, data, sz);
+}
+
+int HttpConnection::ReadBuffer(char* buff, int sz) const
+{
+    return sockServer_.ReadBuffer(connId_, buff, sz);
 }
 
 void HttpConnection::CloseConnection()
@@ -28,10 +33,10 @@ void HttpConnection::ReleaseConnection()
     connId_ = -1;
 }
 
-void HttpConnection::WatchConnection(uintptr_t opaque, short off)
+void HttpConnection::WatchConnection() const
 {
     assert(connId_ >= 0);
-    sockServer_.WatchSocket(connId_, opaque, off);
+    sockServer_.WatchSocket(connId_);
 }
 
 void HttpConnection::ResetConnection(int id)

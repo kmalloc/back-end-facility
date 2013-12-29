@@ -84,19 +84,16 @@ HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& msgPool)
     , msgPool_(msgPool)
     , sockMsgQueue_(msg_queue_sz)
 {
-    pthread_mutex_init(&lock_, NULL);
 }
 
 HttpTask::~HttpTask()
 {
     ReleaseTask();
-    pthread_mutex_destroy(&lock_);
 }
 
 void HttpTask::ReleaseTask()
 {
     context_.ReleaseContext();
-    SetAffinity(-1);
 }
 
 bool HttpTask::PostSockMsg(SocketEvent* msg)
@@ -104,27 +101,18 @@ bool HttpTask::PostSockMsg(SocketEvent* msg)
     return sockMsgQueue_.Push(msg);
 }
 
-void HttpTask::ResetTask(int connid, int affinity)
+void HttpTask::ResetTask(int connid)
 {
     context_.ResetContext(connid);
-    SetAffinity(affinity);
-}
-
-void HttpTask::ProcessHttpData(char* data, short off, short sz)
-{
-    context_.ProcessHttpRequest(data, off, sz);
 }
 
 void HttpTask::ProcessSocketMessage(SocketEvent* msg)
 {
     switch (msg->code)
     {
-        case SC_ACCEPT:
+        case SC_ACCEPTED:
             {
-                int id = msg->msg.u.ud;
-                int affinity = ITask::GetThreadId();
-
-                ResetTask(id, affinity);
+                ResetTask(id, -1);
                 slog(LOG_VERB, "httptask accept(%d)", id);
             }
             break;
@@ -134,15 +122,15 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
                 slog(LOG_VERB, "httptask closed(%d)", msg->msg.fd);
             }
             break;
-        case SC_DATA:
+        case SC_READREADY:
             {
-                slog(LOG_VERB, "httptask data(%d)", msg->msg.fd);
-                ProcessHttpData(msg->msg.data, msg->msg.u.d[0], msg->msg.u.d[1]);
+                slog(LOG_VERB, "httptask read read(%d)", msg->msg.fd);
+                context_.ProcessHttpRead();
             }
             break;
-        case SC_SEND: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
+        case SC_WRITEREADY: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
-                context_.HandleSendDone();
+                context_.ProcessHttpWrite();
                 slog(LOG_VERB, "httptask send done(%d)", msg->msg.fd);
             }
             break;
@@ -157,16 +145,12 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
 
 void HttpTask::Run()
 {
-    if (pthread_mutex_trylock(&lock_)) return;
-
     SocketEvent* msg;
     while (sockMsgQueue_.Pop((void**)&msg))
     {
         ProcessSocketMessage(msg);
         msgPool_.ReleaseBuffer(msg);
     }
-
-    pthread_mutex_unlock(&lock_);
 }
 
 
