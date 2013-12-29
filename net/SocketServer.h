@@ -9,41 +9,28 @@
  * server is based on epoll.
  * internally, there will be an isolated thread polling the socket r/w event.
  */
-
 struct SocketMessage
 {
-    int   fd; // socket id associated with the event.
-    uintptr_t   opaque;
+    int fd; // socket id associated with the event.
 
-    // 1) for send/halfsend buffer event, ud == buffer size that is sended.
-    // 2) for read complete event, d[0] == buffer offset, d[1] == size of read buffer.
-    //    if d[1] == 0, then socket buffer is full, socket is removed from watch list,
-    //    enable it, user must call WatchSocket()
-    //
-    // 3) for socket accept event, this the socket that is accepted.
-    union
-    {
-        int  ud;
-        short d[2];
-    }u;
+    // for socket accept event, this the socket that is accepted.
+    int ud;
 
     // for socket connected event, this is the hostname of the connected socket.
     // for read socket event, this the data received, size is denoted by ud.
     char* data;
+    uintptr_t   opaque;
 };
 
 enum SocketCode
 {
-    SC_NONE,
-    SC_BADSOCK, // SocketEvent::id denotes the bad socket
-    SC_DATA, // SocketEvent::id is the socket that receive data, note: user is responsible to free SocketEvent::data
-    SC_CLOSE, // SocketEvent::id is the socket that been close
-    SC_HALFCLOSE, // SocketEvent::id denotes the corresponding socket
-    SC_LISTEN, // SocketEvent::id denotes the corresponding socket
-    SC_CONNECTED, // SocketEvent::id denotes the corresponding socket
-    SC_ACCEPT, // SocketEvent::ud denotes the accepted socket, SocketEvent::id denotes the corresponding socket that is listening.
-    SC_HALFSEND, // SocketEvent::id denotes the socket, SocketEvent::ud denotes the size of data been send.
-    SC_SEND,  // SocketEvent::id denotes the socket , SocketEvent::ud denotes the size of data been send
+    SC_CLOSE, // SocketEvent::fd is the socket that been close
+    SC_BADSOCK, // SocketEvent::fd denotes the bad socket
+    SC_READREADY, // socket is ready to send data, SocketEvent::fd denotes corresponding fd
+    SC_WRITEREADY, // SocketEvent::fd denotes the socket, SocketEvent::ud denotes the size of data been send.
+    SC_LISTENED, // SocketEvent::fd denotes the corresponding socket
+    SC_CONNECTED, // SocketEvent::fd denotes the corresponding socket
+    SC_ACCEPTED, // SocketEvent::ud denotes the accepted socket, SocketEvent::id denotes the corresponding socket that is listening.
     SC_WATCHED, // socket is added to be watched, SocketEvent::id is the corresponding socket
     SC_ERROR,  // out of resource: socket fd or memory
     SC_IERROR, // error ignored
@@ -58,9 +45,8 @@ struct SocketEvent
     SocketMessage msg;
 };
 
-typedef misc::function<void, SocketEvent> SocketEventHandler;
-
 class ServerImpl;
+typedef misc::function<void, SocketEvent> SocketEventHandler;
 
 class SocketServer: public noncopyable
 {
@@ -84,23 +70,19 @@ class SocketServer: public noncopyable
         // connect to a remote host
         // return value is the connected socket id on success.
         // return -1 on error.
-        int Connect(const char* ip, int port, uintptr_t opaque = 0);
+        int ConnectTo(const char* ip, int port, uintptr_t opaque = 0);
 
         // close the connected socket identified by id.
         void CloseSocket(int id, uintptr_t opaque = 0);
 
         // send buffer to socket identified by id.
-        // param 'copy', control whether we should copy the buff.
-        // if copy == false, please make sure, the buff is allocated from malloc()
-        // because after the buffer is sended, server will freed manually.
-        int SendBuffer(int id, const void* buff, int sz, bool copy = false);
-
-        int SendString(int id, const char* buff);
+        // return val denotes the size of data been send.
+        // param "watch" decides whether to watch the socket when send is not finished.
+        int SendBuffer(int id, const void* buff, int sz, bool watch = true);
+        int ReadBuffer(int fd, void* data, int sz, bool watch = true);
 
         // add the corresponding socket to be watched.
-        void WatchSocket(int id, uintptr_t opaque = 0, short offset = -1);
-
-        int WatchRawSocket(int fd, uintptr_t opaque);
+        void WatchSocket(int id, uintptr_t opaque = 0);
 
         // by default, newly accepted socket is not watched by epoll.
         // call SetWatchAcceptedSock() to change this behavior.

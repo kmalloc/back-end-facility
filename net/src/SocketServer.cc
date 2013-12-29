@@ -20,8 +20,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define MIN_READ_BUFFER (64)
-
 typedef int (* SocketPredicateProc)(int, struct addrinfo*, void*);
 
 enum SocketStatus
@@ -29,39 +27,18 @@ enum SocketStatus
     SS_INVALID,
     SS_LISTEN,
     SS_PLISTEN, // pending listen
+    SS_PWATCH, // pending watch
     SS_CONNECTED,
     SS_CONNECTING,
     SS_PACCEPT, // pending accept
-    SS_HALFCLOSE, // socket is sending pending buffer.
-    SS_BIND
-};
-
-struct SocketBuffer
-{
-    int left_size;
-    int raw_size;
-    char* raw_buffer;
-    char* current_ptr;
-    SocketBuffer* next;
 };
 
 // wrapper of raw socket fd
 struct SocketEntity
 {
     int fd;
-    SocketStatus type;
     uintptr_t opaque;
-    int size; // fixed-size for each read operation.
-
-    // buffer that is pending to send.
-    // this list is only allowed to accessed from writer thread.
-    SocketBuffer* head;
-    SocketBuffer* tail;
-
-    short off_;
-    char* readBuff_; // 4k per connection
-
-    static const short read_buff_sz = 4096;
+    SocketStatus type;
 };
 
 // definitions of internal cmd.
@@ -72,13 +49,6 @@ struct RequestConnect
     uintptr_t opaque;
 
     char host[1];
-};
-
-struct RequestSend
-{
-    int fd;
-    int sz;
-    char* buffer;
 };
 
 struct RequestClose
@@ -103,15 +73,8 @@ struct RequestListen
     char host[1];
 };
 
-struct RequestBind
+struct RequestWatch
 {
-    int fd;
-    uintptr_t opaque;
-};
-
-struct RequestEpoll
-{
-    short offset; // set read buffer offset
     int fd;
     uintptr_t opaque;
 };
@@ -125,12 +88,10 @@ struct RequestPackage
     {
         char buffer[256];
         struct RequestConnect connect;
-        struct RequestSend send;
         struct RequestClose close;
         struct RequestExit exit;
         struct RequestListen listen;
-        struct RequestEpoll epoll;
-        struct RequestBind bind;
+        struct RequestWatch epoll;
     } u;
 
     char padding[256];
@@ -161,14 +122,12 @@ class ServerImpl: public ThreadBase
         int ListenTo(const char* addr, int port, uintptr_t opaque, int backlog = 64, bool poll = true);
 
         // add socket denoted by fd to epoll for watching.
-        void WatchSocket(int fd, uintptr_t opaque, short off);
-
-        // add socket fd to epoll for watching.
-        int WatchRawSocket(int fd, uintptr_t opaque);
+        void WatchSocket(int fd, uintptr_t opaque);
 
         void SetWatchAcceptedSock(bool watch) { watchAccepted_ = watch; }
 
-        int SendData(int sock_id, const void* buffer, int sz);
+        int ReadBuffer(int fd, void* buffer, int sz, bool watch);
+        int SendBuffer(int fd, const void* buffer, int sz, bool watch);
 
         void CloseConnection(int sock_id, uintptr_t opaque);
 
@@ -176,30 +135,26 @@ class ServerImpl: public ThreadBase
 
         void StopServer(uintptr_t opaque);
 
-        int ReserveSocketSlot();
-
-        SocketEntity* SetupSocketEntity(int fd, uintptr_t opaque, bool poll);
-
     private:
 
         inline void ResetSocketSlot(SocketEntity*) const;
         void ForceSocketClose(SocketEntity* so, SocketMessage* res) const;
+        SocketEntity* SetupSocketEntity(int fd, uintptr_t opaque, bool poll);
 
-        int WaitEpollIfNecessary();
+        int WaitPollerIfNecessary();
         SocketCode HandleReadReady(SocketEntity* sock, SocketMessage* result) const;
+        SocketCode HandleWriteReady(SocketEntity* sock, SocketMessage* result) const;
+
         SocketCode HandleAcceptReady(SocketEntity* sock, SocketMessage* result);
         SocketCode HandleConnectDone(SocketEntity* sock, SocketMessage* result);
         SocketCode ProcessInternalCmd(SocketMessage* msg);
-        SocketCode SendPendingBuffer(SocketEntity* sock, SocketMessage* res) const;
 
         // function that is called in epoll_wait() handler.
         SocketCode ShutdownServer(void* buf, SocketMessage* result);
         SocketCode ConnectSocket(void* buf, SocketMessage* result);
         SocketCode CloseSocket(void* buf, SocketMessage* result);
-        SocketCode BindRawSocket(void* buf, SocketMessage* result);
-        SocketCode AddSocketToEpoll(void* buf, SocketMessage* result);
+        SocketCode WatchSocket(void* buf, SocketMessage* result);
         SocketCode ListenSocket(void* buf, SocketMessage* result);
-        SocketCode SendSocketBuffer(void* buffer, SocketMessage* res);
 
         // call epoll_wait, and handle the event accordingly
         SocketCode Poll(SocketMessage* res);
@@ -220,12 +175,10 @@ class ServerImpl: public ThreadBase
 
         enum
         {
-            ACTION_BIND,
             ACTION_CONNECT,
             ACTION_LISTEN,
-            ACTION_EPOLL,
+            ACTION_WATCH,
             ACTION_CLOSE,
-            ACTION_SEND,
             ACTION_STOP_SERVER,
 
             ACTION_NONE
@@ -263,23 +216,12 @@ class ServerImpl: public ThreadBase
 
 const ServerImpl::ActionHandler ServerImpl::actionHandler_[] =
 {
-   &ServerImpl::BindRawSocket,
    &ServerImpl::ConnectSocket,
    &ServerImpl::ListenSocket,
-   &ServerImpl::AddSocketToEpoll,
+   &ServerImpl::WatchSocket,
    &ServerImpl::CloseSocket,
-   &ServerImpl::SendSocketBuffer,
    &ServerImpl::ShutdownServer
 };
-
-static inline void ReleaseFrontBuffer(SocketEntity* sock)
-{
-    SocketBuffer* tmp = sock->head;
-    assert(tmp);
-    sock->head = sock->head->next;
-    free(tmp->raw_buffer);
-    free(tmp);
-}
 
 static size_t CalcMaxFileDesc()
 {
@@ -322,10 +264,7 @@ ServerImpl::ServerImpl(SocketEventHandler handler)
 {
     for (int i = 0; i < maxSocket_; ++i)
     {
-        sockets_[i].head = NULL;
-        sockets_[i].tail = NULL;
         sockets_[i].type = SS_INVALID;
-        sockets_[i].readBuff_ = NULL;
     }
 }
 
@@ -358,10 +297,6 @@ void ServerImpl::SetupServer()
 
     for (int i = 0; i < maxSocket_; ++i)
     {
-        sockets_[i].head = NULL;
-        sockets_[i].tail = NULL;
-        sockets_[i].off_  = 0;
-        sockets_[i].readBuff_ = NULL;
         sockets_[i].type = SS_INVALID;
     }
 
@@ -377,22 +312,11 @@ void ServerImpl::ForceSocketClose(SocketEntity* sock, SocketMessage* result) con
 
     result->fd = sock->fd;
     result->data = 0;
-    result->u.ud = 0;
+    result->ud = 0;
     result->opaque = sock->opaque;
 
     if (sock->type == SS_INVALID) return;
 
-    // release pending buffers.
-    SocketBuffer* wb = sock->head;
-    while (wb)
-    {
-        SocketBuffer* tmp = wb;
-        wb = wb->next;
-        free(tmp->raw_buffer);
-        free(tmp);
-    }
-
-    sock->head = sock->tail = NULL;
     poll_.RemoveSocket(sock->fd);
     close(sock->fd);
 
@@ -407,7 +331,6 @@ void ServerImpl::ShutDownAllSockets()
         SocketMessage dummy;
         SocketEntity* so = &sockets_[i];
         ForceSocketClose(so, &dummy);
-        if (so->readBuff_) free(so->readBuff_);
     }
 
     close(sendCtrlFd_);
@@ -421,23 +344,9 @@ SocketEntity* ServerImpl::SetupSocketEntity(int fd, uintptr_t opaque, bool poll)
     SocketEntity* so = &sockets_[fd];
 
     assert(so->type == SS_INVALID);
-    assert(so->head == NULL);
-    assert(so->tail == NULL);
 
     so->fd = fd;
-    so->size = MIN_READ_BUFFER;
     so->opaque = opaque;
-
-    if (so->readBuff_ == NULL)
-    {
-        so->readBuff_ = (char*)malloc(SocketEntity::read_buff_sz + 2);
-
-        if (so->readBuff_ == NULL) return NULL;
-
-        so->off_ = 0;
-        so->readBuff_[SocketEntity::read_buff_sz] = 0xf8;
-        so->readBuff_[SocketEntity::read_buff_sz + 1] = 0x8f;
-    }
 
     if (poll && !poll_.AddSocket(fd, so))
     {
@@ -517,108 +426,18 @@ _failed:
     return NULL;
 }
 
-// this function should be called in writer thread(one) only.
-SocketCode ServerImpl::SendPendingBuffer(SocketEntity* sock, SocketMessage* res) const
+int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
 {
-    SocketBuffer* buf = NULL;
-    res->fd = sock->fd;
-    res->opaque = sock->opaque;
-
-    int sz_send = 0;
-    while ((buf = sock->head))
-    {
-        while (1)
-        {
-            int sz = write(sock->fd, buf->current_ptr, buf->left_size);
-            if (sz < 0)
-            {
-                if (errno == EINTR) continue;
-                else if (errno == EAGAIN) return SC_HALFSEND;
-
-                slog(LOG_ERROR, "send buffer failed, closing sock(%d)", sock->fd);
-                // ForceSocketClose will free all pending buffers internally.
-                ForceSocketClose(sock, res);
-                return SC_CLOSE;
-            }
-
-            if (sz != buf->left_size)
-            {
-                buf->current_ptr += sz;
-                buf->left_size -= sz;
-                res->u.ud = sz;
-                return SC_HALFSEND;
-            }
-
-            sz_send += sz;
-            break;
-        }
-
-        ReleaseFrontBuffer(sock);
-    }
-
-    res->u.ud = sz_send;
-    sock->tail = NULL;
-
-    // send done, reset epoll flag to read.
-    poll_.ModifySocket(sock->fd, sock, false);
-
-    if (sock->type == SS_HALFCLOSE) ForceSocketClose(sock, res);
-
-    return SC_SEND;
-}
-
-/* ----------------- internal actions ---------------------------------*/
-
-// warn: should be called from writer thread only.
-// buffer will be send immediately if no other buffers are pending to send.
-// otherwise, current buffer will be linked to send buffer queue.
-SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
-{
-    RequestSend* req = (RequestSend*)buffer;
-
-    int fd  = req->fd;
-
     SocketEntity* sock = &sockets_[fd];
 
-    res->fd = fd;
-    res->opaque = sock->opaque;
-
-    if (sock->type == SS_INVALID
-            || sock->fd != fd
-            || sock->type == SS_HALFCLOSE
-            || sock->type == SS_PACCEPT)
+    if (sock->type == SS_INVALID || sock->fd != fd)
     {
-        free(req->buffer);
-        return SC_BADSOCK;
+        return -2;
     }
 
     assert(sock->type != SS_LISTEN && sock->type != SS_PLISTEN);
 
-    res->fd = sock->fd;
-
-    if (sock->head)
-    {
-       SocketBuffer* buf = (SocketBuffer*)malloc(sizeof(SocketBuffer));
-       assert(buf);
-
-       buf->current_ptr = req->buffer;
-       buf->left_size = req->sz;
-       buf->raw_buffer = req->buffer;
-       buf->raw_size   = req->sz;
-
-       assert(sock->tail);
-       assert(sock->tail->next == NULL);
-
-       buf->next = NULL;
-       sock->tail->next = buf;
-       sock->tail = buf;
-
-       res->u.ud = 0;
-
-       return SC_HALFSEND;
-    }
-
-    int n = write(sock->fd, req->buffer, req->sz);
+    int n = write(fd, buffer, sz);
     if (n < 0)
     {
         if (EINTR == errno || EAGAIN == errno)
@@ -627,45 +446,55 @@ SocketCode ServerImpl::SendSocketBuffer(void* buffer, SocketMessage* res)
         }
         else
         {
-            free(req->buffer);
             slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", fd, sock->fd);
-            ForceSocketClose(sock, res);
-            return SC_CLOSE;
+
+            SocketMessage dummy;
+            ForceSocketClose(sock, &dummy);
+            return -1;
         }
     }
 
-    if (n == req->sz)
+    if (n < sz && watch) poll_.AddSocket(fd, sock, true);
+
+    return n;
+}
+
+int ServerImpl::ReadBuffer(int fd, void* buffer, int sz, bool watch)
+{
+    SocketEntity* sock = &sockets_[fd];
+
+    assert(sz);
+    assert(sock->type != SS_INVALID);
+
+    int n = (int)read(fd, buffer, sz);
+    if (n <= 0)
     {
-        free(req->buffer);
-        res->u.ud = n;
-        return SC_SEND;
+        if (errno == EINTR || EAGAIN == errno)
+        {
+            slog(LOG_DEBUG, "server: read sock done:EAGAIN\n");
+        }
+        else
+        {
+            slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
+            SocketMessage dummy;
+            ForceSocketClose(sock, &dummy);
+            return -1;
+        }
     }
 
-    SocketBuffer* buf = (SocketBuffer*)malloc(sizeof(SocketBuffer));
-    assert(buf);
+    if (watch) poll_.AddSocket(fd, sock);
 
-    buf->next = NULL;
-    buf->current_ptr = req->buffer + n;
-    buf->left_size = req->sz - n;
-    buf->raw_buffer = req->buffer;
-    buf->raw_size = req->sz;
-
-    sock->head = sock->tail = buf;
-
-    // set epoll to watch write event.
-    poll_.ModifySocket(sock->fd, sock, true);
-
-    res->u.ud = n;
-
-    return SC_HALFSEND;
+    return n;
 }
+
+/* ----------------- internal actions ---------------------------------*/
 
 SocketCode ServerImpl::ConnectSocket(void* buffer, SocketMessage* res)
 {
     RequestConnect* req = (RequestConnect*)buffer;
 
     res->opaque = req->opaque;
-    res->u.ud     = 0;
+    res->ud   = 0;
     res->data   = NULL;
 
     char port[16];
@@ -755,7 +584,7 @@ SocketCode ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
     if (req->poll)
     {
         new_sock->type = SS_LISTEN;
-        ret = SC_LISTEN;
+        ret = SC_LISTENED;
     }
     else
     {
@@ -763,7 +592,7 @@ SocketCode ServerImpl::ListenSocket(void* buffer, SocketMessage* res)
         ret = SC_SUCC;
     }
 
-    res->u.ud = 0;
+    res->ud = 0;
     res->data = NULL;
 
     return ret;
@@ -776,70 +605,34 @@ SocketCode ServerImpl::CloseSocket(void* buffer, SocketMessage* res)
     int fd = req->fd;
 
     res->fd = fd;
+    res->ud = SC_CLOSE;
     res->opaque = req->opaque;
     SocketEntity* sock = &sockets_[fd];
 
     if (sock->type == SS_INVALID || sock->fd != fd)
     {
-        res->u.ud = 0;
         res->data = NULL;
         slog(LOG_WARN, "try to close bad socket, fd(%d)", fd);
         return SC_BADSOCK;
     }
 
-    if (sock->head)
-    {
-        poll_.ModifySocket(sock->fd, sock, true);
-        SendPendingBuffer(sock, res);
-    }
-
-    if (sock->head == NULL)
-    {
-        ForceSocketClose(sock, res);
-        res->fd = fd;
-        res->opaque = req->opaque;
-        return SC_CLOSE;
-    }
-
-    // still have pending buffers.
-    // socket will be closed after all buffers are send.
-    sock->type = SS_HALFCLOSE;
-    return SC_HALFCLOSE;
-}
-
-SocketCode ServerImpl::BindRawSocket(void* buffer, SocketMessage* res)
-{
-    RequestBind* req = (RequestBind*)buffer;
-
-    int fd = req->fd;
-    res->fd = fd;
-    res->opaque = req->opaque;
-    res->u.ud = 0;
-
-    SocketEntity* sock = SetupSocketEntity(req->fd, req->opaque, true);
-
-    SocketPoll::SetSocketNonBlocking(req->fd);
-    sock->opaque = req->opaque;
-    sock->type = SS_BIND;
-    res->data = "binding";
-    return SC_CONNECTED;
+    ForceSocketClose(sock, res);
 }
 
 // add pending socket(acceptted, or open to listen) to epoll
-SocketCode ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
+SocketCode ServerImpl::WatchSocket(void* buffer, SocketMessage* res)
 {
-    RequestEpoll* req = (RequestEpoll*)buffer;
+    RequestWatch* req = (RequestWatch*)buffer;
 
     int fd = req->fd;
-    short off = req->offset;
 
     res->fd = fd;
     res->opaque = req->opaque;
-    res->u.ud = 0;
+    res->ud = SC_WATCHED;
     res->data = NULL;
 
     SocketEntity* sock = &sockets_[fd];
-    if (sock->type == SS_PACCEPT || sock->type == SS_PLISTEN)
+    if (sock->type == SS_PACCEPT || sock->type == SS_PLISTEN || sock->type == SS_PWATCH)
     {
         if (!poll_.AddSocket(sock->fd, sock))
         {
@@ -848,7 +641,7 @@ SocketCode ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
         }
 
         sock->opaque = req->opaque;
-        if (sock->type == SS_PACCEPT)
+        if (sock->type == SS_PWATCH || sock->type == SS_PACCEPT)
         {
             sock->type = SS_CONNECTED;
             res->data = "accepted";
@@ -859,12 +652,10 @@ SocketCode ServerImpl::AddSocketToEpoll(void* buffer, SocketMessage* res)
             res->data = "listen done";
         }
 
-        if (off >= 0) sock->off_ = off;
-
         return SC_WATCHED;
     }
 
-    return SC_SUCC;
+    return SC_BADSOCK;
 }
 
 SocketCode ServerImpl::ShutdownServer(void* buffer, SocketMessage* result)
@@ -875,7 +666,7 @@ SocketCode ServerImpl::ShutdownServer(void* buffer, SocketMessage* result)
 
     result->opaque = req->opaque;
     result->fd = 0;
-    result->u.ud = 0;
+    result->ud = 0;
     result->data = NULL;
 
     return SC_EXIT;
@@ -900,75 +691,24 @@ SocketCode ServerImpl::ProcessInternalCmd(SocketMessage* result)
 
 SocketCode ServerImpl::HandleReadReady(SocketEntity* sock, SocketMessage* result) const
 {
-    int sz = sock->size;
-    char* buffer = sock->readBuff_ + sock->off_;
-
-    sz = (SocketEntity::read_buff_sz - sock->off_ > sz)? sz : SocketEntity::read_buff_sz - sock->off_;
-
     result->fd = sock->fd;
     result->opaque = sock->opaque;
-
-    if (sz == 0)
-    {
-        // read-buffer is full.
-        // notify caller.
-        poll_.RemoveSocket(sock->fd);
-        sock->type = SS_PACCEPT;
-
-        result->u.d[0] = sock->off_;
-        result->u.d[1] = 0;
-        result->data = sock->readBuff_;
-
-        return SC_DATA;
-    }
 
     // socket may already closed before read event is handled
     if (sock->type == SS_INVALID) return SC_IERROR;
 
-    int n = (int)read(sock->fd, buffer, sz);
+    return SC_READREADY;
+}
 
-    if (n < 0)
-    {
-        switch (errno)
-        {
-            case EINTR:
-                break;
-            case EAGAIN:
-                slog(LOG_DEBUG, "server: read sock done:EAGAIN\n");
-                break;
-            default:
-                slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
-                ForceSocketClose(sock, result);
-                return SC_CLOSE;
-        }
+SocketCode ServerImpl::HandleWriteReady(SocketEntity* sock, SocketMessage* result) const
+{
+    result->fd = sock->fd;
+    result->opaque = sock->opaque;
 
-        return SC_IERROR;
-    }
+    // socket may already closed before read event is handled
+    if (sock->type == SS_INVALID) return SC_IERROR;
 
-    if (n == 0)
-    {
-        slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
-        ForceSocketClose(sock, result);
-        return SC_CLOSE;
-    }
-
-    if (sock->type == SS_HALFCLOSE)
-    {
-        // ignore read since socket is closing.
-        return SC_IERROR;
-    }
-
-    if (n == sz) sock->size *= 2;
-    else if (sz > MIN_READ_BUFFER && n * 2 < sz) sock->size /= 2;
-
-    result->u.d[0] = sock->off_;
-    result->u.d[1] = n;
-
-    result->data = sock->readBuff_;
-
-    sock->off_ += n;
-
-    return SC_DATA;
+    return SC_WRITEREADY;
 }
 
 SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* result)
@@ -988,7 +728,7 @@ SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock, SocketMessage* resu
     else
     {
         sock->type = SS_CONNECTED;
-        result->u.ud = 0;
+        result->ud = 0;
         poll_.ModifySocket(sock->fd, sock, false);
 
         // retrieve peer name of the connected socket.
@@ -1035,7 +775,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     else new_sock->type = SS_PACCEPT;
 
     result->opaque = sock->opaque;
-    result->u.ud = client_fd; // newly accepted socket fd.
+    result->ud = client_fd; // newly accepted socket fd.
     result->data = NULL;
 
     void* sin_addr = (ua.s.sa_family == AF_INET)?
@@ -1049,7 +789,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock, SocketMessage* resu
     return SC_SUCC;
 }
 
-int ServerImpl::WaitEpollIfNecessary()
+int ServerImpl::WaitPollerIfNecessary()
 {
     if (pollEventIndex_ != pollEventNum_) return 1;
 
@@ -1071,7 +811,7 @@ SocketCode ServerImpl::Poll(SocketMessage* result)
     while (1)
     {
         int ret = 0;
-        if ((ret = WaitEpollIfNecessary()) < 0) continue;
+        if ((ret = WaitPollerIfNecessary()) < 0) continue;
 
         PollEvent* event = &pollEvent_[pollEventIndex_++];
         SocketEntity* sock = (SocketEntity*)event->data;
@@ -1090,20 +830,25 @@ SocketCode ServerImpl::Poll(SocketMessage* result)
             case SS_CONNECTING:
                 return HandleConnectDone(sock, result);
             case SS_LISTEN:
-                if (HandleAcceptReady(sock, result) == SC_SUCC)
-                    return SC_ACCEPT;
+                {
+                    int ret = HandleAcceptReady(sock, result);
+                    if (ret == SC_SUCC)
+                    {
+                        return SC_ACCEPTED;
+                    }
+                    else
+                    {
+                        slog(LOG_WARN, "server accept erro");
+                    }
+                }
                 break;
             case SS_INVALID:
-                // this is due to close event is handled before the read event.
-                // suppose socket is busy receiving data, and the user decides to shutdown the socket
-                // then epoll may catch the stop command and read buffer event at the same epoll() function call.
-                // no harm in this case
                 slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd);
                 break;
             default:
                 if (event->write)
                 {
-                    return SendPendingBuffer(sock, result);
+                    return HandleWriteReady(sock, result);
                 }
 
                 if (event->read)
@@ -1195,48 +940,13 @@ int ServerImpl::ListenTo(const char* addr, int port, uintptr_t opaque, int backl
     return 0;
 }
 
-int ServerImpl::SendData(int sock_id, const void* buffer, int sz)
-{
-    SocketEntity* sock = &sockets_[sock_id];
-
-    if (sock->fd != sock_id || sock->type == SS_INVALID)
-    {
-        slog(LOG_ERROR, "try to send data to bad socket, fd(%d)", sock_id);
-        return -1;
-    }
-
-    assert(sock->type != SS_INVALID);
-
-    RequestPackage req;
-    req.u.send.fd = sock_id;
-    req.u.send.sz = sz;
-    req.u.send.buffer = (char*)buffer;
-
-    SendInternalCmd(&req, ACTION_SEND, sizeof(req.u.send));
-
-    return 0;
-}
-
-int ServerImpl::WatchRawSocket(int sock_fd, uintptr_t opaque)
-{
-    RequestPackage req;
-
-    req.u.bind.opaque = opaque;
-    req.u.bind.fd = sock_fd;
-
-    SendInternalCmd(&req, ACTION_BIND, sizeof(req.u.bind));
-
-    return sock_fd;
-}
-
-void ServerImpl::WatchSocket(int fd, uintptr_t opaque, short offset)
+void ServerImpl::WatchSocket(int fd, uintptr_t opaque)
 {
     RequestPackage req;
     req.u.epoll.fd = fd;
-    req.u.epoll.offset = offset;
     req.u.epoll.opaque = opaque;
 
-    SendInternalCmd(&req, ACTION_EPOLL, sizeof(req.u.epoll));
+    SendInternalCmd(&req, ACTION_WATCH, sizeof(req.u.epoll));
 }
 
 void ServerImpl::CloseConnection(int sock_id, uintptr_t opaque)
@@ -1306,7 +1016,7 @@ void SocketServer::StopServer(uintptr_t opaque)
     impl_->StopServer(opaque);
 }
 
-int SocketServer::Connect(const char* ip, int port , uintptr_t opaque)
+int SocketServer::ConnectTo(const char* ip, int port , uintptr_t opaque)
 {
     return impl_->ConnectTo(ip, port, opaque);
 }
@@ -1316,18 +1026,14 @@ int SocketServer::ListenTo(const char* ip, int port, uintptr_t opaque)
     return impl_->ListenTo(ip, port, opaque);
 }
 
-int SocketServer::SendBuffer(int fd, const void* data, int sz, bool copy)
+int SocketServer::SendBuffer(int fd, const void* data, int sz, bool watch)
 {
-    if (copy)
-    {
-        void* buff_to_send = malloc(sz);
-        if (buff_to_send == NULL) return 0;
+    return impl_->SendBuffer(fd, data, sz, watch);
+}
 
-        memcpy(buff_to_send, data, sz);
-        return impl_->SendData(fd, buff_to_send, sz);
-    }
-
-    return impl_->SendData(fd, data, sz);
+int SocketServer::ReadBuffer(int fd, void* data, int sz, bool watch)
+{
+    return impl_->ReadBuffer(fd, data, sz, watch);
 }
 
 void SocketServer::CloseSocket(int fd, uintptr_t opaque)
@@ -1335,24 +1041,9 @@ void SocketServer::CloseSocket(int fd, uintptr_t opaque)
     impl_->CloseConnection(fd, opaque);
 }
 
-int SocketServer::SendString(int fd, const char* data)
+void SocketServer::WatchSocket(int fd, uintptr_t opaque)
 {
-    if (data == NULL) return 0;
-
-    int sz = strlen(data);
-    if (sz <= 0) return 0;
-
-    return SendBuffer(fd, data, sz + 1, true);
-}
-
-void SocketServer::WatchSocket(int fd, uintptr_t opaque, short off)
-{
-    impl_->WatchSocket(fd, opaque, off);
-}
-
-int SocketServer::WatchRawSocket(int fd, uintptr_t opaque)
-{
-    return impl_->WatchRawSocket(fd, opaque);
+    impl_->WatchSocket(fd, opaque);
 }
 
 void SocketServer::DefaultSockEventHandler(SocketEvent event)

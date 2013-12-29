@@ -32,7 +32,7 @@ namespace misc
 
             function(function_base<ret_type, arg_type>* fun): fun_(fun), ref_(new int(1)) {}
 
-            function(NORM_PROC proc = 0): fun_(new function_impl_normal<ret_type, arg_type>(proc)), ref_(new in                                      t(1)) {}
+            function(NORM_PROC proc = 0): fun_(new function_impl_normal<ret_type, arg_type>(proc)), ref_(new int(1)) {}
 
             ret_type operator() (arg_type arg) { fun_->operator()(arg); }
 

@@ -1,4 +1,5 @@
 #include "net/SocketServer.h"
+#include "net/SocketBuffer.h"
 
 #include "sys/AtomicOps.h"
 
@@ -36,12 +37,69 @@ struct SockConn
 {
     void* data;
     char  stream[256];
+    SocketBufferList buff;
 };
 
 static SockConn g_conn[65536];
 
 static set<int> g_stop_sock;
 static set<int> g_stop_code;
+
+
+static void ClearPendingBuffer(int sock)
+{
+    SockConn* conn = &g_conn[sock];
+
+    SocketBufferNode* node;
+
+    while ((node = conn->buff.PopFrontNode()))
+    {
+        conn->buff.FreeBufferNode(node);
+    }
+}
+
+static int SendPendingBuffer(int sock)
+{
+    int ret = 0;
+    SockConn* conn = &g_conn[sock];
+
+    while (1)
+    {
+        SocketBufferNode* node = conn->buff.GetFrontNode();
+        if (node == NULL) break;
+
+        int sz = server.SendBuffer(sock, node->curPtr_, node->curSize_, true);
+
+        ret += sz;
+
+        if (sz == node->curSize_)
+        {
+            conn->buff.PopFrontNode();
+            conn->buff.FreeBufferNode(node);
+        }
+        else
+        {
+            node->curPtr_ += sz;
+            node->curSize_ -= sz;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+
+static void SendBuffer(int sock, const char* buff, int sz)
+{
+    SocketBufferNode* node = g_conn[sock].buff.AllocNode(sz);
+    assert(node);
+
+    node->curSize_ = sz + 1;
+    memcpy(node->curPtr_, buff, sz + 1);
+    g_conn[sock].buff.AppendBufferNode(node);
+
+    SendPendingBuffer(sock);
+}
 
 static void handle_data(int sock, const char* txt, int size)
 {
@@ -50,9 +108,12 @@ static void handle_data(int sock, const char* txt, int size)
     set<int>::const_iterator it = g_stop_sock.find(sock);
     if (it != g_stop_sock.end())
     {
-        char info[] = "stop listening now!";
+        char* info = "stop listening now!";
+        int sz = strlen(info) + 1;
+
+        SendBuffer(sock, info, sz);
+
         cout << "socket(sock) send stop signal to client" << endl;
-        server.SendBuffer(sock, info, sizeof(info), true);
 
         g_stop_sock.erase(it);
     }
@@ -68,15 +129,17 @@ static void handle_data(int sock, const char* txt, int size)
             cout << "receive close req:op code: " << endl;
         }
 
-        server.Connect(out[1].c_str(), atoi(out[2].c_str()), op_code);
+        server.ConnectTo(out[1].c_str(), atoi(out[2].c_str()), op_code);
         // echo msg
-        server.SendBuffer(sock, txt, size, true);
+        SendBuffer(sock, txt, size);
     }
     else if (memcmp(txt, "wewe:own", 8))
     {
-        server.SendBuffer(sock, txt, size, true);
+        SendBuffer(sock, txt, size);
     }
 }
+
+static const int READ_WRITE_SZ = 512;
 
 static void handler(SocketEvent evt)
 {
@@ -88,10 +151,8 @@ static void handler(SocketEvent evt)
         case SC_EXIT:
             return;
         case SC_CLOSE:
+            ClearPendingBuffer(msg.fd);
             cout << "socket(" << msg.fd << ") is closed" << endl;
-            break;
-        case SC_HALFCLOSE:
-            cout << "socket(" << msg.fd << ") is closing, need to send out pending buffer first" << endl;
             break;
         case SC_CONNECTED:
             {
@@ -106,27 +167,38 @@ static void handler(SocketEvent evt)
                 cout << "socket(" << msg.fd << ") connected, operation id:" << msg.opaque << endl;
             }
             break;
-        case SC_DATA:
+        case SC_WRITEREADY:
+            {
+                SendPendingBuffer(msg.fd);
+            }
+            break;
+        case SC_READREADY:
             {
                 // user better define msg format, including in some fields to indicate the package size.
                 // so that we can elimite the following string operation which can be very time consuming.
 
-                if (msg.u.d[1] == 0)
+                char* data = (char*)malloc(READ_WRITE_SZ + 2);
+                assert(data);
+
+                data[READ_WRITE_SZ] = 0xf8;
+                data[READ_WRITE_SZ + 1] = 0x8f;
+
+                int ret = server.ReadBuffer(msg.fd, data, READ_WRITE_SZ, true);
+
+                if (ret <= 0)
                 {
-                    server.WatchSocket(msg.fd, NULL, 0);
+                    free(data);
                     break;
                 }
-
-                char* data = msg.data + msg.u.d[0];
 
                 int sz = strlen(data) + 1;
                 int left = strlen(g_conn[msg.fd].stream);
 
-                if (sz > msg.u.d[1])
+                if (sz > ret)
                 {
                     // in this case, package partially received.
-                    memcpy(g_conn[msg.fd].stream + left, data, msg.u.d[1]);
-                    g_conn[msg.fd].stream[left + msg.u.d[1]] = 0;
+                    memcpy(g_conn[msg.fd].stream + left, data, ret);
+                    g_conn[msg.fd].stream[left + ret] = 0;
                     break;
                 }
 
@@ -139,7 +211,7 @@ static void handler(SocketEvent evt)
                 handle_data(msg.fd, txt, size);
 
                 // store the msg that is partial received.
-                left = msg.u.d[1] - sz;
+                left = ret - sz;
                 assert(left >= 0);
 
                 while (left)
@@ -159,25 +231,19 @@ static void handler(SocketEvent evt)
                     }
                 }
 
+                free(data);
                 g_conn[msg.fd].stream[left] = 0;
                 break;
             }
-        case SC_ACCEPT:
+        case SC_ACCEPTED:
             {
-                cout << "socket(" << msg.u.ud << ") accepted, from server id: " << msg.fd << endl;
+                cout << "socket(" << msg.ud << ") accepted, from server id: " << msg.fd << endl;
 
                 int op = atomic_increment(&g_op);
-                server.WatchSocket(msg.u.ud, op);
+                server.WatchSocket(msg.ud, op);
             }
             break;
-        case SC_SEND:
-            cout << "socket(" << msg.fd << ") send buffer done:" << msg.u.d[0] << endl;
-            break;
-        case SC_HALFSEND:
-            cout << "socket(" << msg.fd << ") sending buffer, buffer send:"
-                << msg.ud << "bytes, not finish yet" << endl;
-            break;
-        case SC_LISTEN:
+        case SC_LISTENED:
             cout << "socket(" << msg.fd << ") listen, operation id:" << msg.opaque << endl;
             break;
         case SC_WATCHED:
@@ -191,14 +257,14 @@ static void handler(SocketEvent evt)
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2)
+    if (argc < 3)
     {
-        cout << "please specify port to listen to\n";
+        cout << "please specify addr && port to listen to\n";
         return 0;
     }
 
-    int port = atoi(argv[1]);
-    char* host = "127.0.0.1";
+    char* host = argv[1];
+    int   port = atoi(argv[2]);
 
     cout << "server main." << endl;
 
@@ -208,13 +274,12 @@ int main(int argc, char* argv[])
     server.StartServer(host, port, op);
 
     op = atomic_increment(&g_op);
-    int id = server.Connect(host, port, op);
+    server.ConnectTo(host, port, op);
 
     sleep(1);
-    server.SendString(id, "wewe:own,12345678");
 
     op = atomic_increment(&g_op);
-    int id2 = server.Connect(host, port, op);
+    server.ConnectTo(host, port, op);
 
     op = atomic_increment(&g_op);
     server.ListenTo(host, port + 1, op);
@@ -231,37 +296,20 @@ int main(int argc, char* argv[])
     server.ListenTo(host, port - 2, op);
 
     op = atomic_increment(&g_op);
-    int id3 = server.Connect(host, port + 1, op);
+    server.ConnectTo(host, port + 1, op);
 
     op = atomic_increment(&g_op);
-    int id4 = server.Connect(host, port - 1, op);
+    server.ConnectTo(host, port - 1, op);
 
     sleep(1);
 
     op = atomic_increment(&g_op);
-    int id5 = server.Connect(host, port + 2, op);
+    server.ConnectTo(host, port + 2, op);
 
     op = atomic_increment(&g_op);
-    int id6 = server.Connect(host, port - 2, op);
+    server.ConnectTo(host, port - 2, op);
 
     sleep(1);
-
-    void* data1 = malloc(24);
-    memcpy(data1, "wewe:own, some random buffer string", 24);
-
-    server.SendBuffer(id3, data1, 24);
-    server.SendString(id3, "wewe:own,hellohello");
-    server.SendString(id4, "wewe:own,hellohello");
-    server.SendString(id5, "wewe:own, hellohello");
-
-    void* data2 = malloc(24);
-    memcpy(data2, "wewe:own, some random buffer", 24);
-
-    server.SendBuffer(id6, data2, 24);
-
-    sleep(1);
-    op = atomic_increment(&g_op);
-    server.CloseSocket(id4, op);
 
     int i;
     cin >> i;

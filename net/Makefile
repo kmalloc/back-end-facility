@@ -9,7 +9,7 @@ LIBS=-lxthread -lsysutil -lmisc -lpthread -lrt
 INCLUDE=-I./
 INCLUDE+=-I$(ROOT)
 
-SOURCES=src/SocketServer.cc src/SocketPoll.cc
+SOURCES=src/SocketServer.cc src/SocketPoll.cc src/SocketBuffer.cc
 OBJECTS=$(SOURCES:.cc=.o)
 
 LIBNAME=libxnet.a
