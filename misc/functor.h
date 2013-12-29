@@ -7,16 +7,19 @@ namespace misc
     class function_base
     {
         public:
+            function_base() {}
+            virtual ~function_base(){}
+
+            virtual ret_type operator() (arg_type) = 0;
+    };
+
+    template<class ret_type, class arg_type>
+    class function_impl_normal: public function_base<ret_type, arg_type>
+    {
+        public:
             typedef ret_type (* NORM_PROC) (arg_type);
-
-            function_base(NORM_PROC proc = 0): norm_proc_(proc) {}
-
-            virtual ret_type operator() (arg_type arg)
-            {
-                if (norm_proc_) return norm_proc_(arg);
-
-                return ret_type();
-            }
+            function_impl_normal(NORM_PROC proc): norm_proc_(proc) {}
+            ret_type operator() (arg_type arg) { return norm_proc_(arg); }
         private:
             NORM_PROC norm_proc_;
     };
@@ -29,7 +32,7 @@ namespace misc
 
             function(function_base<ret_type, arg_type>* fun): fun_(fun), ref_(new int(1)) {}
 
-            function(NORM_PROC proc = 0): fun_(new function_base<ret_type, arg_type>(proc)), ref_(new int(1)) {}
+            function(NORM_PROC proc = 0): fun_(new function_impl_normal<ret_type, arg_type>(proc)), ref_(new in                                      t(1)) {}
 
             ret_type operator() (arg_type arg) { fun_->operator()(arg); }
 
@@ -64,7 +67,6 @@ namespace misc
             }
 
         private:
-
             int* ref_;
             function_base<ret_type, arg_type>* fun_;
     };
@@ -73,57 +75,24 @@ namespace misc
     class function_impl: public function_base<ret_type, arg_type>
     {
         public:
-
-            function_impl(CS obj): obj_(obj) {}
-
-            // operator function_base<ret_type, arg_type>*() const { return new function_impl<CS, ret_type, arg_type>(obj_); }
-
-            ret_type operator() (arg_type arg) { return obj_(arg); }
-
-        private:
-            CS obj_;
-    };
-
-    template<class ret_type, class arg_type>
-    class function_impl_normal: public function_base<ret_type, arg_type>
-    {
-        public:
-            typedef ret_type (*PROC)(arg_type);
-
-            function_impl_normal(PROC proc): proc_(proc) {}
-
-            ret_type operator() (arg_type arg) { return *proc_(arg); }
-
-            // operator function_base<ret_type, arg_type>*() const { return new function_impl_normal<ret_type, arg_type>(proc_); }
-        private:
-            PROC proc_;
-    };
-
-    template<class CS, class ret_type, class arg_type>
-    class FuncHolder
-    {
-        public:
             typedef ret_type (CS::* PROC)(arg_type);
 
-            FuncHolder(CS* pc, PROC proc)
-                :pc_(pc), proc_(proc)
-            {
-            }
+            function_impl(CS* obj, PROC proc): obj_(obj), proc_(proc) {}
 
-            ret_type operator() (arg_type arg) {  return (pc_->*proc_)(arg); }
+            ret_type operator() (arg_type arg) { return (obj_->*proc_)(arg); }
+
         private:
-            CS* pc_;
+            CS* obj_;
             PROC proc_;
     };
 
     template<class CS, class ret_type, class arg_type>
     function<ret_type, arg_type> bind(ret_type (CS::* proc)(arg_type), CS* pc)
     {
-        FuncHolder<CS, ret_type, arg_type> func_holder(pc, proc);
-        return new function_impl<FuncHolder<CS, ret_type, arg_type>, ret_type, arg_type>(func_holder);
+        function_base<ret_type, arg_type>* pf = new function_impl<CS, ret_type, arg_type>(pc, proc);
+        return function<ret_type, arg_type>(pf);
     }
 
 } // end namespace misc
 
 #endif
-
