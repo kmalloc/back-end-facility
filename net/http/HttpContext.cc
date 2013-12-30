@@ -21,7 +21,7 @@ void HttpContext::ResetContext(int connid)
     ReleaseContext();
 
     status_ = HS_CONNECTED;
-    buffer_.ReleaseBuffer();
+    buffer_.ResetBuffer();
     conn_.ResetConnection(connid);
 }
 
@@ -36,7 +36,7 @@ void HttpContext::ReleaseContext()
     response_.CleanUp();
 
     conn_.ReleaseConnection();
-    buffer_.ReleaseBuffer();
+    // buffer_.ReleaseBuffer();
 }
 
 // in normal case, this should be called after respone is done.
@@ -64,11 +64,20 @@ void HttpContext::DoResponse()
     if (response_.GetShouldResponse())
     {
         size_t sz = response_.GetResponseSize() + 8;
-        char* buf = (char*)malloc(sz);
-        if (buf)
+
+        HttpBufferEntity entity;
+        if (!buffer_.GetFreeWriteBuffer(sz, entity))
         {
-             sz = response_.GenerateResponse(buf, sz);
-             conn_.SendData(buf, sz, false);
+            ForceCloseConnection();
+        }
+        else
+        {
+            char* buff = entity.buff;
+            sz = buff.size;
+            sz = response_.GenerateResponse(buf, sz);
+            buffer_.ConsumeWrite(sz);
+            sz = conn_.SendBuffer(buf, sz);
+            // TODO
         }
     }
 
@@ -80,7 +89,7 @@ void HttpContext::HandleSendDone()
 {
     if (!keepalive_)
     {
-       // ForceCloseConnection();
+        // ForceCloseConnection();
     }
 }
 

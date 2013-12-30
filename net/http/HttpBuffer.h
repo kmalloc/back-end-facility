@@ -5,13 +5,18 @@
 #include "misc/NonCopyable.h"
 #include "net/SocketBuffer.h"
 
+extern const char CTRL[];
+extern const char HEADER_DELIM[];
+
 struct HttpBufferEntity
 {
     char* buff;
     int   size;
+
+    HttpBufferEntity* next;
 };
 
-class HttpBuffer: public noncopyable
+class HttpReadBuffer: public noncopyable
 {
     public:
 
@@ -22,35 +27,48 @@ class HttpBuffer: public noncopyable
         const char* GetReadStart() const;
         const char* GetReadEnd() const;
 
-        void ResetReadBuffer();
-        void ResetWriteBuffer();
+        void ResetBuffer();
 
         void ConsumeRead(int sz);
-        void ConsumeWrite(int sz);
-        void ReleaseReadBuffer(int sz);
-        void ReleaseWriteBuffer(int sz);
+        void ReleaseBuffer(int sz);
 
-        void GetFreeReadBuffer(HttpBufferEntity& entity);
-        void GetFreeWriteBuffer(const int sz, HttpBufferEntity& entity);
-
-        void GetPendingWrite(HttpBufferEntity& entity);
-
-        static const char CTRL[];
-        static const char HEADER_DELIM[];
+        int  SetExpandReadBuffer(int sz);
+        HttpBufferEntity GetFreeBuffer();
 
     private:
 
-        void FreeReadWriteBuffer();
-        void InitHttpBuffer();
+        void  FreeBuffer();
+        void  InitBuffer();
         short MoveDataToFront(SocketBufferNode*) const;
 
         SocketBufferNode* readBuff_;
-        SocketBufferNode* writeBuff_;
-        SocketBufferNode* pendingWriteBuff_;
-
-        SocketBufferList writeList_;
-        SocketBufferList freeWriteBuffer_;
 };
 
+class HttpWriteBuffer: public noncopyable
+{
+    public:
+
+        HttpWriteBuffer(int granularity = 1024, int total = 8);
+        ~HttpWriteBuffer();
+
+        void ResetBuffer();
+        void ReleaseBuffer(int sz);
+
+        HttpBufferEntity* GetPendingWrite();
+        HttpBufferEntity* AllocWriteBuffer(const int sz);
+
+        void AddWriteBuffer(HttpBufferEntity* entity);
+        void ReleaseWriteBuffer(HttpBufferEntity* entity);
+
+    private:
+
+        void  DestroyAllBuffer();
+        void  InitHttpBuffer();
+
+        const int size_;
+        const int num_;
+        HttpBufferEntity* pendingBuffer_;
+        HttpBufferEntity* freeBuffer_[4];
+};
 #endif
 

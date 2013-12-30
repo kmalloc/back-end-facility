@@ -1,66 +1,39 @@
-#include "HttpBuffer.h"
+#include "HttpReadBuffer.h"
 
 #include <string.h>
 #include <assert.h>
 
-const char HttpBuffer::CTRL[] = "\r\n";
-const char HttpBuffer::HEADER_DELIM[] = ": ";
+const char CTRL[] = "\r\n";
+const char HEADER_DELIM[] = ": ";
 
-HttpBuffer::HttpBuffer()
+HttpReadBuffer::HttpReadBuffer()
     : readBuff_(NULL)
-    , writeBuff_(NULL)
 {
-    InitHttpBuffer();
+    InitHttpReadBuffer();
 }
 
-HttpBuffer::~HttpBuffer()
+HttpReadBuffer::~HttpReadBuffer()
 {
-    FreeReadWriteBuffer();
+    FreeBuffer();
 }
 
-void HttpBuffer::InitHttpBuffer()
+void HttpReadBuffer::InitBuffer()
 {
-    int i = 0;
-    const int node_size = 4*1024;
-
-    SocketBufferNode* node = SocketBufferList::AllocNode(node_size);
-    while (node && i++ < 4)
-    {
-        freeWriteBuffer_.AppendBufferNode(node);
-        node = SocketBufferList::AllocNode(node_size);
-    }
-
-    writeBuff_ = freeWriteBuffer_.PopFrontNode();
-    readBuff_ = SocketBufferList::AllocNode(node_size);
+    readBuff_ = SocketBufferList::AllocNode(4*1024);
 }
 
-void HttpBuffer::FreeReadWriteBuffer()
+void HttpReadBuffer::FreeBuffer()
 {
-    // TODO
+    SocketBufferList::FreeBufferNode(readBuff_);
 }
 
-void HttpBuffer::ResetReadBuffer()
+void HttpReadBuffer::ResetBuffer()
 {
     readBuff_->curPtr_ = readBuff_->memFrame_;
     readBuff_->curSize_ = 0;
 }
 
-void HttpBuffer::ResetWriteBuffer()
-{
-    if (writeBuff_ == NULL) writeBuff_ = writeList_.PopFrontNode();
-
-    while (writeBuff_)
-    {
-        writeBuff_->curPtr_ = writeBuff_->memFrame_;
-        writeBuff_->curSize_ = 0;
-        freeWriteBuffer_.AppendBufferNode(writeBuff_);
-        writeBuff_ = writeList_.PopFrontNode();
-    }
-
-    writeBuff_ = NULL;
-}
-
-void HttpBuffer::ReleaseReadBuffer(int sz)
+void HttpReadBuffer::ReleaseBuffer(int sz)
 {
     if (sz > readBuff_->curSize_) sz = readBuff_->curSize_;
 
@@ -76,7 +49,7 @@ void HttpBuffer::ReleaseReadBuffer(int sz)
     readBuff_->curSize_ -= sz;
 }
 
-void HttpBuffer::ConsumeRead(int sz)
+void HttpReadBuffer::ConsumeRead(int sz)
 {
     int left = (readBuff_->memFrame_ + readBuff_->size_) - (readBuff_->curPtr_ + readBuff_->curSize_);
     assert(sz <= left);
@@ -84,41 +57,24 @@ void HttpBuffer::ConsumeRead(int sz)
     readBuff_->curSize_ += sz;
 }
 
-void HttpBuffer::ConsumeWrite(int sz)
-{
-    int left = (writeBuff_->memFrame_ + writeBuff_->size_) - (writeBuff_->curPtr_ + writeBuff_->curSize_);
-    if (sz > left) sz = left;
-
-    writeBuff_->curSize_ += sz;
-
-    if (sz == left)
-    {
-        writeList_.AppendBufferNode(writeBuff_);
-        writeBuff_ = freeWriteBuffer_.PopFrontNode();
-
-        writeBuff_->curSize_ = 0;
-        writeBuff_->curPtr_ = writeBuff_->memFrame_;
-    }
-}
-
-const char* HttpBuffer::GetReadPoint(int off) const
+const char* HttpReadBuffer::GetReadPoint(int off) const
 {
     if (off >= readBuff_->curSize_) return NULL;
 
     return readBuff_->curPtr_ + off;
 }
 
-const char* HttpBuffer::GetReadStart() const
+const char* HttpReadBuffer::GetReadStart() const
 {
     return readBuff_->curPtr_;
 }
 
-const char* HttpBuffer::GetReadEnd() const
+const char* HttpReadBuffer::GetReadEnd() const
 {
     return readBuff_->curPtr_ + readBuff_->curSize_;
 }
 
-short HttpBuffer::MoveDataToFront(SocketBufferNode* node) const
+short HttpReadBuffer::MoveDataToFront(SocketBufferNode* node) const
 {
     memmove(node->memFrame_, node->curPtr_, node->curSize_);
 
@@ -126,64 +82,86 @@ short HttpBuffer::MoveDataToFront(SocketBufferNode* node) const
     return node->curSize_;
 }
 
-void HttpBuffer::GetFreeReadBuffer(HttpBufferEntity& entity)
+void HttpReadBuffer::SetExpandReadBuffer(int sz)
 {
+    readBuff_->curSize_ += sz;
+    assert(readBuff_->curPtr_ + readBuff_->curSize_ <= readBuff_->memFrame_ + readBuff_->size_);
+}
+
+HttpReadBufferEntity HttpReadBuffer::GetFreeBuffer()
+{
+    HttpReadBufferEntity entity;
     int left = readBuff_->size_ - (readBuff_->curPtr_ - readBuff_->memFrame_) - readBuff_->curSize_;
 
     if (left < MINI_SOCKET_READ_SIZE) MoveDataToFront(readBuff_);
 
     entity.buff = readBuff_->curPtr_ + readBuff_->curSize_;
     entity.size = readBuff_->memFrame_ + readBuff_->size_ - (readBuff_->curPtr_ + readBuff_->curSize_);
+
+    return entity;
 }
 
-void HttpBuffer::GetFreeWriteBuffer(int sz, HttpBufferEntity& entity)
+// HttpWriteBuffer
+HttpWriteBuffer::HttpWriteBuffer(int granularity, int num)
+    :size_(granularity), num_(num)
+    ,pendingBuffer_(NULL)
 {
-    if (writeBuff_ == NULL) writeBuff_ = freeWriteBuffer_.PopFrontNode();
+    InitBuffer();
+}
 
-    if (writeBuff_ == NULL || sz > writeBuff_->size_) return;
+HttpReadBufferEntity* HttpWriteBuffer::AllocWriteBuffer(int sz)
+{
+    if (sz <= 0 || sz > 4*size) return NULL;
 
-    int left = writeBuff_->memFrame_ + writeBuff_->size_ - (writeBuff_->curPtr_ + writeBuff_->curSize_);
+    int mod = sz%size_;
 
-    if (left < sz)
+    mod = mod > 0? size_ - mod : 0;
+    int index = (sz + mod)/size_ - 1;
+
+    HttpReadBufferEntity* entity = NULL;
+    HttpReadBufferEntity* list = freeBuffer_[index];
+
+    if (list == NULL)
     {
-        SocketBufferNode* node = freeWriteBuffer_.PopFrontNode();
-        if (node == NULL)
+        char* buff = (char*)malloc(size_*(index + 1));
+        if (buff == NULL) return NULL;
+
+        entity = (HttpReadBufferEntity*)malloc(sizeof(HttpReadBufferEntity));
+        if (entity == NULL)
         {
-            MoveDataToFront(writeBuff_);
-            if (writeBuff_->size_ - writeBuff_->curSize_ < sz) return;
+            free(buff);
+            return NULL;
         }
-        else
-        {
-            writeList_.AppendBufferNode(writeBuff_);
-            writeBuff_ = node;
-        }
+
+        entity->buff = buff;
+        entity->size = size_*(index + 1);
+
+        return entity;
     }
 
-    left = writeBuff_->memFrame_ + writeBuff_->size_ - (writeBuff_->curPtr_ + writeBuff_->curSize_);
-    entity.buff = writeBuff_->curPtr_ + writeBuff_->curSize_;
-    entity.size = left;
+    entity = list;
+    list   = list->next;
+    entity->next = NULL;
+
+    return entity;
 }
 
-void HttpBuffer::GetPendingWrite(HttpBufferEntity& entity)
+HttpReadBufferEntity* HttpWriteBuffer::GetPendingWrite()
 {
-    if (pendingWriteBuff_ == NULL) pendingWriteBuff_ = writeList_.PopFrontNode();
+    HttpReadBufferEntity* ret = pendingBuffer_;
 
-    if (pendingWriteBuff_ == NULL) pendingWriteBuff_ = writeBuff_;
+    if (pendingBuffer_) pendingBuffer_->next;
 
-    entity.buff = pendingWriteBuff_->curPtr_;
-    entity.size = pendingWriteBuff_->curSize_;
+    return ret;
 }
 
-void HttpBuffer::ReleaseWriteBuffer(int sz)
+void HttpReadBuffer::ReleaseWriteBuffer(HttpReadBufferEntity* buf)
 {
-    assert(sz <= pendingWriteBuff_->curSize_);
-    pendingWriteBuff_->curPtr_ += sz;
-    pendingWriteBuff_->curSize_ -= sz;
+    int mod = buf->size%size_;
+    mod = mod > 0? size_ - mod : 0;
+    int index = (buf->size + mod)/size_ - 1;
 
-    if (pendingWriteBuff_->curSize_ == 0)
-    {
-        freeWriteBuffer_.AppendBufferNode(pendingWriteBuff_);
-        pendingWriteBuff_ = NULL;
-    }
+    buf->next = freeBuffer_[index];
+    freeBuffer_[index] = buf;
 }
 
