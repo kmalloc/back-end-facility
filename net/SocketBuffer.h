@@ -19,11 +19,12 @@ class SocketBufferList
         SocketBufferList();
         ~SocketBufferList();
 
-        SocketBufferNode* AllocNode(int size) const;
         SocketBufferNode* GetFrontNode() const;
         SocketBufferNode* PopFrontNode();
         void FreeBufferNode(SocketBufferNode* node) const;
         void AppendBufferNode(SocketBufferNode* node);
+
+        static SocketBufferNode* AllocNode(int size);
     private:
         SocketBufferNode* head;
         SocketBufferNode* tail;

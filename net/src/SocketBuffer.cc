@@ -20,7 +20,7 @@ SocketBufferList::~SocketBufferList()
     }
 }
 
-SocketBufferNode* SocketBufferList::AllocNode(int size) const
+SocketBufferNode* SocketBufferList::AllocNode(int size)
 {
     SocketBufferNode* node = (SocketBufferNode*)malloc(size + sizeof(SocketBufferNode));
     if (node)

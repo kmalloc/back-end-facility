@@ -31,13 +31,10 @@ class HttpContext: public noncopyable
         void ResetContext(int connid);
         void ReleaseContext();
 
-        void ProcessHttpRequest(char* data ,short off, short sz);
-
-        const HttpRequest& GetRequest() const { return request_; }
+        void ProcessHttpRead();
+        void ProcessHttpWrite();
 
         bool IsKeepAlive() const { return keepalive_; }
-
-        void HandleSendDone();
 
         enum ParseStage
         {
@@ -53,6 +50,7 @@ class HttpContext: public noncopyable
     private:
 
         void CleanData();
+        void HandleSendDone();
 
         bool ShouldParseRequestLine() const { return curStage_ == HS_REQUEST_LINE; }
         bool ShouldParseHeader() const { return curStage_ == HS_HEADER; }

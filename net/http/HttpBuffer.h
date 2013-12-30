@@ -18,29 +18,38 @@ class HttpBuffer: public noncopyable
         HttpBuffer();
         ~HttpBuffer();
 
-        const char* GetRead(size_t offset = 0) const;
+        const char* GetReadPoint(int offset = 0) const;
         const char* GetReadStart() const;
         const char* GetReadEnd() const;
 
-        void ConsumeRead(size_t sz);
-        void ReleaseReadBuffer();
-        void ReleaseWriteBuffer();
+        void ResetReadBuffer();
+        void ResetWriteBuffer();
 
-        bool GetReadBuffer(HttpBufferEntity& entity);
-        bool GetWriteBuffer(HttpBufferEntity& entity);
+        void ConsumeRead(int sz);
+        void ConsumeWrite(int sz);
+        void ReleaseReadBuffer(int sz);
+        void ReleaseWriteBuffer(int sz);
 
-        short MoveReadDataToFront();
+        void GetFreeReadBuffer(HttpBufferEntity& entity);
+        void GetFreeWriteBuffer(const int sz, HttpBufferEntity& entity);
+
+        void GetPendingWrite(HttpBufferEntity& entity);
 
         static const char CTRL[];
         static const char HEADER_DELIM[];
 
     private:
 
-        int curRead_;
-        int endRead_;
+        void FreeReadWriteBuffer();
+        void InitHttpBuffer();
+        short MoveDataToFront(SocketBufferNode*) const;
 
-        SocketBufferList readList_;
+        SocketBufferNode* readBuff_;
+        SocketBufferNode* writeBuff_;
+        SocketBufferNode* pendingWriteBuff_;
+
         SocketBufferList writeList_;
+        SocketBufferList freeWriteBuffer_;
 };
 
 #endif

@@ -112,7 +112,8 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
     {
         case SC_ACCEPTED:
             {
-                ResetTask(id, -1);
+                int id = msg->msg.fd;
+                ResetTask(id);
                 slog(LOG_VERB, "httptask accept(%d)", id);
             }
             break;

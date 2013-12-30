@@ -88,7 +88,8 @@ void HttpContext::ProcessHttpRequest()
 {
     if (status_ != HS_CONNECTED) return;
 
-    buffer_.SetBuffer(buff, off, sz);
+    HttpBufferEntity entity;
+    char* buf = buffer_.GetReadBuffer(entity);
 
     if (ShouldParseRequestLine())
     {
