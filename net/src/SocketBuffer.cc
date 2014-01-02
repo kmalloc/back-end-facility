@@ -34,7 +34,7 @@ SocketBufferNode* SocketBufferList::AllocNode(int size)
     return node;
 }
 
-void SocketBufferList::FreeBufferNode(SocketBufferNode* node) const
+void SocketBufferList::FreeBufferNode(SocketBufferNode* node)
 {
     free(node);
 }

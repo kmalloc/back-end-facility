@@ -3,6 +3,8 @@
 #include <iostream>
 #include <stdlib.h>
 
+#include "sys/Log.h"
+
 using namespace std;
 
 int main(int argc, char* argv[])
@@ -18,6 +20,8 @@ int main(int argc, char* argv[])
     int port = 80;
 
     if (argc >= 3) port = atoi(argv[2]);
+
+    if (argc >= 4) SetLogLevel(atoi(argv[3]));
 
     HttpServer server(addr, port);
 

@@ -9,7 +9,7 @@
 /*
  * simple wrapper of epoll.
  * technically, It should be named as FilePoll, because other file descriptor is not restricted,
- * just leave it as it is for the moment. 
+ * just leave it as it is for the moment.
  */
 
 struct PollEvent

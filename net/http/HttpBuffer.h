@@ -5,35 +5,31 @@
 #include "misc/NonCopyable.h"
 #include "net/SocketBuffer.h"
 
-extern const char CTRL[];
-extern const char HEADER_DELIM[];
+extern const char HTTP_CTRL[];
+extern const char HTTP_HEADER_DELIM[];
 
 struct HttpBufferEntity
 {
-    char* buff;
+    char* buffer;
     int   size;
-
-    HttpBufferEntity* next;
 };
 
 class HttpReadBuffer: public noncopyable
 {
     public:
 
-        HttpBuffer();
-        ~HttpBuffer();
+        HttpReadBuffer(int size = 8*1024);
+        ~HttpReadBuffer();
 
-        const char* GetReadPoint(int offset = 0) const;
-        const char* GetReadStart() const;
-        const char* GetReadEnd() const;
+        const char* GetContentPoint(int offset = 0) const;
+        const char* GetContentStart() const;
+        const char* GetContentEnd() const;
 
         void ResetBuffer();
+        void ConsumeBuffer(int sz);
 
-        void ConsumeRead(int sz);
-        void ReleaseBuffer(int sz);
-
-        int  SetExpandReadBuffer(int sz);
-        HttpBufferEntity GetFreeBuffer();
+        void IncreaseContentRange(int sz);
+        HttpBufferEntity GetAvailableReadRange();
 
     private:
 
@@ -41,6 +37,7 @@ class HttpReadBuffer: public noncopyable
         void  InitBuffer();
         short MoveDataToFront(SocketBufferNode*) const;
 
+        const int size_;
         SocketBufferNode* readBuff_;
 };
 
@@ -51,24 +48,20 @@ class HttpWriteBuffer: public noncopyable
         HttpWriteBuffer(int granularity = 1024, int total = 8);
         ~HttpWriteBuffer();
 
-        void ResetBuffer();
-        void ReleaseBuffer(int sz);
-
-        HttpBufferEntity* GetPendingWrite();
-        HttpBufferEntity* AllocWriteBuffer(const int sz);
-
-        void AddWriteBuffer(HttpBufferEntity* entity);
-        void ReleaseWriteBuffer(HttpBufferEntity* entity);
+        SocketBufferNode* AllocWriteBuffer(int sz);
+        void ReleaseWriteBuffer(SocketBufferNode* entity);
 
     private:
 
-        void  DestroyAllBuffer();
-        void  InitHttpBuffer();
+        bool  InitBuffer();
+        void  DestroyBuffer();
 
         const int size_;
         const int num_;
-        HttpBufferEntity* pendingBuffer_;
-        HttpBufferEntity* freeBuffer_[4];
+        const int num_slot_;
+
+        SocketBufferNode** freeBuffer_;
 };
+
 #endif
 

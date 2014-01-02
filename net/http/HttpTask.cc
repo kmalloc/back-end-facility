@@ -112,7 +112,7 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
     {
         case SC_ACCEPTED:
             {
-                int id = msg->msg.fd;
+                int id = msg->msg.ud;
                 ResetTask(id);
                 slog(LOG_VERB, "httptask accept(%d)", id);
             }
@@ -125,14 +125,14 @@ void HttpTask::ProcessSocketMessage(SocketEvent* msg)
             break;
         case SC_READREADY:
             {
-                slog(LOG_VERB, "httptask read read(%d)", msg->msg.fd);
-                context_.ProcessHttpRead();
+                int ret = context_.ProcessHttpRead();
+                slog(LOG_VERB, "httptask read read(%d), sz(%d)", msg->msg.fd, ret);
             }
             break;
         case SC_WRITEREADY: // send is asynchronous, only when received this msg, can we try to close the http connection if necessary.
             {
-                context_.ProcessHttpWrite();
-                slog(LOG_VERB, "httptask send done(%d)", msg->msg.fd);
+                int ret = context_.ProcessHttpWrite();
+                slog(LOG_VERB, "httptask send done(%d), sz(%d)", msg->msg.fd, ret);
             }
             break;
         default:

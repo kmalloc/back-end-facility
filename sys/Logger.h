@@ -12,7 +12,7 @@
 #define LOG_GRANULARITY (256)
 #define LOG_FLUSH_TIMEOUT (23)
 
-// #define LOG_NO_PENDING
+#define LOG_NO_PENDING
 
 class Logger: public noncopyable
 {

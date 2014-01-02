@@ -35,7 +35,7 @@ void slog_fatal(const char* format, va_list va);
 int  slog_level();
 
 // not thread safe
-void SetLogLevel();
+void SetLogLevel(int level);
 
 inline void slog(LogLevel level, const char* format, ...)
 {

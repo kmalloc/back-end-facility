@@ -21,9 +21,9 @@ class SocketBufferList
 
         SocketBufferNode* GetFrontNode() const;
         SocketBufferNode* PopFrontNode();
-        void FreeBufferNode(SocketBufferNode* node) const;
         void AppendBufferNode(SocketBufferNode* node);
 
+        static void FreeBufferNode(SocketBufferNode* node);
         static SocketBufferNode* AllocNode(int size);
     private:
         SocketBufferNode* head;

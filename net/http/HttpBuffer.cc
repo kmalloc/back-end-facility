@@ -1,15 +1,16 @@
-#include "HttpReadBuffer.h"
+#include "HttpBuffer.h"
 
 #include <string.h>
 #include <assert.h>
 
-const char CTRL[] = "\r\n";
-const char HEADER_DELIM[] = ": ";
+const char HTTP_CTRL[] = "\r\n";
+const char HTTP_HEADER_DELIM[] = ": ";
 
-HttpReadBuffer::HttpReadBuffer()
+HttpReadBuffer::HttpReadBuffer(int size)
     : readBuff_(NULL)
+    , size_(size)
 {
-    InitHttpReadBuffer();
+    InitBuffer();
 }
 
 HttpReadBuffer::~HttpReadBuffer()
@@ -19,7 +20,7 @@ HttpReadBuffer::~HttpReadBuffer()
 
 void HttpReadBuffer::InitBuffer()
 {
-    readBuff_ = SocketBufferList::AllocNode(4*1024);
+    readBuff_ = SocketBufferList::AllocNode(size_);
 }
 
 void HttpReadBuffer::FreeBuffer()
@@ -33,7 +34,7 @@ void HttpReadBuffer::ResetBuffer()
     readBuff_->curSize_ = 0;
 }
 
-void HttpReadBuffer::ReleaseBuffer(int sz)
+void HttpReadBuffer::ConsumeBuffer(int sz)
 {
     if (sz > readBuff_->curSize_) sz = readBuff_->curSize_;
 
@@ -49,27 +50,19 @@ void HttpReadBuffer::ReleaseBuffer(int sz)
     readBuff_->curSize_ -= sz;
 }
 
-void HttpReadBuffer::ConsumeRead(int sz)
-{
-    int left = (readBuff_->memFrame_ + readBuff_->size_) - (readBuff_->curPtr_ + readBuff_->curSize_);
-    assert(sz <= left);
-
-    readBuff_->curSize_ += sz;
-}
-
-const char* HttpReadBuffer::GetReadPoint(int off) const
+const char* HttpReadBuffer::GetContentPoint(int off) const
 {
     if (off >= readBuff_->curSize_) return NULL;
 
     return readBuff_->curPtr_ + off;
 }
 
-const char* HttpReadBuffer::GetReadStart() const
+const char* HttpReadBuffer::GetContentStart() const
 {
     return readBuff_->curPtr_;
 }
 
-const char* HttpReadBuffer::GetReadEnd() const
+const char* HttpReadBuffer::GetContentEnd() const
 {
     return readBuff_->curPtr_ + readBuff_->curSize_;
 }
@@ -82,21 +75,21 @@ short HttpReadBuffer::MoveDataToFront(SocketBufferNode* node) const
     return node->curSize_;
 }
 
-void HttpReadBuffer::SetExpandReadBuffer(int sz)
+void HttpReadBuffer::IncreaseContentRange(int sz)
 {
     readBuff_->curSize_ += sz;
     assert(readBuff_->curPtr_ + readBuff_->curSize_ <= readBuff_->memFrame_ + readBuff_->size_);
 }
 
-HttpReadBufferEntity HttpReadBuffer::GetFreeBuffer()
+HttpBufferEntity HttpReadBuffer::GetAvailableReadRange()
 {
-    HttpReadBufferEntity entity;
+    HttpBufferEntity entity;
     int left = readBuff_->size_ - (readBuff_->curPtr_ - readBuff_->memFrame_) - readBuff_->curSize_;
 
     if (left < MINI_SOCKET_READ_SIZE) MoveDataToFront(readBuff_);
 
-    entity.buff = readBuff_->curPtr_ + readBuff_->curSize_;
-    entity.size = readBuff_->memFrame_ + readBuff_->size_ - (readBuff_->curPtr_ + readBuff_->curSize_);
+    entity.buffer = readBuff_->curPtr_ + readBuff_->curSize_;
+    entity.size   = readBuff_->memFrame_ + readBuff_->size_ - (readBuff_->curPtr_ + readBuff_->curSize_);
 
     return entity;
 }
@@ -104,64 +97,106 @@ HttpReadBufferEntity HttpReadBuffer::GetFreeBuffer()
 // HttpWriteBuffer
 HttpWriteBuffer::HttpWriteBuffer(int granularity, int num)
     :size_(granularity), num_(num)
-    ,pendingBuffer_(NULL)
+    ,num_slot_(4)
 {
-    InitBuffer();
+    assert(InitBuffer());
 }
 
-HttpReadBufferEntity* HttpWriteBuffer::AllocWriteBuffer(int sz)
+HttpWriteBuffer::~HttpWriteBuffer()
 {
-    if (sz <= 0 || sz > 4*size) return NULL;
+    DestroyBuffer();
+}
+
+bool HttpWriteBuffer::InitBuffer()
+{
+    freeBuffer_ = (SocketBufferNode**)malloc(num_slot_*sizeof(SocketBufferNode*));
+    for (int i = 0; i < num_slot_; ++i)
+    {
+        freeBuffer_[i] = NULL;
+    }
+
+    for (int i = 0; i < num_; ++i)
+    {
+        SocketBufferNode* entity = (SocketBufferNode*)malloc(sizeof(SocketBufferNode) + size_);
+        if (entity == NULL) return false;
+
+        entity->size_    = size_;
+        entity->next_    = freeBuffer_[0];
+        entity->curPtr_  = entity->memFrame_;
+        entity->curSize_ = 0;
+        freeBuffer_[0]   = entity;
+    }
+
+    return true;
+}
+
+void HttpWriteBuffer::DestroyBuffer()
+{
+    int i = 0;
+    while (i < num_slot_)
+    {
+        SocketBufferNode* cur = freeBuffer_[i];
+        SocketBufferNode* next;
+
+        while (cur)
+        {
+            next = cur->next_;
+            free(cur);
+            cur = next;
+        }
+
+        freeBuffer_[i] = NULL;
+        ++i;
+    }
+
+    free(freeBuffer_);
+}
+
+SocketBufferNode* HttpWriteBuffer::AllocWriteBuffer(int sz)
+{
+    if (sz <= 0 || sz > num_slot_*size_) return NULL;
 
     int mod = sz%size_;
 
     mod = mod > 0? size_ - mod : 0;
     int index = (sz + mod)/size_ - 1;
 
-    HttpReadBufferEntity* entity = NULL;
-    HttpReadBufferEntity* list = freeBuffer_[index];
+    SocketBufferNode* entity = NULL;
+    SocketBufferNode* list = freeBuffer_[index];
 
     if (list == NULL)
     {
-        char* buff = (char*)malloc(size_*(index + 1));
-        if (buff == NULL) return NULL;
+        entity = (SocketBufferNode*)malloc(sizeof(SocketBufferNode) + (index + 1)*size_);
+        if (entity == NULL) return NULL;
 
-        entity = (HttpReadBufferEntity*)malloc(sizeof(HttpReadBufferEntity));
-        if (entity == NULL)
-        {
-            free(buff);
-            return NULL;
-        }
-
-        entity->buff = buff;
-        entity->size = size_*(index + 1);
+        entity->size_    = size_*(index + 1);
+        entity->curPtr_  = entity->memFrame_;
+        entity->curSize_ = 0;
+        entity->next_    = NULL;
 
         return entity;
     }
 
     entity = list;
-    list   = list->next;
-    entity->next = NULL;
+    freeBuffer_[index] = list->next_;
+
+    entity->next_ = NULL;
+    entity->curPtr_  = entity->memFrame_;
+    entity->curSize_ = 0;
 
     return entity;
 }
 
-HttpReadBufferEntity* HttpWriteBuffer::GetPendingWrite()
+void HttpWriteBuffer::ReleaseWriteBuffer(SocketBufferNode* buf)
 {
-    HttpReadBufferEntity* ret = pendingBuffer_;
-
-    if (pendingBuffer_) pendingBuffer_->next;
-
-    return ret;
-}
-
-void HttpReadBuffer::ReleaseWriteBuffer(HttpReadBufferEntity* buf)
-{
-    int mod = buf->size%size_;
+    int mod = buf->size_%size_;
     mod = mod > 0? size_ - mod : 0;
-    int index = (buf->size + mod)/size_ - 1;
+    int index = (buf->size_ + mod)/size_ - 1;
 
-    buf->next = freeBuffer_[index];
+    buf->next_ = freeBuffer_[index];
+    buf->curPtr_  = buf->memFrame_;
+    buf->curSize_ = 0;
+
     freeBuffer_[index] = buf;
 }
 

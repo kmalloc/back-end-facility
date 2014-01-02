@@ -124,11 +124,7 @@ void LogWorker::Run()
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
             continue;
 
-#ifndef LOG_NO_PENDING
-        ts.tv_nsec =  100;
-#else
         ts.tv_sec += timeout_;
-#endif
 
         while (sem_timedwait(&sig_,&ts) == -1 && errno == EINTR)
             continue;
@@ -148,7 +144,11 @@ size_t LogWorker::DoLog(LogEntity* buffer)
     {
         ret = pendingMsg_.Push(buffer);
 
+#ifdef LOG_NO_PENDING
+        if (retry < 32)
+#else
         if (ret == false && retry < 32)
+#endif
         {
             // msg queue is full, time to wake up worker to flush all the msg.
             ++retry;
