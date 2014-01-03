@@ -5,8 +5,7 @@
 #include <string>
 
 HttpContext::HttpContext(SocketServer& server, HttpCallBack cb)
-    : status_(HS_CLOSED)
-    , conn_(server), httpReader_(conn_), httpWriter_(conn_)
+    : conn_(server), httpReader_(conn_), httpWriter_(conn_)
     , callBack_(cb)
 {
 }
@@ -19,18 +18,12 @@ HttpContext::~HttpContext()
 void HttpContext::ResetContext(int connid)
 {
     ReleaseContext();
-
-    status_ = HS_CONNECTED;
-    httpWriter_.ResetWriter();
-    httpReader_.ResetReader();
     conn_.ResetConnection(connid);
 }
 
 // call this function only when connection is already closed
 void HttpContext::ReleaseContext()
 {
-    status_ = HS_CLOSED;
-
     httpWriter_.ResetWriter();
     httpReader_.ResetReader();
     conn_.ReleaseConnection();
@@ -38,7 +31,9 @@ void HttpContext::ReleaseContext()
 
 void HttpContext::ForceCloseConnection()
 {
-    status_ = HS_CLOSING;
+    httpReader_.ResetReader();
+    httpWriter_.ResetWriter();
+
     conn_.CloseConnection();
 }
 
@@ -69,7 +64,9 @@ void HttpContext::DoResponse(const HttpRequest& request)
             node->curSize_ = sz;
 
             httpWriter_.AddToWriteList(node);
-            httpWriter_.SendPendingBuffer();
+            sz = httpWriter_.SendPendingBuffer();
+
+            if (sz < 0) ForceCloseConnection();
         }
     }
 
@@ -83,8 +80,6 @@ int HttpContext::ProcessHttpWrite()
 
 int HttpContext::ProcessHttpRead()
 {
-    if (status_ != HS_CONNECTED) return 0;
-
     int ret = httpReader_.ProcessHttpRead();
     if (ret < 0)
     {

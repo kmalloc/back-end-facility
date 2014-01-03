@@ -24,8 +24,9 @@ void HttpConnection::CloseConnection()
 
     slog(LOG_VERB, "to close http connection(%d)", connId_);
 
-    sockServer_.CloseSocket(connId_);
+    int conn = connId_;
     connId_ = -1;
+    sockServer_.CloseSocket(conn);
 }
 
 void HttpConnection::ReleaseConnection()

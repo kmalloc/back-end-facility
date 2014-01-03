@@ -1,6 +1,5 @@
 #ifndef __HTTP_TASK_H__
 #define __HTTP_TASK_H__
-
 #include "thread/ITask.h"
 #include "misc/LockFreeList.h"
 #include "misc/LockFreeBuffer.h"
@@ -14,7 +13,7 @@ class HttpTask: public ITask
 {
     public:
 
-        HttpTask(SocketServer* server, LockFreeBuffer& msgPool);
+        HttpTask(SocketServer* server, LockFreeBuffer& msgPool, int id = -1);
         ~HttpTask();
 
         bool PostSockMsg(SocketEvent* msg);
@@ -32,6 +31,7 @@ class HttpTask: public ITask
 
         void ProcessSocketMessage(SocketEvent* msg);
 
+        int taskid_;
         SocketServer* tcpServer_;
         HttpContext context_;
         LockFreeBuffer& msgPool_;

@@ -310,11 +310,11 @@ void ServerImpl::ForceSocketClose(SocketEntity* sock, SocketMessage* result) con
 
     if (sock->type == SS_INVALID) return;
 
+    slog(LOG_VERB, "force closing socket:%d", sock->fd);
     ResetSocketSlot(sock);
     poll_.RemoveSocket(sock->fd);
-    close(sock->fd);
 
-    slog(LOG_VERB, "force closing socket:%d", sock->fd);
+    close(sock->fd);
 }
 
 void ServerImpl::ShutDownAllSockets()
@@ -419,12 +419,15 @@ _failed:
     return NULL;
 }
 
+// in case of error occurs, let user handles the error first.
+// closing socket should be the last step to be taken
 int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
 {
     SocketEntity* sock = &sockets_[fd];
 
     if (sock->type == SS_INVALID || sock->fd != fd)
     {
+        slog(LOG_ERROR, "send, invalid socketid,sock(%d)", fd);
         return -2;
     }
 
@@ -440,9 +443,6 @@ int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
         else
         {
             slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", fd, sock->fd);
-
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
             return -1;
         }
     }
@@ -452,8 +452,6 @@ int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
         if(!poll_.AddSocket(fd, sock, true))
         {
             slog(LOG_ERROR, "poll socket failed, error:%s", strerror(errno));
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
             return -3;
         }
     }
@@ -463,6 +461,7 @@ int ServerImpl::SendBuffer(int fd, const void* buffer, int sz, bool watch)
 
 int ServerImpl::ReadBuffer(int fd, void* buffer, int sz, bool watch)
 {
+    assert(fd >=0 && fd <= maxSocket_);
     SocketEntity* sock = &sockets_[fd];
 
     assert(sz);
@@ -477,18 +476,14 @@ int ServerImpl::ReadBuffer(int fd, void* buffer, int sz, bool watch)
         }
         else
         {
-            slog(LOG_ERROR, "read sock(%d) error, closing", sock->fd);
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
+            slog(LOG_ERROR, "read sock error, fd(%d)", fd);
             return -1;
         }
     }
     else if (n == 0)
     {
         slog(LOG_VERB, "socket closed by remote, sock(%d)", fd);
-        SocketMessage dummy;
-        ForceSocketClose(sock, &dummy);
-        return 0;
+        return -1;
     }
 
     if (watch)
@@ -496,8 +491,6 @@ int ServerImpl::ReadBuffer(int fd, void* buffer, int sz, bool watch)
         if(!poll_.AddSocket(fd, sock))
         {
             slog(LOG_ERROR, "poll socket failed, error:%s", strerror(errno));
-            SocketMessage dummy;
-            ForceSocketClose(sock, &dummy);
             return -2;
         }
     }

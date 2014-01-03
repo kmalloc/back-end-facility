@@ -36,8 +36,9 @@ int HttpReader::ProcessHttpRead()
     if (entity.buffer && entity.size)
     {
         ret = conn_.ReadBuffer(entity.buffer, entity.size);
-        buffer_.IncreaseContentRange(ret);
         if (ret < 0) return -1;
+
+        buffer_.IncreaseContentRange(ret);
     }
 
     if (ShouldParseRequestLine())
@@ -267,6 +268,7 @@ int HttpWriter::SendPendingBuffer()
         else
         {
             // error
+            co = sz;
             slog(LOG_ERROR, "send buffer error, sock(%d)", conn_.GetConnectionId());
             break;
         }

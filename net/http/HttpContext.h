@@ -13,13 +13,6 @@
 #include "net/http/HttpReaderWriter.h"
 #include "net/http/HttpCallBack.h"
 
-enum HttpStatus
-{
-    HS_CLOSING,
-    HS_CLOSED,
-    HS_CONNECTED,
-};
-
 class HttpContext: public noncopyable
 {
     public:
@@ -40,7 +33,6 @@ class HttpContext: public noncopyable
         void DoResponse(const HttpRequest& request);
         void ForceCloseConnection();
 
-        HttpStatus status_;
         HttpConnection conn_;
         HttpReader httpReader_;
         HttpWriter httpWriter_;

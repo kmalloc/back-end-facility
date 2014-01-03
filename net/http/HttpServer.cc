@@ -60,7 +60,7 @@ HttpImpl::HttpImpl(const char* addr, int port)
 
         while (i < SocketServer::max_conn_id)
         {
-            tasks_[i] = new HttpTask(&tcpServer_, msgPool_);
+            tasks_[i] = new HttpTask(&tcpServer_, msgPool_, i);
             ++i;
         }
     }
@@ -89,7 +89,7 @@ void HttpImpl::StartServer()
 {
     assert(threadPool_.StartPooling());
 
-    tcpServer_.SetWatchAcceptedSock(true);
+    // tcpServer_.SetWatchAcceptedSock(true);
     tcpServer_.RegisterSocketEventHandler(misc::bind(&HttpImpl::SocketEventHandler, this));
     tcpServer_.StartServer(addr_.c_str(), port_, (uintptr_t)this);
 }

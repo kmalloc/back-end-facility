@@ -77,8 +77,9 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
 
 static const int msg_queue_sz = 64;
 
-HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& msgPool)
+HttpTask::HttpTask(SocketServer* server, LockFreeBuffer& msgPool, int id)
     : ITask(false)
+    , taskid_(id)
     , tcpServer_(server)
     , context_(*server, &DefaultHttpRequestHandler)
     , msgPool_(msgPool)
@@ -104,6 +105,7 @@ bool HttpTask::PostSockMsg(SocketEvent* msg)
 void HttpTask::ResetTask(int connid)
 {
     context_.ResetContext(connid);
+    tcpServer_->WatchSocket(connid);
 }
 
 void HttpTask::ProcessSocketMessage(SocketEvent* msg)
