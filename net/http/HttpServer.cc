@@ -130,7 +130,12 @@ void HttpImpl::SocketEventHandler(SocketEvent evt)
                 int id = evt.msg.fd;
                 if (SC_ACCEPTED == evt.code)
                 {
+                    tasks_[id]->SetPriority(TP_LOW);
                     id = evt.msg.ud;
+                }
+                else
+                {
+                    tasks_[id]->SetPriority(TP_NORMAL);
                 }
 
                 conn_msg->code = evt.code;
