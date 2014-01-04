@@ -32,17 +32,6 @@ enum SocketStatus
     SS_PACCEPT, // pending accept
 };
 
-// wrapper of raw socket fd
-struct SocketEntity
-{
-    int fd;
-    uintptr_t opaque;
-    SocketStatus type;
-    SocketConnection conn;
-
-    char buff[64];
-};
-
 union SockAddrAll
 {
 	struct sockaddr s;
@@ -60,12 +49,13 @@ class ServerImpl: public noncopyable
         // connect to addr, and add the corresponding socket to epoll for watching.
         SocketConnection* ConnectTo(const char* addr, int port, uintptr_t opaque);
 
+        bool CloseSocket(int fd);
         // connect to ip:port, return the socket fd, not add to epoll for watching.
         int ListenTo(const char* addr, int port, uintptr_t opaque);
 
         // add socket denoted by fd to epoll for watching.
         bool WatchSocket(int fd, bool listen);
-        bool CloseSocket(int fd);
+        bool WatchRawSocket(int fd, bool listen);
 
         void SetWatchAcceptedSock(bool watch) { watchAccepted_ = watch; }
 
@@ -78,14 +68,14 @@ class ServerImpl: public noncopyable
 
     private:
 
-        inline void ResetSocketSlot(SocketEntity*) const;
-        void ForceSocketClose(SocketEntity* so) const;
-        SocketEntity* SetupSocketEntity(int fd, uintptr_t opaque, bool poll);
+        inline void ResetSocketSlot(SocketConnection*) const;
+        void ForceSocketClose(SocketConnection* so) const;
+        SocketConnection* SetupSocketConnection(int fd, uintptr_t opaque, bool poll);
 
         int WaitPollerIfNecessary();
 
-        SocketCode HandleAcceptReady(SocketEntity* sock);
-        SocketCode HandleConnectDone(SocketEntity* sock);
+        SocketCode HandleAcceptReady(SocketConnection* sock, SocketConnection*& conn);
+        SocketCode HandleConnectDone(SocketConnection* sock);
 
         void SetupServer();
         void ShutDownAllSockets();
@@ -101,7 +91,7 @@ class ServerImpl: public noncopyable
 
         bool watchAccepted_;
 
-        SocketEntity* sockets_;
+        SocketConnection* sockets_;
         PollEvent* pollEvent_;
         SocketPoll poller_;
 };
@@ -127,40 +117,32 @@ SocketConnection::~SocketConnection()
 
 int SocketConnection::SendBuffer(const char* buff, int sz)
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-
-    return server_->SendBuffer(sock->fd, buff, sz);
+    return server_->SendBuffer(fd_, buff, sz);
 }
 
 int SocketConnection::ReadBuffer(char* buff, int sz)
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-    return server_->ReadBuffer(sock->fd, buff, sz);
+    return server_->ReadBuffer(fd_, buff, sz);
 }
 
 void SocketConnection::CloseConnection()
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-    server_->CloseSocket(sock->fd);
+    server_->CloseSocket(fd_);
 }
 
 bool SocketConnection::IsConnected() const
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-    return sock->type == SS_CONNECTED || sock->type == SS_LISTEN;
+    return status_ == SS_CONNECTED || status_ == SS_LISTEN;
 }
 
 uintptr_t SocketConnection::GetOpaqueValue() const
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-
-    return sock->opaque;
+    return opaque_;
 }
 
 int SocketConnection::GetConnectionId() const
 {
-    SocketEntity* sock = container_of(this, SocketEntity, conn);
-    return sock->fd;
+    return fd_;
 }
 
 // ServerImpl
@@ -170,14 +152,14 @@ ServerImpl::ServerImpl()
     ,maxSocket_(CalcMaxFileDesc())
     ,isRunning_(false)
     ,watchAccepted_(false)
-    ,sockets_(new SocketEntity[maxSocket_])
+    ,sockets_(new SocketConnection[maxSocket_])
     ,pollEvent_(new PollEvent[maxSocket_])
     ,poller_()
 {
     for (int i = 0; i < maxSocket_; ++i)
     {
-        sockets_[i].type = SS_INVALID;
-        sockets_[i].conn.SetServerImpl(this);
+        sockets_[i].status_ = SS_INVALID;
+        sockets_[i].SetServerImpl(this);
     }
 }
 
@@ -193,43 +175,43 @@ ServerImpl::~ServerImpl()
     delete[] pollEvent_;
 }
 
-void ServerImpl::ForceSocketClose(SocketEntity* sock) const
+void ServerImpl::ForceSocketClose(SocketConnection* sock) const
 {
     assert(sock);
 
-    if (sock->type == SS_INVALID) return;
+    if (sock->status_ == SS_INVALID) return;
 
-    poller_.RemoveSocket(sock->fd);
+    poller_.RemoveSocket(sock->fd_);
     ResetSocketSlot(sock);
 
-    close(sock->fd);
+    close(sock->fd_);
 
-    slog(LOG_VERB, "force closing socket:%d", sock->fd);
+    slog(LOG_VERB, "force closing socket:%d", sock->fd_);
 }
 
 void ServerImpl::ShutDownAllSockets()
 {
     for (int i = 0; i < maxSocket_; i++)
     {
-        SocketEntity* so = &sockets_[i];
+        SocketConnection* so = &sockets_[i];
         ForceSocketClose(so);
     }
 
     isRunning_ = false;
 }
 
-SocketEntity* ServerImpl::SetupSocketEntity(int fd, uintptr_t opaque, bool poll)
+SocketConnection* ServerImpl::SetupSocketConnection(int fd, uintptr_t opaque, bool poll)
 {
-    SocketEntity* so = &sockets_[fd];
+    SocketConnection* so = &sockets_[fd];
 
-    assert(so->type == SS_INVALID);
+    assert(so->status_ == SS_INVALID);
 
-    so->fd = fd;
-    so->opaque = opaque;
+    so->fd_ = fd;
+    so->opaque_ = opaque;
 
     if (poll && !poller_.AddSocket(fd, so))
     {
-        slog(LOG_ERROR, "SetupSocketEntity failed, fd: %d, opaque:%d", fd, opaque);
+        slog(LOG_ERROR, "SetupSocketConnection failed, fd: %d, opaque:%d", fd, opaque);
         ResetSocketSlot(so);
         return NULL;
     }
@@ -238,9 +220,9 @@ SocketEntity* ServerImpl::SetupSocketEntity(int fd, uintptr_t opaque, bool poll)
     return so;
 }
 
-void ServerImpl::ResetSocketSlot(SocketEntity* sock) const
+void ServerImpl::ResetSocketSlot(SocketConnection* sock) const
 {
-    sock->type = SS_INVALID;
+    sock->status_ = SS_INVALID;
 }
 
 static int TryConnectTo(int fd, struct addrinfo* ai_ptr)
@@ -309,15 +291,15 @@ _failed:
 // closing socket should be the last step to be taken
 int ServerImpl::SendBuffer(int fd, const char* buffer, int sz)
 {
-    SocketEntity* sock = &sockets_[fd];
+    SocketConnection* sock = &sockets_[fd];
 
-    if (sock->type == SS_INVALID || sock->fd != fd)
+    if (sock->status_ == SS_INVALID || sock->fd_ != fd)
     {
         slog(LOG_ERROR, "send, invalid socketid,sock(%d)", fd);
         return -2;
     }
 
-    assert(sock->type != SS_LISTEN);
+    assert(sock->status_ != SS_LISTEN);
 
     int n = write(fd, buffer, sz);
     if (n < 0)
@@ -328,9 +310,18 @@ int ServerImpl::SendBuffer(int fd, const char* buffer, int sz)
         }
         else
         {
-            slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", fd, sock->fd);
+            slog(LOG_ERROR, "server:write to %d(fd=%d) failed.", fd, sock->fd_);
             return -1;
         }
+    }
+
+    if (n < sz)
+    {
+        poller_.ModifySocket(sock->fd_, sock, true);
+    }
+    else
+    {
+        poller_.ModifySocket(sock->fd_, sock, false);
     }
 
     return n;
@@ -339,10 +330,10 @@ int ServerImpl::SendBuffer(int fd, const char* buffer, int sz)
 int ServerImpl::ReadBuffer(int fd, char* buffer, int sz)
 {
     assert(fd >=0 && fd <= maxSocket_);
-    SocketEntity* sock = &sockets_[fd];
+    SocketConnection* sock = &sockets_[fd];
 
     assert(sz);
-    assert(sock->type != SS_INVALID);
+    assert(sock->status_ != SS_INVALID);
 
     int n = (int)read(fd, buffer, sz);
     if (n < 0)
@@ -356,6 +347,8 @@ int ServerImpl::ReadBuffer(int fd, char* buffer, int sz)
             slog(LOG_ERROR, "read sock error, fd(%d)", fd);
             return -1;
         }
+
+        return 0;
     }
     else if (n == 0)
     {
@@ -381,7 +374,7 @@ SocketConnection* ServerImpl::ConnectTo(const char* host, int _port, uintptr_t o
     if (sock < 0 || ai_ptr == NULL) return NULL;
 
     // alloc socket entity, and poll the socket
-    SocketEntity* new_sock = SetupSocketEntity(sock, opaque, true);
+    SocketConnection* new_sock = SetupSocketConnection(sock, opaque, true);
 
     if (status == 0)
     {
@@ -391,21 +384,21 @@ SocketConnection* ServerImpl::ConnectTo(const char* host, int _port, uintptr_t o
             (void*)&((struct sockaddr_in*)addr)->sin_addr:
             (void*)&((struct sockaddr_in6*)addr)->sin6_addr;
 
-        inet_ntop(ai_ptr->ai_family, sin_addr, new_sock->buff, sizeof(new_sock->buff));
+        inet_ntop(ai_ptr->ai_family, sin_addr, new_sock->buff_, sizeof(new_sock->buff_));
 
-        new_sock->type = SS_CONNECTED;
+        new_sock->status_ = SS_CONNECTED;
     }
     else
     {
-        new_sock->type = SS_CONNECTING;
+        new_sock->status_ = SS_CONNECTING;
 
         // since socket is nonblocking.
         // connecting is in the progress.
         // set writable to track status by epoll.
-        poller_.ModifySocket(new_sock->fd, new_sock, true);
+        poller_.ModifySocket(new_sock->fd_, new_sock, true);
     }
 
-    return &new_sock->conn;
+    return new_sock;
 }
 
 static int TryListenTo(int fd, struct addrinfo* ai_ptr)
@@ -446,9 +439,9 @@ int ServerImpl::ListenTo(const char* host, int _port, uintptr_t opaque)
 
     // set up socket, but not put it into epoll yet.
     // call start socket to if user wants to.
-    SocketEntity* new_sock = SetupSocketEntity(listen_fd, opaque, true);
+    SocketConnection* new_sock = SetupSocketConnection(listen_fd, opaque, true);
 
-    new_sock->type = SS_LISTEN;
+    new_sock->status_ = SS_LISTEN;
 
     return listen_fd;
 }
@@ -456,9 +449,9 @@ int ServerImpl::ListenTo(const char* host, int _port, uintptr_t opaque)
 // make sure this function is thread safe
 bool ServerImpl::CloseSocket(int fd)
 {
-    SocketEntity* sock = &sockets_[fd];
+    SocketConnection* sock = &sockets_[fd];
 
-    if (sock->type == SS_INVALID || sock->fd != fd)
+    if (sock->status_ == SS_INVALID || sock->fd_ != fd)
     {
         slog(LOG_WARN, "try to close bad socket, fd(%d)", fd);
         return false;
@@ -472,22 +465,22 @@ bool ServerImpl::CloseSocket(int fd)
 // make sure this function thread safe.
 bool ServerImpl::WatchSocket(int fd, bool listen)
 {
-    SocketEntity* sock = &sockets_[fd];
-    if (sock->type == SS_PACCEPT || sock->type == SS_INVALID)
+    SocketConnection* sock = &sockets_[fd];
+    if (sock->status_ == SS_PACCEPT || sock->status_ == SS_INVALID)
     {
-        if (!poller_.AddSocket(sock->fd, sock))
+        if (!poller_.AddSocket(sock->fd_, sock))
         {
             ResetSocketSlot(sock);
             return false;
         }
 
-        if (sock->type == SS_PACCEPT || (!listen && sock->type == SS_INVALID))
+        if (sock->status_ == SS_PACCEPT || (!listen && sock->status_ == SS_INVALID))
         {
-            sock->type = SS_CONNECTED;
+            sock->status_ = SS_CONNECTED;
         }
         else
         {
-            sock->type = SS_LISTEN;
+            sock->status_ = SS_LISTEN;
         }
 
         return true;
@@ -496,56 +489,75 @@ bool ServerImpl::WatchSocket(int fd, bool listen)
     return false;
 }
 
-SocketCode ServerImpl::HandleConnectDone(SocketEntity* sock)
+bool ServerImpl::WatchRawSocket(int fd, bool listen)
+{
+    SocketConnection* sock = &sockets_[fd];
+    if (sock->status_ != SS_INVALID) return false;
+
+    sock->fd_ = fd;
+    sock->status_ = listen? SS_LISTEN:SS_CONNECTED;
+
+    if (!poller_.AddSocket(sock->fd_, sock))
+    {
+        ResetSocketSlot(sock);
+        return false;
+    }
+
+    return true;
+}
+
+SocketCode ServerImpl::HandleConnectDone(SocketConnection* sock)
 {
     int error;
     socklen_t len = sizeof(error);
-    int code = getsockopt(sock->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+    int code = getsockopt(sock->fd_, SOL_SOCKET, SO_ERROR, &error, &len);
 
     if (code < 0 || error) return SC_FAIL_CONN;
 
-    sock->type = SS_CONNECTED;
-    poller_.ModifySocket(sock->fd, sock, false);
+    sock->status_ = SS_CONNECTED;
+    poller_.ModifySocket(sock->fd_, sock, false);
 
     // retrieve peer name of the connected socket.
     union SockAddrAll u;
     socklen_t slen = sizeof(u);
 
-    if (getpeername(sock->fd, &u.s, &slen) == 0)
+    if (getpeername(sock->fd_, &u.s, &slen) == 0)
     {
         void* sin_addr = (u.s.sa_family == AF_INET)?
             (void*)&u.v4.sin_addr:(void*)&u.v6.sin6_addr;
 
-        inet_ntop(u.s.sa_family, sin_addr, sock->buff, sizeof(sock->buff));
+        inet_ntop(u.s.sa_family, sin_addr, sock->buff_, sizeof(sock->buff_));
     }
 
     return SC_CONNECTED;
 }
 
-SocketCode ServerImpl::HandleAcceptReady(SocketEntity* sock)
+SocketCode ServerImpl::HandleAcceptReady(SocketConnection* sock, SocketConnection*& conn)
 {
     union SockAddrAll ua;
     socklen_t len = sizeof(ua);
 
 #ifdef _GNU_SOURCE
-    int client_fd = accept4(sock->fd, &ua.s, &len, SOCK_NONBLOCK);
+    int client_fd = accept4(sock->fd_, &ua.s, &len, SOCK_NONBLOCK);
     if (client_fd < 0) return SC_ERROR;
 #else
-    int client_fd = accept(sock->fd, &ua.s, &len);
+    int client_fd = accept(sock->fd_, &ua.s, &len);
     if (client_fd < 0) return SC_ERROR;
 
     SocketPoll::SetSocketNonBlocking(client_fd);
 #endif
 
-    SocketEntity* new_sock = SetupSocketEntity(client_fd, sock->opaque, watchAccepted_);
+    SocketConnection* new_sock = SetupSocketConnection(client_fd, sock->opaque_, watchAccepted_);
 
-    if (watchAccepted_) new_sock->type = SS_CONNECTED;
-    else new_sock->type = SS_PACCEPT;
+    conn = new_sock;
+
+    if (watchAccepted_) new_sock->status_ = SS_CONNECTED;
+    else new_sock->status_ = SS_PACCEPT;
 
     void* sin_addr = (ua.s.sa_family == AF_INET)?
         (void*)&ua.v4.sin_addr : (void*)&ua.v6.sin6_addr;
 
-    inet_ntop(ua.s.sa_family, sin_addr, new_sock->buff, sizeof(new_sock->buff));
+    inet_ntop(ua.s.sa_family, sin_addr, new_sock->buff_, sizeof(new_sock->buff_));
 
     return SC_SUCC;
 }
@@ -575,9 +587,10 @@ void ServerImpl::RunPoll(SocketEvent* result)
         if ((ret = WaitPollerIfNecessary()) < 0) continue;
 
         PollEvent* event = &pollEvent_[pollEventIndex_++];
-        SocketEntity* sock = (SocketEntity*)event->data;
+        SocketConnection* sock = (SocketConnection*)event->data;
+        result->conn = sock;
 
-        switch (sock->type)
+        switch (sock->status_)
         {
             case SS_CONNECTING:
                 {
@@ -587,7 +600,8 @@ void ServerImpl::RunPoll(SocketEvent* result)
                 break;
             case SS_LISTEN:
                 {
-                    int ret = HandleAcceptReady(sock);
+                    int ret = HandleAcceptReady(sock, result->conn);
+
                     if (ret == SC_SUCC)
                     {
                         result->code = SC_ACCEPTED;
@@ -602,7 +616,7 @@ void ServerImpl::RunPoll(SocketEvent* result)
                 break;
             case SS_INVALID:
                 {
-                    slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd);
+                    slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd_);
                 }
                 break;
             default:
@@ -610,13 +624,11 @@ void ServerImpl::RunPoll(SocketEvent* result)
                     if (event->write)
                     {
                         result->code = SC_WRITE;
-                        result->conn = &sock->conn;
                     }
 
                     if (event->read)
                     {
                         result->code = SC_READ;
-                        result->conn = &sock->conn;
                     }
 
                     return;
@@ -690,6 +702,11 @@ bool SocketServer::CloseSocket(int fd)
 bool SocketServer::WatchSocket(int fd, bool listen)
 {
     return impl_->WatchSocket(fd, listen);
+}
+
+bool SocketServer::WatchRawSocket(int fd, bool listen)
+{
+    return impl_->WatchRawSocket(fd, listen);
 }
 
 void SocketServer::SetWatchAcceptedSock(bool watch)

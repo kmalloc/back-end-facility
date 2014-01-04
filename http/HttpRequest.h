@@ -179,6 +179,8 @@ class HttpRequest
 
         void CleanUp()
         {
+            reqUrl_ = "";
+            urlData_ = "";
             httpBody_ = "";
             httpHeader_.clear();
             bodyLen_ = 0;

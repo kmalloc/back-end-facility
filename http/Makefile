@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-c -Wall -g
+CFLAGS=-c -Wall -Wextra -g
 SOURCES=main.cc HttpClient.cc HttpBuffer.cc HttpServer.cc SocketServer.cc SocketPoll.cc
 
 ROOT=../

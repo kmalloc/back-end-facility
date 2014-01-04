@@ -108,6 +108,9 @@ class HttpResponse
 
         void CleanUp()
         {
+            closeConn_ = false;
+            response_ = false;
+            msgLen_ = 0;
             statusMsg_ = "";
             httpBody_  = "";
             httpHeader_.clear();

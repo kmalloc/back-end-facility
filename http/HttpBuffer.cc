@@ -9,6 +9,7 @@ static HttpBuffer* AllocHttpBuffer(int sz)
     HttpBuffer* buff = (HttpBuffer*)malloc(sizeof(HttpBuffer) + sz);
     if (buff == NULL) return NULL;
 
+    buff->size_ = sz;
     buff->curPtr_ = buff->memory_;
     buff->curSize_ = 0;
     buff->next_ = NULL;
@@ -22,6 +23,7 @@ static inline void FreeHttpBuffer(HttpBuffer* buf)
 }
 
 HttpBufferList::HttpBufferList()
+    :head_(NULL), tail_(NULL)
 {
 }
 
@@ -151,10 +153,15 @@ char* HttpReadBuffer::GetFreeBuffer(int& size)
     return buffer;
 }
 
+int HttpReadBuffer::GetContenLen() const
+{
+    return readBuff_->curSize_;
+}
+
 // HttpWriteBuffer
 HttpWriteBuffer::HttpWriteBuffer(int granularity, int num)
     :size_(granularity), num_(num)
-    ,num_slot_(3)
+    ,num_slot_(8)
 {
     assert(InitBuffer());
 }

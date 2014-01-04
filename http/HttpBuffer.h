@@ -40,6 +40,7 @@ class HttpReadBuffer: public noncopyable
         HttpReadBuffer(int size = 8*1024);
         ~HttpReadBuffer();
 
+        int GetContenLen() const;
         const char* GetContentPoint(int offset = 0) const;
         const char* GetContentStart() const;
         const char* GetContentEnd() const;

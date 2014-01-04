@@ -15,14 +15,14 @@ enum SocketCode
     SC_READ, // socket is ready to read data, SocketEvent::fd denotes corresponding fd, note: corresponding fd will be removed poller
     SC_WRITE, // socket is ready to send data, note: corresponding fd is removed from poller.
     SC_CONNECTED, // SocketEvent::fd denotes the corresponding socket
-    SC_ACCEPTED, // 
+    SC_ACCEPTED, //
     SC_FAIL_CONN, // fail to connect, need to close socket.
     SC_ERROR,  // out of resource: socket fd or memory
 
     SC_SUCC
 };
 
-class SocketConnection: public noncopyable
+struct SocketConnection
 {
     public:
 
@@ -41,6 +41,13 @@ class SocketConnection: public noncopyable
         void SetServerImpl(ServerImpl* server) { server_ = server; }
 
         int GetConnectionId() const;
+
+    public:
+
+        int fd_;
+        int status_;
+        uintptr_t opaque_;
+        char buff_[64];
 
     private:
 
@@ -76,6 +83,7 @@ class SocketServer: public noncopyable
 
         // add the corresponding socket to be watched.
         bool WatchSocket(int fd, bool listen = false);
+        bool WatchRawSocket(int fd, bool listen = false);
 
         // by default, newly accepted socket is not watched by epoll.
         // call SetWatchAcceptedSock() to change this behavior.

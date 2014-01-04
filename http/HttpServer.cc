@@ -91,11 +91,12 @@ void HttpServer::DestroyServer()
 
 void HttpServer::SetListenSock(int fd)
 {
-    tcpServer_.WatchSocket(fd, true);
+    tcpServer_.WatchRawSocket(fd, true);
 }
 
 void HttpServer::RunServer()
 {
+    tcpServer_.SetWatchAcceptedSock(true);
     for (int i = 0; i < tcpServer_.max_conn_id; ++i)
     {
         conn_[i] = NULL;
@@ -119,7 +120,7 @@ void HttpServer::PollHandler(SocketEvent evt)
             break;
         case SC_ACCEPTED:
             {
-                conn_[id]->ResetClient();
+                conn_[id]->ResetClient(evt.conn);
             }
             break;
         case SC_FAIL_CONN:

@@ -43,7 +43,6 @@ int main(int argc, char* argv[])
     int i = 0;
     int num = sysconf(_SC_NPROCESSORS_CONF);
 
-    /*
     while (i < num)
     {
         int pid = fork();
@@ -51,7 +50,6 @@ int main(int argc, char* argv[])
 
         ++i;
     }
-    */
 
     if (i < num) WorkerProc(fd);
 

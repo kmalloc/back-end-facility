@@ -17,7 +17,7 @@ class HttpClient: public noncopyable
         HttpClient(HttpHandler handler = NULL);
         ~HttpClient();
 
-        void ResetClient();
+        void ResetClient(SocketConnection* conn);
         void SetConnection(SocketConnection* conn);
 
         // return value < 0 indicate fatal error, need to close connection.

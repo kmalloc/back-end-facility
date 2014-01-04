@@ -6,7 +6,7 @@ static const char HTTP_CTRL[] = "\r\n";
 static const char HTTP_HEADER_DELIM[] = ": ";
 
 static const int HTTP_CTRL_LEN = sizeof(HTTP_CTRL) - 1;
-static const int HTTP_HEADER_DELIM_LEN = sizeof(HTTP_HEADER_DELIM_LEN) - 1;
+static const int HTTP_HEADER_DELIM_LEN = sizeof(HTTP_HEADER_DELIM) - 1;
 
 HttpClient::HttpClient(HttpHandler handler)
     :keepalive_(false)
@@ -29,9 +29,11 @@ void HttpClient::RegisterHttpHandler(HttpHandler handler)
     cgi_ = handler;
 }
 
-void HttpClient::ResetClient()
+void HttpClient::ResetClient(SocketConnection* conn)
 {
     keepalive_ = false;
+    request_.CleanUp();
+    response_.CleanUp();
     readBuffer_.ResetBuffer();
     HttpBuffer* buf = pendingWrite_.PopFront();
     while (buf)
@@ -40,36 +42,48 @@ void HttpClient::ResetClient()
         buf = pendingWrite_.PopFront();
     }
 
+    conn_ = conn;
     evtHandler_ = &HttpClient::ProcessRequestLine;
 }
 
 void HttpClient::CloseConnection()
 {
-    ResetClient();
     conn_->CloseConnection();
+    ResetClient(NULL);
 }
 
 int HttpClient::ProcessEvent(SocketEvent evt)
 {
-    int ret = (this->*evtHandler_)(evt);
+    int ret = 0;
+    int len = 0;
 
-    if (ret)
+    do
     {
-        CloseConnection();
-        return -1;
-    }
+        len = (this->*evtHandler_)(evt);
+        if (len < 0)
+        {
+            CloseConnection();
+            return -1;
+        }
+
+        ret += len;
+    } while (len > 0);
 
     return ret;
 }
 
 int HttpClient::ReadHttpData()
 {
-    int sz;
+    int sz = readBuffer_.GetContenLen();
+    if (sz) return 0;
+
     char* buf = readBuffer_.GetFreeBuffer(sz);
 
-    if (sz) return conn_->ReadBuffer(buf, sz);
+    if (sz) sz = conn_->ReadBuffer(buf, sz);
 
-    return 0;
+    if (sz > 0) readBuffer_.IncreaseContentRange(sz);
+
+    return sz;
 }
 
 int HttpClient::ProcessRequestLine(SocketEvent evt)
@@ -234,7 +248,7 @@ int HttpClient::ParseBody()
         len += end - start;
         readBuffer_.ConsumeBuffer(end - start);
         FinishParsingBody();
-        return len;
+        return 1;
     }
 
     size_t contentLen = request_.GetBodyLength();
@@ -274,12 +288,13 @@ int HttpClient::GenerateResponse(SocketEvent evt)
     int sz = response_.GetResponseSize();
 
     HttpBuffer* buf = writeBuffer_.AllocWriteBuffer(sz);
-    response_.GenerateResponse(buf->curPtr_, buf->size_);
+    buf->curSize_ = response_.GenerateResponse(buf->curPtr_, buf->size_);
 
     pendingWrite_.PushBack(buf);
+    response_.CleanUp();
 
     FinishGenerateResponse();
-    return 0;
+    return 1;
 }
 
 int HttpClient::SendResponse(SocketEvent evt)
