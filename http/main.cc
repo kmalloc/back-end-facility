@@ -8,6 +8,8 @@ using namespace std;
 
 static void WorkerProc(int fd)
 {
+    InitLogger();
+
     HttpServer* server = new HttpServer();
 
     server->SetListenSock(fd);

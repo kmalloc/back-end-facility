@@ -1,5 +1,7 @@
 #include "HttpServer.h"
 
+#include "sys/Log.h"
+
 static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& response)
 {
     response.SetShouldResponse(true);
@@ -68,6 +70,8 @@ static void DefaultHttpRequestHandler(const HttpRequest& req, HttpResponse& resp
 
 HttpServer::HttpServer()
     :stop_(false)
+    ,watching_(false)
+    ,listenFd_(-1)
     ,tcpServer_()
     ,conn_(new HttpClient*[tcpServer_.max_conn_id])
 {
@@ -91,7 +95,8 @@ void HttpServer::DestroyServer()
 
 void HttpServer::SetListenSock(int fd)
 {
-    tcpServer_.WatchRawSocket(fd, true);
+    listenFd_ = fd;
+    watching_ = tcpServer_.WatchRawSocket(fd, true);
 }
 
 void HttpServer::RunServer()
@@ -120,6 +125,9 @@ void HttpServer::PollHandler(SocketEvent evt)
             break;
         case SC_ACCEPTED:
             {
+                static int co = 0;
+                ++co;
+                slog(LOG_INFO, "accept(%d)", co);
                 conn_[id]->ResetClient(evt.conn);
             }
             break;
@@ -141,9 +149,24 @@ void HttpServer::PollHandler(SocketEvent evt)
 
 void HttpServer::RunPoll()
 {
+    int num_conn;
+    int total = tcpServer_.max_conn_id;
+
     while (stop_ == false)
     {
         SocketEvent evt;
+        num_conn = tcpServer_.GetConnNumber();
+
+        if (watching_ && num_conn > total - total/8)
+        {
+            watching_ = !tcpServer_.UnwatchSocket(listenFd_);
+        }
+        else if (!watching_ && num_conn <= total/2)
+        {
+            // this may be buggy, if half of the connections stay long.
+            watching_ = tcpServer_.WatchRawSocket(listenFd_, true);
+        }
+
         tcpServer_.RunPoll(&evt);
         PollHandler(evt);
     }

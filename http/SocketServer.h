@@ -77,6 +77,7 @@ class SocketServer: public noncopyable
         void RunPoll(SocketEvent* evt);
 
         int ListenTo(const char* ip, int port, uintptr_t opaque = 0);
+        int GetConnNumber() const;
 
         // connect to a remote host
         SocketConnection* ConnectTo(const char* ip, int port, uintptr_t opaque = 0);
@@ -84,6 +85,8 @@ class SocketServer: public noncopyable
         // add the corresponding socket to be watched.
         bool WatchSocket(int fd, bool listen = false);
         bool WatchRawSocket(int fd, bool listen = false);
+
+        bool UnwatchSocket(int fd);
 
         // by default, newly accepted socket is not watched by epoll.
         // call SetWatchAcceptedSock() to change this behavior.

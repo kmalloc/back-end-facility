@@ -37,7 +37,6 @@ class Logger: public noncopyable
     private:
 
         std::ostream* fout_;
-        const std::string logfile_;
 };
 
 #endif

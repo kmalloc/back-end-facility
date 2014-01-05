@@ -2,7 +2,7 @@
 #define __HTTP_SERVER_H__
 
 #include "HttpClient.h"
-#include "net/SocketServer.h"
+#include "SocketServer.h"
 #include "misc/NonCopyable.h"
 
 class HttpServer: public noncopyable
@@ -23,6 +23,8 @@ class HttpServer: public noncopyable
         void PollHandler(SocketEvent evt);
 
         bool stop_;
+        bool watching_;
+        int  listenFd_;
         SocketServer tcpServer_;
         HttpClient** conn_;
 };

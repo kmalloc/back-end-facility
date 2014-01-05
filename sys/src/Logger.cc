@@ -4,6 +4,7 @@
 #include "misc/LockFreeBuffer.h"
 #include "misc/LockFreeList.h"
 
+#include <unistd.h>
 #include <time.h>
 #include <errno.h>
 #include <string.h>
@@ -72,7 +73,6 @@ LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_ti
     sem_init(&sig_, 0, 0);
     sem_init(&stop_,0, 0);
     pthread_mutex_init(&guardRunning_, NULL);
-    ThreadBase::Start();
 }
 
 LogWorker::~LogWorker()
@@ -239,10 +239,15 @@ static LogWorker g_worker(LOG_MAX_PENDING, LOG_GRANULARITY, LOG_FLUSH_TIMEOUT);
 
 // definition of logger
 Logger::Logger(const char* file)
-    :fout_(NULL), logfile_(file)
+    :fout_(NULL)
 {
+    char buff[256];
+    int pid = (int)getpid();
+
+    snprintf(buff, sizeof(buff), "%s.%d", file, pid);
+
     ofstream* fout = new ofstream();
-    fout->open(file, ofstream::out | ofstream::app);
+    fout->open(buff, ofstream::out | ofstream::app);
 
     if (!fout->good()) throw "can not open file";
 

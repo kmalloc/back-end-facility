@@ -11,52 +11,55 @@
 #define LOG_FILE_ERROR   "slog_error.log"
 #define LOG_FILE_FATAL   "slog_fatal.log"
 
-static Logger gs_log_all(LOG_FILE_ALL);
-static Logger gs_log_debug(LOG_FILE_DEBUG);
-static Logger gs_log_info(LOG_FILE_INFO);
-static Logger gs_log_verb(LOG_FILE_VERB);
-static Logger gs_log_warn(LOG_FILE_WARN);
-static Logger gs_log_error(LOG_FILE_ERROR);
-static Logger gs_log_fatal(LOG_FILE_FATAL);
+void InitLogger()
+{
+    Logger::RunLogging();
+}
 
 void slog_all(const char* format, va_list arg)
 {
-   gs_log_all.Log(format, arg);
+    static Logger gs_log_all(LOG_FILE_ALL);
+    gs_log_all.Log(format, arg);
 }
 
 void slog_debug(const char* format, va_list arg)
 {
-   gs_log_debug.Log(format, arg);
+    static Logger gs_log_debug(LOG_FILE_DEBUG);
+    gs_log_debug.Log(format, arg);
 }
 
 void slog_info(const char* format, va_list arg)
 {
-   gs_log_info.Log(format, arg);
+    static Logger gs_log_info(LOG_FILE_INFO);
+    gs_log_info.Log(format, arg);
 }
 
 void slog_verb(const char* format, va_list arg)
 {
-   gs_log_verb.Log(format, arg);
+    static Logger gs_log_verb(LOG_FILE_VERB);
+    gs_log_verb.Log(format, arg);
 }
 
 void slog_warn(const char* format, va_list arg)
 {
-   gs_log_warn.Log(format, arg);
+    static Logger gs_log_warn(LOG_FILE_WARN);
+    gs_log_warn.Log(format, arg);
 }
 
 void slog_error(const char* format, va_list arg)
 {
-   gs_log_error.Log(format, arg);
+    static Logger gs_log_error(LOG_FILE_ERROR);
+    gs_log_error.Log(format, arg);
 }
 
 void slog_fatal(const char* format, va_list arg)
 {
-   gs_log_fatal.Log(format, arg);
+    static Logger gs_log_fatal(LOG_FILE_FATAL);
+    gs_log_fatal.Log(format, arg);
 }
 
 // TODO specify log level to filter log
 // the smaller the value is the the fewer log get filterred.
-
 
 static volatile int g_logLevel = LOG_ERROR;
 

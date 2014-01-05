@@ -285,6 +285,7 @@ int HttpClient::GenerateResponse(SocketEvent evt)
 {
     // TODO
     cgi_(request_, response_);
+
     int sz = response_.GetResponseSize();
 
     HttpBuffer* buf = writeBuffer_.AllocWriteBuffer(sz);

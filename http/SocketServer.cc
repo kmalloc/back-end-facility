@@ -1,5 +1,5 @@
 #include "SocketServer.h"
-#include "net/SocketPoll.h"
+#include "SocketPoll.h"
 
 #include "sys/Log.h"
 #include "sys/Defs.h"
@@ -20,6 +20,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#include <queue>
 
 typedef int (* SocketPredicateProc)(int, struct addrinfo*);
 
@@ -56,12 +58,14 @@ class ServerImpl: public noncopyable
         // add socket denoted by fd to epoll for watching.
         bool WatchSocket(int fd, bool listen);
         bool WatchRawSocket(int fd, bool listen);
+        bool UnwatchSocket(int fd);
 
         void SetWatchAcceptedSock(bool watch) { watchAccepted_ = watch; }
 
         int ReadBuffer(int fd, char* buffer, int sz);
         int SendBuffer(int fd, const char* buffer, int sz);
 
+        int  GetConnNumber() const;
         void StartServer();
         void StopServer();
         void RunPoll(SocketEvent* res);
@@ -81,6 +85,8 @@ class ServerImpl: public noncopyable
         void ShutDownAllSockets();
 
     private:
+
+        mutable int connNum_;
 
         int pollEventIndex_;
         int pollEventNum_;
@@ -147,7 +153,8 @@ int SocketConnection::GetConnectionId() const
 
 // ServerImpl
 ServerImpl::ServerImpl()
-    :pollEventIndex_(0)
+    :connNum_(0)
+    ,pollEventIndex_(0)
     ,pollEventNum_(0)
     ,maxSocket_(CalcMaxFileDesc())
     ,isRunning_(false)
@@ -175,12 +182,18 @@ ServerImpl::~ServerImpl()
     delete[] pollEvent_;
 }
 
+int ServerImpl::GetConnNumber() const
+{
+    return connNum_;
+}
+
 void ServerImpl::ForceSocketClose(SocketConnection* sock) const
 {
     assert(sock);
 
     if (sock->status_ == SS_INVALID) return;
 
+    --connNum_;
     poller_.RemoveSocket(sock->fd_);
     ResetSocketSlot(sock);
 
@@ -506,6 +519,18 @@ bool ServerImpl::WatchRawSocket(int fd, bool listen)
     return true;
 }
 
+bool ServerImpl::UnwatchSocket(int fd)
+{
+    SocketConnection* conn = &sockets_[fd];
+
+    if (conn->status_ == SS_INVALID) return false;
+
+    if (!poller_.RemoveSocket(fd)) return false;
+
+    ResetSocketSlot(conn);
+    return true;
+}
+
 SocketCode ServerImpl::HandleConnectDone(SocketConnection* sock)
 {
     int error;
@@ -547,6 +572,7 @@ SocketCode ServerImpl::HandleAcceptReady(SocketConnection* sock, SocketConnectio
     SocketPoll::SetSocketNonBlocking(client_fd);
 #endif
 
+    ++connNum_;
     SocketConnection* new_sock = SetupSocketConnection(client_fd, sock->opaque_, watchAccepted_);
 
     conn = new_sock;
@@ -582,58 +608,81 @@ int ServerImpl::WaitPollerIfNecessary()
 void ServerImpl::RunPoll(SocketEvent* result)
 {
     int ret = 0;
+
+    static std::queue<SocketEvent> accept_queue;
+    static std::queue<SocketEvent> read_write_queue;
+
     while (1)
     {
+        if (!accept_queue.empty())
+        {
+            *result = accept_queue.front();
+            accept_queue.pop();
+            return;
+        }
+
+        if (!read_write_queue.empty())
+        {
+            *result = read_write_queue.front();
+            read_write_queue.pop();
+            return;
+        }
+
         if ((ret = WaitPollerIfNecessary()) < 0) continue;
 
-        PollEvent* event = &pollEvent_[pollEventIndex_++];
-        SocketConnection* sock = (SocketConnection*)event->data;
-        result->conn = sock;
-
-        switch (sock->status_)
+        while (pollEventIndex_ < pollEventNum_)
         {
-            case SS_CONNECTING:
-                {
-                    result->code = HandleConnectDone(sock);
-                    return;
-                }
-                break;
-            case SS_LISTEN:
-                {
-                    int ret = HandleAcceptReady(sock, result->conn);
+            SocketEvent evt;
+            PollEvent* event = &pollEvent_[pollEventIndex_++];
+            SocketConnection* sock = (SocketConnection*)event->data;
 
-                    if (ret == SC_SUCC)
-                    {
-                        result->code = SC_ACCEPTED;
-                    }
-                    else
-                    {
-                        result->code = SC_ERROR;
-                        slog(LOG_WARN, "server accept erro");
-                    }
-                    return;
-                }
-                break;
-            case SS_INVALID:
-                {
-                    slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd_);
-                }
-                break;
-            default:
-                {
-                    if (event->write)
-                    {
-                        result->code = SC_WRITE;
-                    }
+            evt.conn = sock;
 
-                    if (event->read)
+            switch (sock->status_)
+            {
+                case SS_CONNECTING:
                     {
-                        result->code = SC_READ;
+                        evt.code = HandleConnectDone(sock);
+                        read_write_queue.push(evt);
                     }
+                    break;
+                case SS_LISTEN:
+                    {
+                        int ret = HandleAcceptReady(sock, evt.conn);
 
-                    return;
-                }
-                break;
+                        if (ret == SC_SUCC)
+                        {
+                            evt.code = SC_ACCEPTED;
+                            accept_queue.push(evt);
+                        }
+                        else
+                        {
+                            evt.code = SC_ERROR;
+                            slog(LOG_WARN, "server accept erro");
+                        }
+                    }
+                    break;
+                case SS_INVALID:
+                    {
+                        slog(LOG_WARN, "server: invalid socket, fd(%d)", sock->fd_);
+                    }
+                    break;
+                default:
+                    {
+                        if (event->write)
+                        {
+                            evt.code = SC_WRITE;
+                        }
+
+                        if (event->read)
+                        {
+                            evt.code = SC_READ;
+                        }
+
+                        read_write_queue.push(evt);
+                    }
+                    break;
+            }
         }
     }
 }
@@ -717,6 +766,16 @@ void SocketServer::SetWatchAcceptedSock(bool watch)
 void SocketServer::RunPoll(SocketEvent* evt)
 {
     impl_->RunPoll(evt);
+}
+
+bool SocketServer::UnwatchSocket(int fd)
+{
+    return impl_->UnwatchSocket(fd);
+}
+
+int SocketServer::GetConnNumber() const
+{
+    return impl_->GetConnNumber();
 }
 
 const int SocketServer::max_conn_id = CalcMaxFileDesc();
