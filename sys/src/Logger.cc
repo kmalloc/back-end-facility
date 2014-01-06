@@ -49,6 +49,8 @@ class LogWorker: public ThreadBase
 
         sem_t sig_;
         sem_t stop_;
+
+        bool run_;
         pthread_mutex_t guardRunning_;
 
         const size_t size_; // total piece of buffers cached in memory.
@@ -63,7 +65,8 @@ class LogWorker: public ThreadBase
 };
 
 LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_time)
-    :size_(max_pending_log)
+    :run_(false)
+    ,size_(max_pending_log)
     ,granularity_(granularity)
     ,counter_(0)
     ,buffer_(size_, granularity_ + sizeof(LogEntity))
@@ -77,8 +80,11 @@ LogWorker::LogWorker(size_t max_pending_log, size_t granularity, size_t flush_ti
 
 LogWorker::~LogWorker()
 {
-    StopLogging();
-    Join();
+    if (run_)
+    {
+        StopLogging();
+        Join();
+    }
 
     sem_destroy(&sig_);
     sem_destroy(&stop_);
@@ -87,12 +93,14 @@ LogWorker::~LogWorker()
 
 void LogWorker::StopLogging()
 {
+    run_ = false;
     sem_post(&sig_);
     sem_post(&stop_);
 }
 
 void LogWorker::RunWorker()
 {
+    run_ = true;
     pthread_mutex_lock(&guardRunning_);
     if (ThreadBase::IsRunning() == false)
     {

@@ -89,7 +89,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         throw "out of memory";
     }
 
-    freeWorkerBit_ = (~(unsigned long long)1) << (sizeof(unsigned long long) << 3) - workerNum_;
+    freeWorkerBit_ = (~(unsigned long long)0) << (sizeof(unsigned long long) << 3) - workerNum_;
     freeWorkerBit_ >>= (sizeof(unsigned long long) << 3) - workerNum_;
 
     sem_init(&workerNotify_,0,workerNum_);
