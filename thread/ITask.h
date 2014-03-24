@@ -13,7 +13,7 @@ class ITask
 {
     public:
 
-        ITask(bool autoDel = true, TaskPriority prio = TP_NORMAL): thread_(-1), affinity_(-1), deleteAfterRun_(autoDel), priority_(prio){}
+        explicit ITask(bool autoDel = true, TaskPriority prio = TP_NORMAL): thread_(-1), affinity_(-1), deleteAfterRun_(autoDel), priority_(prio){}
         virtual ~ITask(){}
         virtual void Run()=0;
 

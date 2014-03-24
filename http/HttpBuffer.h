@@ -37,7 +37,7 @@ class HttpReadBuffer: public noncopyable
 {
     public:
 
-        HttpReadBuffer(int size = 8*1024);
+        explicit HttpReadBuffer(int size = 8*1024);
         ~HttpReadBuffer();
 
         int GetContenLen() const;
@@ -66,7 +66,7 @@ class HttpWriteBuffer: public noncopyable
 {
     public:
 
-        HttpWriteBuffer(int granularity = 1024, int total = 8);
+        explicit HttpWriteBuffer(int granularity = 1024, int total = 8);
         ~HttpWriteBuffer();
 
         HttpBuffer* AllocWriteBuffer(int sz);

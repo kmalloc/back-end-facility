@@ -67,6 +67,7 @@ int HttpClient::ProcessEvent(SocketEvent evt)
         }
 
         ret += len;
+
     } while (len > 0);
 
     return ret;
@@ -315,10 +316,8 @@ int HttpClient::SendResponse(SocketEvent evt)
             buf->curSize_ -= sz;
             break;
         }
-
         pendingWrite_.PopFront();
         writeBuffer_.ReleaseWriteBuffer(buf);
-
         buf = pendingWrite_.GetFront();
     }
 

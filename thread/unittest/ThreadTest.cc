@@ -2,6 +2,7 @@
 #include "Thread.h"
 #include "ITask.h"
 
+#include <pthread.h>
 #include <semaphore.h>
 
 class ThreadTestDummyTask:public ITask
@@ -32,10 +33,9 @@ TEST(operation,threadtest)
     using namespace std;
 
     ThreadTestDummyTask task;
-    Thread thread1;
+    Thread thread1(&task);
     bool detachable = false;
     thread1.SetDetachable(detachable);
-    thread1.SetTask(&task);
     EXPECT_TRUE(thread1.Start());
 
     sem_wait(&task.m_sem);

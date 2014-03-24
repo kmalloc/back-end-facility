@@ -16,7 +16,7 @@ class Thread: public noncopyable
 {
     public:
 
-        Thread(ITask* = NULL, bool detachable = false);
+        explicit Thread(ITask*, bool detachable = false);
         virtual ~Thread();
 
         bool   IsDetachable() const { return detachable_; }
@@ -52,7 +52,7 @@ class ThreadBase: public Thread
 {
     public:
 
-        ThreadBase(bool detachable = false);
+        explicit ThreadBase(bool detachable = false);
         ~ThreadBase();
 
     protected:
@@ -68,7 +68,7 @@ class ThreadBase: public Thread
         {
             public:
 
-                ThreadBaseTask(ThreadBase* host) :host_(host) {}
+                explicit ThreadBaseTask(ThreadBase* host) :host_(host) {}
 
                 virtual void Run()
                 {

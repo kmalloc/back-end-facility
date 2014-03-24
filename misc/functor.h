@@ -18,7 +18,7 @@ namespace misc
     {
         public:
             typedef ret_type (* NORM_PROC) (arg_type);
-            function_impl_normal(NORM_PROC proc): norm_proc_(proc) {}
+            explicit function_impl_normal(NORM_PROC proc): norm_proc_(proc) {}
             ret_type operator() (arg_type arg) { return norm_proc_(arg); }
         private:
             NORM_PROC norm_proc_;
@@ -30,7 +30,7 @@ namespace misc
         public:
             typedef ret_type (* NORM_PROC) (arg_type);
 
-            function(function_base<ret_type, arg_type>* fun): fun_(fun), ref_(new int(1)) {}
+            explicit function(function_base<ret_type, arg_type>* fun): fun_(fun), ref_(new int(1)) {}
 
             function(NORM_PROC proc = 0): fun_(new function_impl_normal<ret_type, arg_type>(proc)), ref_(new int(1)) {}
 

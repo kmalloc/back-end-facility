@@ -33,7 +33,7 @@ class LockFreeStack: public noncopyable
 {
     public:
 
-        LockFreeStack(size_t sz)
+        explicit LockFreeStack(size_t sz)
             :top_(0)
             ,maxSz_(sz)
             ,mask_(0)
@@ -176,7 +176,7 @@ class LockFreeQueue
 {
     public:
 
-        LockFreeQueue(int sz)
+        explicit LockFreeQueue(int sz)
             :maxSz_(sz)
             ,read_(0)
             ,write_(0)

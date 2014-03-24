@@ -11,7 +11,7 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
 {
     public:
 
-        ThreadPool(int num = 0);
+        explicit ThreadPool(int num = 0);
         ~ThreadPool();
 
         bool PostTask(ITask*);

@@ -19,7 +19,7 @@ class WorkerBodyBase: public ITask, public noncopyable
 {
     public:
 
-        WorkerBodyBase(NotifyerBase* notifyer = NULL);
+        explicit WorkerBodyBase(NotifyerBase* notifyer = NULL);
         virtual ~WorkerBodyBase();
 
         bool PostTask(ITask*);

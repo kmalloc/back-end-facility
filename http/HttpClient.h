@@ -14,7 +14,7 @@ class HttpClient: public noncopyable
 
         typedef void (* HttpHandler)(const HttpRequest&, HttpResponse&);
 
-        HttpClient(HttpHandler handler = NULL);
+        explicit HttpClient(HttpHandler handler = NULL);
         ~HttpClient();
 
         void ResetClient(SocketConnection* conn);

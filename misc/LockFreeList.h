@@ -9,7 +9,7 @@ class LockFreeListQueue: public noncopyable
 {
     public:
 
-        LockFreeListQueue(size_t capacity = 2048);
+        explicit LockFreeListQueue(size_t capacity = 2048);
         ~LockFreeListQueue();
 
         bool Push(void* data);

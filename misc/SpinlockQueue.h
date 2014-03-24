@@ -104,7 +104,7 @@ class SpinlockQueue
 {
     public:
 
-        SpinlockQueue(int Maxsize = DEFAULT_WORKER_TASK_MSG_SIZE)
+        explicit SpinlockQueue(int Maxsize = DEFAULT_WORKER_TASK_MSG_SIZE)
             :maxSz_(Maxsize)
         {
             pthread_spin_init(&lock_,0);
@@ -194,7 +194,7 @@ class SpinlockWeakPriorityQueue: public SpinlockQueue<Type,DequeQueue<Type> >
 {
     public:
 
-        SpinlockWeakPriorityQueue(int maxSz = DEFAULT_WORKER_TASK_MSG_SIZE): SpinlockQueue<Type,DequeQueue<Type> >(maxSz){}
+        explicit SpinlockWeakPriorityQueue(int maxSz = DEFAULT_WORKER_TASK_MSG_SIZE): SpinlockQueue<Type,DequeQueue<Type> >(maxSz){}
         ~SpinlockWeakPriorityQueue() {}
 
 

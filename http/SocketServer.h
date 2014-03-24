@@ -26,7 +26,7 @@ struct SocketConnection
 {
     public:
 
-        SocketConnection(ServerImpl* server = 0);
+        explicit SocketConnection(ServerImpl* server = 0);
         ~SocketConnection();
 
         int SendBuffer(const char* buff, int sz);

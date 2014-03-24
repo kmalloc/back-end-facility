@@ -8,7 +8,7 @@ class DummyExitTask: public ITask
 {
     public:
 
-        DummyExitTask(WorkerBodyBase* worker)
+        explicit DummyExitTask(WorkerBodyBase* worker)
             :worker_(worker)
         {
         }

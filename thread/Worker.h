@@ -11,13 +11,12 @@ class WorkerBody: public WorkerBodyBase
 {
     public:
 
-        WorkerBody(NotifyerBase* notifyer = NULL, int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+        explicit WorkerBody(NotifyerBase* notifyer = NULL, int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~WorkerBody();
 
     protected:
 
         virtual int GetContainerSize() const;
-
         virtual bool HandleTask(ITask*);
         virtual bool HasTask();
         virtual ITask* GetTaskFromContainer();
@@ -34,7 +33,7 @@ class Worker: public Thread, public NotifyerBase
 {
     public:
 
-        Worker(WorkerManagerBase* manager = NULL, int id = -1
+        explicit Worker(WorkerManagerBase* manager = NULL, int id = -1
                 ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
         Worker(WorkerBodyBase*, int id = -1, WorkerManagerBase* man = NULL);

@@ -21,7 +21,7 @@ class Dispatcher:public WorkerBodyBase
 {
     public:
 
-        Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
+        explicit Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
         void StartWorker();
@@ -172,26 +172,8 @@ bool Dispatcher::HasTask()
  * just avoiding premptive operation and use brute-search is enough.
  */
 
-
 Worker* Dispatcher::SelectFreeWorker() const
 {
-    /*
-    for (int i = 0; i < workerNum_; ++i)
-    {
-        int sz = workers_[i]->GetTaskNumber();
-        if (sz == 0)
-        {
-            return workers_[i];
-        }
-    }
-    n = 010011
-    n+1 = 010100
-    ~(n+1) = 101011
-
-    n & ~(n+1) = 000 011
-
-    */
-
     unsigned long long sel = (freeWorkerBit_ & (~freeWorkerBit_ + 1));
 
     if (sel)
@@ -317,11 +299,9 @@ bool Dispatcher::HandleTask(ITask* task)
 }
 
 
-
 /*
  * thread pool definition
  */
-
 ThreadPool::ThreadPool(int num)
    :WorkerManagerBase()
    ,worker_(NULL)

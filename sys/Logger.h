@@ -19,7 +19,7 @@ class Logger: public noncopyable
     public:
 
         // file: specify the file to store all the log.
-        Logger(const char* file);
+        explicit Logger(const char* file);
         ~Logger();
 
         // in case of failure, return 0

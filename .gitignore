@@ -24,3 +24,7 @@ net/server
 */*.log
 */*/*.log
 tags
+thread_http/*
+core.*
+*/*.swp
+*/*/*.swp
