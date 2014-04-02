@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <assert.h>
 
+#include "sys/AtomicOps.h"
+
 class DummyExitTask: public ITask
 {
     public:
@@ -29,7 +31,8 @@ class DummyExitTask: public ITask
  *     WorkerBodyBase
  */
 WorkerBodyBase::WorkerBodyBase(NotifyerBase* worker)
-    :isRuning_(false)
+    :isRuning_(0)
+    ,ShouldStop_(false)
     ,timeout_(5)
     ,reqThreshold_(3)
     ,done_(0)
@@ -99,6 +102,7 @@ bool WorkerBodyBase::GetRunTask(ITask*& msg)
         {
             if (TryConsume()) break;
 
+            // send request for task.
             Notify();
             req++;
 
@@ -123,9 +127,7 @@ int WorkerBodyBase::NotifyDone()
 
 void WorkerBodyBase::Run()
 {
-    isRuning_ = false;
     ShouldStop_ = false;
-
     while (1)
     {
         ITask* msg = NULL;
@@ -134,15 +136,13 @@ void WorkerBodyBase::Run()
 
         if (GetRunTask(msg))
         {
-            isRuning_ = true;
-
+            atomic_cas(&isRuning_, 0, 1);
             bool done = HandleTask(msg);
 
             if (done) CleanRunTask(msg);
 
             ++done_;
-            isRuning_ = false;
-
+            atomic_cas(&isRuning_, 1, 0);
         }
         else
         {
@@ -249,15 +249,15 @@ bool WorkerBodyBase::StopRunning()
     return PostExit();
 }
 
-// note, this number is not 100% accurate.
+// note, this number is not 100% accurate when calling from other thread.
 int WorkerBodyBase::GetTaskNumber() const
 {
-    return GetContainerSize() + (isRuning_?1:0);
+    return GetContainerSize() + atomic_read(&isRuning_);
 }
 
 bool WorkerBodyBase::IsRunning() const
 {
-    return isRuning_;
+    return atomic_read(&isRuning_);
 }
 
 

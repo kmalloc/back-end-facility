@@ -265,7 +265,7 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
     int       co    = 0;
 
     // make sure all buffers are released when cleaning up.
-    assert(pHead->node_number == pHead->population_ + 1);
+    assert(atomic_read(&pHead->node_number) == pHead->population_ + 1);
 
     while (cur)
     {
@@ -287,7 +287,7 @@ void PerThreadMemoryAlloc::Cleaner(NodeHead* val)
 bool PerThreadMemoryAlloc::FreeCurThreadMemory()
 {
     NodeHead* pHead = (NodeHead*)pthread_getspecific(key_);
-    if (pHead == NULL || pHead->node_number < population_) return false;
+    if (pHead == NULL || atomic_read(&pHead->node_number) < population_) return false;
 
     DoReleaseBuffer(pHead->dummy - offset_);
     pthread_setspecific(key_, NULL);
@@ -301,6 +301,6 @@ int PerThreadMemoryAlloc::Size() const
     NodeHead* pHead = (NodeHead*)pthread_getspecific(key_);
     if (pHead == NULL) return 0;
 
-    return pHead->node_number;
+    return atomic_read(&pHead->node_number);
 }
 

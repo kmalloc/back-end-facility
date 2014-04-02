@@ -50,15 +50,15 @@ bool WorkerBody::HandleTask(ITask* task)
  */
 
 Worker::Worker(WorkerManagerBase* man, int id, int maxMsgSize)
-    :Thread(), id_(id), manager_(man)
+    :Thread(NULL), id_(id), manager_(man)
 {
-   task_ = WorkerBody_ = new WorkerBody(this,maxMsgSize);
+   WorkerBody_ = new WorkerBody(this, maxMsgSize);
+   SetTask(WorkerBody_);
 }
 
 Worker::Worker(WorkerBodyBase* task, int id, WorkerManagerBase* man)
-    :Thread(), id_(id), manager_(man)
+    :Thread(task), id_(id), manager_(man), WorkerBody_(task)
 {
-    task_ = WorkerBody_ = task;
 }
 
 Worker::~Worker()

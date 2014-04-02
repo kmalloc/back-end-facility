@@ -37,7 +37,6 @@ void LockFreeListQueue::LockFreeListNode::PrintList(LockFreeListQueue::LockFreeL
 
 LockFreeListQueue::LockFreeListQueue(size_t capacity)
     :id_(0)
-    ,no_(0)
     ,max_(capacity)
     ,id2_(0)
     ,freeList_(NULL)

@@ -79,7 +79,7 @@ class WorkerBodyBase: public ITask, public noncopyable
         inline void ProcessInternalCmd(ITask*);
 
         // is running task.
-        volatile bool isRuning_;
+        mutable volatile int isRuning_;
 
         // timeout for sem_timewait
         const int timeout_;
@@ -101,8 +101,8 @@ class WorkerBodyBase: public ITask, public noncopyable
         SpinlockQueue<ITask*> cmd_;
 
         // exit flag.
-        // this variable will be accessed on in the worker thread.
-        // It will be set by DummyExitTask only.
+        // this variable will be accessed in the worker thread.
+        // It will be changed by DummyExitTask only.
         bool ShouldStop_;
 
         friend class DummyExitTask;

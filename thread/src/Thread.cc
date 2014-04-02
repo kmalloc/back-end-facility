@@ -1,6 +1,7 @@
 #include "Thread.h"
 #include "ITask.h"
 #include "sys/Log.h"
+#include "sys/AtomicOps.h"
 
 #include <string.h>
 #include <errno.h>
@@ -8,19 +9,19 @@
 Thread::Thread(ITask* task, bool detachable)
     :task_(task)
     ,tid_(0)
-    ,busy_(false)
+    ,busy_(0)
     ,detachable_(detachable)
 {
 }
 
 Thread::~Thread()
 {
-    if (busy_) pthread_cancel(tid_);
+    if (atomic_read(&busy_)) pthread_cancel(tid_);
 }
 
 bool Thread::Start()
 {
-    if (busy_ || task_ == NULL) return false;
+    if (atomic_read(&busy_) || task_ == NULL) return false;
 
     pthread_attr_t attr;
     int status = pthread_attr_init(&attr);
@@ -45,7 +46,7 @@ bool Thread::Start()
         return false;
     }
 
-    status = pthread_create(&tid_,&attr, Thread::RunTask, static_cast<void*>(this));
+    status = pthread_create(&tid_, &attr, Thread::RunTask, static_cast<void*>(this));
 
     pthread_attr_destroy(&attr);
 
@@ -61,12 +62,12 @@ void* Thread::RunTask(void*arg)
 
     if (task == NULL) return NULL;
 
-    thread->busy_ = true;
+    atomic_cas(&thread->busy_, 0, 1);
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
     task->Run();
 
-    thread->busy_ = false;
+    atomic_cas(&thread->busy_, 1, 0);
 
     return task;
 }
@@ -80,16 +81,21 @@ bool Thread::Join(void** ret)
 
 bool Thread::Cancel()
 {
-    if (!busy_) return true;
+    if (!atomic_read(&busy_)) return true;
     return pthread_cancel(tid_) == 0;
 }
 
 bool Thread::SetDetachable(bool enable)
 {
-    if (busy_) return false;
+    if (atomic_read(&busy_)) return false;
 
     detachable_ = enable;
     return true;
+}
+
+bool Thread::IsRunning() const
+{
+    return atomic_read(&busy_);
 }
 
 ///thread base

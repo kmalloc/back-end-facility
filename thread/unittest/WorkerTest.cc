@@ -75,6 +75,7 @@ TEST(WorkerTaskTest,WorkerTest)
 
     EXPECT_EQ(workerTestDummyTask::m_number, (int)workerTestDummyTask::m_order.size());
 
+    EXPECT_FALSE(worker.IsRunning());
 
     int ci = 0;
     for (; ci < workerTestDummyTask::m_counter; ++ci)
@@ -92,7 +93,6 @@ TEST(WorkerTaskTest,WorkerTest)
     ASSERT_TRUE(worker.StartWorking());
 
     sleep(1);
-    EXPECT_TRUE(worker.IsRunning());
 
     for (int i = 0; i < 10; ++i)
         sem_wait(&workerTestDummyTask::m_sem);

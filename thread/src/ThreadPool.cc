@@ -51,8 +51,8 @@ class Dispatcher:public WorkerBodyBase
     private:
 
         ThreadPool* pool_;
-        unsigned long long freeWorkerBit_;
         const int workerNum_;
+        mutable unsigned long long freeWorkerBit_;
 
         sem_t workerNotify_;
         Worker* freeWorker_;//keep this variable using in dispatch thread only, eliminating volatile
@@ -174,7 +174,9 @@ bool Dispatcher::HasTask()
 
 Worker* Dispatcher::SelectFreeWorker() const
 {
-    unsigned long long sel = (freeWorkerBit_ & (~freeWorkerBit_ + 1));
+    unsigned long long sel = atomic_read(&freeWorkerBit_);
+
+    sel = (sel & (~sel + 1));
 
     if (sel)
     {
@@ -265,7 +267,6 @@ void Dispatcher::DispatchTask(ITask* task)
 
         atomic_fetch_and_and(&freeWorkerBit_, ~(1 << workid));
         task->SetThreadId(workid);
-
         worker->PostTask(task);
     }
 }

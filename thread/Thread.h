@@ -26,7 +26,7 @@ class Thread: public noncopyable
         bool   Join(void** ret = NULL);
         bool   Cancel();
 
-        virtual bool IsRunning() const { return busy_; }
+        virtual bool IsRunning() const;
 
         // this function is not thread safe, be sure not to call it when the thread is already started.
         ITask* SetTask(ITask*task) { ITask* tmp = task_; task_ = task; return tmp; }
@@ -44,7 +44,7 @@ class Thread: public noncopyable
 
         pthread_t tid_;
 
-        volatile bool busy_;
+        volatile mutable int busy_;
         volatile bool detachable_;
 };
 

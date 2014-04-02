@@ -60,7 +60,7 @@ class LockFreeStack: public noncopyable
 
             while (1)
             {
-                old_mask = (mask_ & (~readMask_));
+                old_mask = (atomic_read(&mask_) & (~readMask_));
 
                 if ((old_mask >> 16) >= (maxConcurrntWrite_)) continue;
 
@@ -72,7 +72,7 @@ class LockFreeStack: public noncopyable
             //reserve a slot in stack.
             while (1)
             {
-                old_top = top_;
+                old_top = atomic_read(&top_);
 
                 if (old_top == maxSz_)
                 {
@@ -85,7 +85,7 @@ class LockFreeStack: public noncopyable
 
             if (ret) arr_[old_top] = val;
 
-            assert((mask_ & (~writeMask_)) == 0);
+            assert((atomic_read(&mask_) & (~writeMask_)) == 0);
 
             //release 'write-lock'
             while (1)
@@ -108,7 +108,7 @@ class LockFreeStack: public noncopyable
 
             while(1)
             {
-                old_mask = (mask_ & (~writeMask_));
+                old_mask = (atomic_read(&mask_) & (~writeMask_));
 
                 if (old_mask >= maxConcurrentRead_) continue;
 
@@ -117,7 +117,7 @@ class LockFreeStack: public noncopyable
 
             while (1)
             {
-                old_top = top_;
+                old_top = atomic_read(&top_);
 
                 if (old_top == 0)
                 {
@@ -134,7 +134,7 @@ class LockFreeStack: public noncopyable
                 arr_[old_top - 1] = (Type)0xcdcd; //to detech corruption.
             }
 
-            assert((mask_ & (~readMask_)) == 0);
+            assert((atomic_read(&mask_) & (~readMask_)) == 0);
 
             while (1)
             {
@@ -149,12 +149,12 @@ class LockFreeStack: public noncopyable
 
         bool IsEmpty() const
         {
-            return top_ == 0;
+            return atomic_read(&top_);
         }
 
         size_t Size() const
         {
-            return top_;
+            return atomic_read(&top_);
         }
 
     private:
@@ -197,8 +197,8 @@ class LockFreeQueue
 
             do
             {
-                old_write = write_;
-                old_read  = read_;
+                old_write = atomic_read(&write_);
+                old_read  = atomic_read(&read_);
 
                 if ((old_write + 1)%maxSz_ == old_read) return false;
 
@@ -224,9 +224,9 @@ class LockFreeQueue
 
             do
             {
-                old_read = read_;
+                old_read = atomic_read(&read_);
 
-                if (old_read == maxRead_) return false;
+                if (old_read == atomic_read(&maxRead_)) return false;
 
                 ret = arr_[old_read];
 
@@ -239,12 +239,12 @@ class LockFreeQueue
 
         bool IsEmpty() const
         {
-            return read_ == write_;
+            return atomic_read(&read_) == atomic_read(&write_);
         }
 
         int Size() const
         {
-            return (write_ + maxSz_ - read_)%maxSz_;
+            return (atomic_read(&write_) + maxSz_ - atomic_read(&read_))%maxSz_;
         }
 
     private:

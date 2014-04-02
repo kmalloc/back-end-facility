@@ -36,9 +36,9 @@ class Worker: public Thread, public NotifyerBase
         explicit Worker(WorkerManagerBase* manager = NULL, int id = -1
                 ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
-        Worker(WorkerBodyBase*, int id = -1, WorkerManagerBase* man = NULL);
+        explicit Worker(WorkerBodyBase*, int id = -1, WorkerManagerBase* man = NULL);
 
-        ~Worker();
+        virtual ~Worker();
 
         virtual bool IsRunning() const { return WorkerBody_->IsRunning(); }
         bool StopWorking(bool join = true);
