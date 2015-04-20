@@ -6,7 +6,7 @@
  */
 
 WorkerBody::WorkerBody(NotifyerBase* notifyer, int maxMsgSize)
-    :WorkerBodyBase(notifyer), mailbox_(maxMsgSize)
+    : WorkerBodyBase(notifyer), mailbox_(maxMsgSize)
 {
 }
 
@@ -84,7 +84,6 @@ int Worker::Notify(int type)
 bool Worker::StopWorking(bool join)
 {
     bool ret =  WorkerBody_->StopRunning();
-
     if (join && ret) ret = Join();
 
     return ret;

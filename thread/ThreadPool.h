@@ -10,19 +10,17 @@ class Dispatcher;
 class ThreadPool: public WorkerManagerBase, public noncopyable
 {
     public:
-
         explicit ThreadPool(int num = 0);
         ~ThreadPool();
 
         bool PostTask(ITask*);
         bool IsRunning() const;
-        int GetTaskNumber() const;
+        int  GetTaskNumber() const;
         bool StartPooling();
 
-        //calling this function will shutdown threadpool in an elegant way.
-        //currently running task will not abort.
-        //otherwise, on destruction,
-        //destructor will shutdown all the threads using pthread_cancel,
+        //calling this function will shutdown threadpool in an elegant way:
+        //running tasks will not abort.
+        //however, on destruction, destructor will shutdown all threads using pthread_cancel,
         //which is totally out of control.
         bool StopPooling();
 
@@ -31,10 +29,8 @@ class ThreadPool: public WorkerManagerBase, public noncopyable
         void ForceShutdown();
 
     protected:
-
-        virtual int SetWorkerNotify(NotifyerBase* notifyer, int type = 0);
-
         virtual int CalcDefaultThreadNum() const;
+        virtual int SetWorkerNotify(NotifyerBase* notifyer, int type = 0);
 
         bool        running_;
         Worker*     worker_;

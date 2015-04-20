@@ -49,7 +49,6 @@ bool Thread::Start()
     status = pthread_create(&tid_, &attr, Thread::RunTask, static_cast<void*>(this));
 
     pthread_attr_destroy(&attr);
-
     if (status) slog(LOG_FATAL, "error:%d %s\n", status, strerror(status));
 
     return status == 0;
@@ -63,10 +62,8 @@ void* Thread::RunTask(void*arg)
     if (task == NULL) return NULL;
 
     atomic_cas(&thread->busy_, 0, 1);
-
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
     task->Run();
-
     atomic_cas(&thread->busy_, 1, 0);
 
     return task;
@@ -82,6 +79,7 @@ bool Thread::Join(void** ret)
 bool Thread::Cancel()
 {
     if (!atomic_read(&busy_)) return true;
+
     return pthread_cancel(tid_) == 0;
 }
 

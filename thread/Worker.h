@@ -10,12 +10,12 @@
 class WorkerBody: public WorkerBodyBase
 {
     public:
+        explicit WorkerBody(NotifyerBase* notifyer = NULL,
+                int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
-        explicit WorkerBody(NotifyerBase* notifyer = NULL, int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~WorkerBody();
 
     protected:
-
         virtual int GetContainerSize() const;
         virtual bool HandleTask(ITask*);
         virtual bool HasTask();
@@ -32,11 +32,11 @@ class WorkerBody: public WorkerBodyBase
 class Worker: public Thread, public NotifyerBase
 {
     public:
-
         explicit Worker(WorkerManagerBase* manager = NULL, int id = -1
-                ,int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
+                , int maxMsgSize = DEFAULT_WORKER_TASK_MSG_SIZE);
 
-        explicit Worker(WorkerBodyBase*, int id = -1, WorkerManagerBase* man = NULL);
+        explicit Worker(WorkerBodyBase*, int id = -1,
+                WorkerManagerBase* man = NULL);
 
         virtual ~Worker();
 
@@ -45,19 +45,14 @@ class Worker: public Thread, public NotifyerBase
         bool PostTask(ITask* msg) { return WorkerBody_->PostTask(msg); }
 
         virtual int GetTaskNumber() const { return WorkerBody_->GetTaskNumber(); }
-
         void EnableNotify(bool enable = true) { WorkerBody_->EnableNotify(enable); }
 
+        virtual int Notify(int type);
         virtual bool StartWorking();
-
         int GetWorkerId() const { return id_; }
-
         int TaskDone() const { return WorkerBody_->TaskDone(); }
 
-        virtual int Notify(int type);
-
     protected:
-
         using Thread::Start;
         using Thread::SetTask;
 

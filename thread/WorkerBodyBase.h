@@ -11,14 +11,12 @@
 class NotifyerBase
 {
     public:
-
         virtual int Notify(int type = 0) = 0;
 };
 
 class WorkerBodyBase: public ITask, public noncopyable
 {
     public:
-
         explicit WorkerBodyBase(NotifyerBase* notifyer = NULL);
         virtual ~WorkerBodyBase();
 
@@ -41,7 +39,6 @@ class WorkerBodyBase: public ITask, public noncopyable
         ITask* TryGetTask();
 
     protected:
-
         virtual void PrepareWorker() {}
         virtual bool HandleTask(ITask*) = 0;
         virtual bool HasTask() = 0;
@@ -59,7 +56,6 @@ class WorkerBodyBase: public ITask, public noncopyable
         inline bool PostExit();
 
     private:
-
         void Run();
         int NotifyDone();
 
@@ -111,12 +107,10 @@ class WorkerBodyBase: public ITask, public noncopyable
 class WorkerManagerBase
 {
     public:
-
         WorkerManagerBase() {}
         virtual ~WorkerManagerBase() {}
 
     protected:
-
         virtual int SetWorkerNotify(NotifyerBase*, int type = 0) = 0;
 
         friend class Worker;

@@ -9,7 +9,6 @@
 class DummyExitTask: public ITask
 {
     public:
-
         explicit DummyExitTask(WorkerBodyBase* worker)
             :worker_(worker)
         {
@@ -23,7 +22,6 @@ class DummyExitTask: public ITask
         }
 
     private:
-
         WorkerBodyBase* worker_;
 };
 
@@ -31,13 +29,10 @@ class DummyExitTask: public ITask
  *     WorkerBodyBase
  */
 WorkerBodyBase::WorkerBodyBase(NotifyerBase* worker)
-    :isRuning_(0)
-    ,ShouldStop_(false)
-    ,timeout_(5)
-    ,reqThreshold_(3)
-    ,done_(0)
-    ,notify_(false)
-    ,notifyer_(worker)
+    : isRuning_(0), timeout_(5)
+    , reqThreshold_(3), done_(0)
+    , notify_(false), notifyer_(worker)
+    , ShouldStop_(false)
 {
     sem_init(&sem_,0,0);
 }
@@ -61,13 +56,10 @@ bool WorkerBodyBase::SignalConsumeTimeout(int sec)
 {
     int s;
     struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME,&ts) == -1)
-        return false;
+    if (clock_gettime(CLOCK_REALTIME,&ts) == -1) return false;
 
     ts.tv_sec += sec;
-
-    while ((s = sem_timedwait(&sem_,&ts)) == -1 && errno == EINTR)
-        continue;
+    while ((s = sem_timedwait(&sem_,&ts)) == -1 && errno == EINTR) continue;
 
     return (s == 0);
 }
@@ -79,10 +71,7 @@ bool WorkerBodyBase::TryConsume()
 
 int WorkerBodyBase::Notify()
 {
-    if (notifyer_)
-    {
-        return notifyer_->Notify();
-    }
+    if (notifyer_) return notifyer_->Notify();
 
     return 0;
 }
@@ -122,7 +111,7 @@ int WorkerBodyBase::NotifyDone()
 {
     if (!notify_ || !notifyer_) return true;
 
-    notifyer_->Notify(-1);
+    return notifyer_->Notify(-1);
 }
 
 void WorkerBodyBase::Run()
@@ -259,5 +248,4 @@ bool WorkerBodyBase::IsRunning() const
 {
     return atomic_read(&isRuning_);
 }
-
 

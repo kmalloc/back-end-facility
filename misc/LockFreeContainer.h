@@ -17,30 +17,26 @@
 //to ensure efficiency of manipulating these structure,
 //better use them to store pointer only
 //(b)
-//if a thread calling pop/push die before the function finishs .
+//if a thread calling pop/push die before the function finishs.
 //later calling to pop/push will be blocking forever
 
 //memory model is conceptually not an concern here according to the gnu document:
 //gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/atomic-builtins.html:
 //atomic operations are considerd "full barrier".
 //so we don't even need to set memory barrier explicitly.
-//One thing to note: the following code is targetting for x86/x64 only.
-//I don't even test them on other processor architecture.
 
+//One thing to note: the following code is designed only for x86/x64.
 
 template<class Type>
 class LockFreeStack: public noncopyable
 {
     public:
-
         explicit LockFreeStack(size_t sz)
-            :top_(0)
-            ,maxSz_(sz)
-            ,mask_(0)
-            ,readMask_(0xffff)
-            ,writeMask_(readMask_ << 16)
-            ,maxConcurrentRead_(0xff)
-            ,maxConcurrntWrite_(0xff)
+            : top_(0), maxSz_(sz)
+            , mask_(0), readMask_(0xffff)
+            , writeMask_(readMask_ << 16)
+            , maxConcurrentRead_(0xff)
+            , maxConcurrntWrite_(0xff)
         {
             arr_ = new Type[sz];
         }
@@ -169,19 +165,14 @@ class LockFreeStack: public noncopyable
         const size_t maxConcurrntWrite_;
 };
 
-
-
 template<class Type>
 class LockFreeQueue
 {
     public:
-
         explicit LockFreeQueue(int sz)
-            :maxSz_(sz)
-            ,read_(0)
-            ,write_(0)
-            ,maxRead_(0)
-            ,size_(0)
+            : maxSz_(sz), read_(0)
+            , write_(0), maxRead_(0)
+            , size_(0)
         {
             arr_ = new Type[sz];
         }
@@ -215,11 +206,9 @@ class LockFreeQueue
             return true;
         }
 
-
         bool Pop(Type* val)
         {
             Type ret;
-
             size_t old_read;
 
             do
@@ -248,7 +237,6 @@ class LockFreeQueue
         }
 
     private:
-
         Type*  arr_;
         const size_t maxSz_;
         volatile size_t read_; // read position

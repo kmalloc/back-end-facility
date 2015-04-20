@@ -20,7 +20,6 @@ struct CompareTaskPriority
 class Dispatcher:public WorkerBodyBase
 {
     public:
-
         explicit Dispatcher(ThreadPool* pool, int workerNum = DEFAULT_WORKER_TASK_MSG_SIZE);
         ~Dispatcher();
 
@@ -39,7 +38,6 @@ class Dispatcher:public WorkerBodyBase
         int SetWorkerNotify(NotifyerBase* worker, int type = 0);
 
     protected:
-
         virtual void PrepareWorker();
         virtual bool HandleTask(ITask*);
         virtual ITask* GetTaskFromContainer();
@@ -49,7 +47,6 @@ class Dispatcher:public WorkerBodyBase
         Worker* SelectFreeWorker() const;
 
     private:
-
         ThreadPool* pool_;
         const int workerNum_;
         mutable unsigned long long freeWorkerBit_;
@@ -61,11 +58,11 @@ class Dispatcher:public WorkerBodyBase
 };
 
 Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
-    :WorkerBodyBase()
-    ,pool_(pool)
-    ,freeWorkerBit_(0)
-    ,workerNum_(workerNum)
-    ,freeWorker_(NULL)
+    : WorkerBodyBase()
+    , pool_(pool)
+    , workerNum_(workerNum)
+    , freeWorkerBit_(0)
+    , freeWorker_(NULL)
 {
     int i;
     workers_.reserve(workerNum_);
@@ -89,7 +86,7 @@ Dispatcher::Dispatcher(ThreadPool* pool, int workerNum)
         throw "out of memory";
     }
 
-    freeWorkerBit_ = (~(unsigned long long)0) << (sizeof(unsigned long long) << 3) - workerNum_;
+    freeWorkerBit_ = (~(unsigned long long)0) << ((sizeof(unsigned long long) << 3) - workerNum_);
     freeWorkerBit_ >>= (sizeof(unsigned long long) << 3) - workerNum_;
 
     sem_init(&workerNotify_,0,workerNum_);
@@ -219,10 +216,7 @@ int Dispatcher::PickIdleWorker() const
     for (int i = 0; miniTask && i < workerNum_; ++i)
     {
         int sz = workers_[i]->GetTaskNumber();
-        if (sz < miniTask)
-        {
-            miniTask = sz;
-        }
+        if (sz < miniTask) miniTask = sz;
     }
 
     return miniTask;
@@ -338,7 +332,10 @@ int ThreadPool::CalcDefaultThreadNum() const
     slog(LOG_DEBUG, "threadpool, cpu number:%d\n", num);
     if (num <= 0) num = 2;
 
-    if (num > (sizeof(long long) << 3)) num = (sizeof(long long) << 3);
+    if (static_cast<size_t>(num) > (sizeof(long long) << 3))
+    {
+        num = (sizeof(long long) << 3);
+    }
 
     return num;
 }
