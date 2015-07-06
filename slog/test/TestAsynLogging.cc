@@ -114,7 +114,7 @@ void LaunchTestThread()
     vector<boost::shared_ptr<boost::thread> > bv;
     bv.reserve(4);
 
-    static thread_param args1[4] = {0};
+    static thread_param args1[4] = {{{0}}};
     for (int i = 0; i < g_thread_cnt/2; ++i)
     {
         snprintf(args1[i].msg, sizeof(args1[i].msg), "boost thread %d:", i + 1);
@@ -126,7 +126,7 @@ void LaunchTestThread()
     vector<pthread_t> pv;
     pv.reserve(4);
 
-    static thread_param args2[4] = {0};
+    static thread_param args2[4] = {{{0}}};
     for (int i = 0; i < g_thread_cnt/2; ++i)
     {
         pthread_t tid;

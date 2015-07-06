@@ -1,16 +1,30 @@
-NOMAN=
+CC=clang++
+CFLAGS=-c -Wall -Wextra -g -Werror -DSLOG_TEST_GLOBAL_INIT
+SOURCES=$(wildcard *.cc)
 
-LIB=slog
-SRCS = CacheTimeStamp.cc Logger.cc LogStream.cc LogFileAppender.cc AsynLogAppender.cc
-NOMAN=
-INTERNALLIB=
+LIBS=
+INCLUDE=-I./
 
-CFLAGS+= -I${TOPDIR}
-CXXFLAGS += -Werror -Wall
+OBJECTS=$(SOURCES:.cc=.o)
 
-.ifdef for_testing
-CFLAGS+= -DSLOG_TEST_GLOBAL_INIT
-.endif
+OUTPUT=libslog.a
 
-.include <bsd.lib.mk>
+all: $(SOURCES) $(OUTPUT)
+
+%.o:%.cc
+	$(CC) $(CFLAGS) $(INCLUDE) $< -o $@
+
+depend:.depend
+
+.depend:$(SOURCES)
+	rm -f ./.depend
+	$(CC) $(CFLAGS) -MM $^>>./.depend;
+
+include .depend
+
+$(OUTPUT) : $(OBJECTS)
+	ar rcs $@ $^
+
+clean:
+	-rm *.o $(OUTPUT) .depend
 

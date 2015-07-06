@@ -4,6 +4,8 @@
 #include <iostream>
 #include "LogStream.h"
 
+#include <stdint.h>
+
 using namespace std;
 using namespace slog;
 
@@ -68,7 +70,7 @@ TEST(test_logstream, test_operator)
     ls << (int64_t)89;
     ASSERT_STREQ(ls.Buffer(), "abc123456789") << "sz:" << ls.Length();
 
-    ls << (unsigned int64_t)10;
+    ls << (uint64_t)10;
     ASSERT_STREQ(ls.Buffer(), "abc12345678910") << "sz:" << ls.Length();
 
     ls << (unsigned int)-1;

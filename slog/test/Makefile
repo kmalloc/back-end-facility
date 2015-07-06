@@ -1,24 +1,29 @@
+CC=clang++
+CFLAGS=-c -Wall -Wextra -Werror -g -DSLOG_TEST_GLOBAL_INIT
+SOURCES=$(wildcard *.cc)
 
-PROG=	test_slog
-SRCS= 	main.cc TestLogStream.cc TestLogger.cc TestCacheTimeStamp.cc TestAsynLogging.cc
+LIBS=
+DEPS=slog
+DEPS_PATH=../
+INCLUDE=-I./ -I../
+LINKPATH=-L../
+LINKLIBS=$(foreach i,$(DEPS),-l${i}) -lgtest_main -lgtest -lpthread -lboost_system -lboost_thread
 
-NOMAN=
+OBJECTS=$(SOURCES:.cc=.o)
 
+OUTPUT=testLog
 
-OSTYPE!= uname -s
+.cc.o:
+	$(CC) $(CFLAGS) $(INCLUDE) $< -o $@
 
+$(OUTPUT) : $(OBJECTS) $(foreach i,$(DEPS),$(DEPS_PATH)lib${i}.a)
+	$(CC) -o $@ $^ $(GTEST_LIB) $(LINKPATH) $(LINKLIBS)
+	cp ./$(OUTPUT) ./$(OUTPUT).bak
+	-./$(OUTPUT)
+	-rm -f ./$(OUTPUT).bak
 
-.ifndef MAKE_PROG
-all: updatelibs
-.endif
+clean:
+	-rm ../*.o
+	-rm *.o $(OUTPUT)
+	-rm -f $(OUTPUT).bak
 
-CFLAGS+= -DSLOG_TEST_GLOBAL_INIT
-
-updatelibs:
-	(cd ../ && $(MAKE) clean && $(MAKE) DEBUG_FLAGS=-g for_testing=1)
-
-.include <bsd.prog.mk>
-
-.if ${OSTYPE} == "Linux"
-LDADD+= -lrt
-.endif

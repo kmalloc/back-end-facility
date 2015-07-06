@@ -37,7 +37,7 @@ __attribute__((aligned(__alignof__(AppenderSharedPtr))));
 
 static AppenderSharedPtr& g_global_appender = reinterpret_cast<AppenderSharedPtr&>(g_app_data);
 
-static void SignalHandler(int sig_num, siginfo_t* info, void* cnxt)
+static void SignalHandler(int, siginfo_t*, void*)
 {
     slog::Logger::FlushPendingLog(false);
     _exit(1);

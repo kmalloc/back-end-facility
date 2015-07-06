@@ -1,6 +1,7 @@
 #include "CacheTimeStamp.h"
 
 #include <stdio.h>
+#include <assert.h>
 #include <sys/time.h>
 
 namespace slog {

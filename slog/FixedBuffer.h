@@ -3,6 +3,7 @@
 
 #include <set>
 #include <vector>
+#include <stdio.h>
 #include <assert.h>
 #include <boost/foreach.hpp>
 #include <boost/thread/mutex.hpp>

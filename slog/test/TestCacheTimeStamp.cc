@@ -7,8 +7,12 @@
 using namespace std;
 using namespace slog;
 
+static char g_tz[] = "TZ=Asia/Shanghai";
 TEST(test_cachetimestamp, test_sec_mircosec)
 {
+    putenv(g_tz);
+    tzset();
+
     CacheTimeStamp t0 = CacheTimeStamp::Now();
     const char* fmt_sec0 = t0.GetFmtSec();
     string fmt_str0(fmt_sec0);
