@@ -11,6 +11,7 @@ namespace misc
             virtual ~function_base(){}
 
             virtual ret_type operator() (arg_type) = 0;
+            virtual function_base<ret_type, arg_type>* clone() const = 0;
     };
 
     template<class ret_type, class arg_type>
@@ -20,8 +21,72 @@ namespace misc
             typedef ret_type (* NORM_PROC) (arg_type);
             explicit function_impl_normal(NORM_PROC proc): norm_proc_(proc) {}
             ret_type operator() (arg_type arg) { return norm_proc_(arg); }
+
+            virtual function_impl_normal<ret_type, arg_type>* clone() const
+            {
+                return new function_impl_normal<ret_type, arg_type>(norm_proc_);
+            }
+
         private:
             NORM_PROC norm_proc_;
+    };
+
+    template<class CS, class ret_type, class arg_type>
+    class function_impl_class: public function_base<ret_type, arg_type>
+    {
+        public:
+            typedef ret_type (CS::* PROC)(arg_type);
+
+            function_impl_class(CS* obj, PROC proc): obj_(obj), proc_(proc) {}
+
+            ret_type operator() (arg_type arg) { return (obj_->*proc_)(arg); }
+
+            virtual function_impl_class<CS, ret_type, arg_type>* clone() const
+            {
+                return new function_impl_class<CS, ret_type, arg_type>(obj_, proc_);
+            }
+
+        private:
+            CS* obj_;
+            PROC proc_;
+    };
+
+    template<class CS, class ret_type, class arg_type>
+    class function_impl_functor: public function_impl_class<CS, ret_type, arg_type>
+    {
+        public:
+            typedef function_impl_class<CS, ret_type, arg_type> base;
+
+            // TODO, check if CS define the corresponding function.
+            explicit function_impl_functor(CS obj)
+                : obj_(obj), base(&obj_, static_cast<ret_type(CS::*)(arg_type)>(&CS::operator()))
+            {}
+
+            ret_type operator()(arg_type arg) { return obj_(arg); }
+
+            virtual function_impl_functor* clone() const
+            {
+                return new function_impl_functor<CS, ret_type, arg_type>(obj_);
+            }
+
+        private:
+            CS obj_;
+    };
+
+    template<class CS, class ret_type, class arg_type>
+    class function1
+    {
+        public:
+            // TODO, check if CS define the corresponding function.
+            function1(CS obj, arg_type arg)
+                : obj_(obj), arg_(arg)
+            {}
+
+            ret_type operator()() { return obj_(arg_); }
+
+        private:
+            CS obj_;
+            arg_type arg_;
     };
 
     template<class ret_type, class arg_type>
@@ -30,69 +95,58 @@ namespace misc
         public:
             typedef ret_type (* NORM_PROC) (arg_type);
 
-            explicit function(function_base<ret_type, arg_type>* fun): fun_(fun), ref_(new int(1)) {}
+            explicit function(function_base<ret_type, arg_type>* fun)
+                : fun_(fun)
+            {}
 
-            function(NORM_PROC proc = 0): fun_(new function_impl_normal<ret_type, arg_type>(proc)), ref_(new int(1)) {}
+            function(NORM_PROC proc = 0)
+                : fun_(new function_impl_normal<ret_type, arg_type>(proc))
+            {}
 
-            ret_type operator() (arg_type arg) { fun_->operator()(arg); }
+            template<class FUN>
+            function(FUN obj)
+                : fun_(new function_impl_functor<FUN, ret_type, arg_type>(obj))
+            {}
+
+            ret_type operator() (arg_type arg) { return fun_->operator()(arg); }
 
             ~function()
             {
-                Release();
-            }
-
-            void Release()
-            {
-                *ref_ -= 1;
-                if (*ref_ == 0)
-                {
-                    delete ref_;
-                    delete fun_;
-                }
+                delete fun_;
             }
 
             function(const function& fun)
             {
-                fun_ = fun.fun_;
-                ref_ = fun.ref_;
-                *ref_ += 1;
+                fun_ = fun.fun_->clone();
             }
 
             void operator=(const function& fun)
             {
-                Release();
-                fun_ = fun.fun_;
-                ref_ = fun.ref_;
-                *ref_ += 1;
+                if (this == &fun) return;
+
+                fun_ = fun.fun_->clone();
             }
 
         private:
-            int* ref_;
             function_base<ret_type, arg_type>* fun_;
-    };
-
-    template<class CS, class ret_type, class arg_type>
-    class function_impl: public function_base<ret_type, arg_type>
-    {
-        public:
-            typedef ret_type (CS::* PROC)(arg_type);
-
-            function_impl(CS* obj, PROC proc): obj_(obj), proc_(proc) {}
-
-            ret_type operator() (arg_type arg) { return (obj_->*proc_)(arg); }
-
-        private:
-            CS* obj_;
-            PROC proc_;
     };
 
     template<class CS, class ret_type, class arg_type>
     function<ret_type, arg_type> bind(ret_type (CS::* proc)(arg_type), CS* pc)
     {
-        function_base<ret_type, arg_type>* pf = new function_impl<CS, ret_type, arg_type>(pc, proc);
+        function_base<ret_type, arg_type>* pf = new function_impl_class<CS, ret_type, arg_type>(pc, proc);
         return function<ret_type, arg_type>(pf);
     }
 
+    template<class F, class arg_type>
+    struct result_of
+    {
+        static F getFun();
+        static arg_type getArg();
+
+        // gcc's equivalent of decltype before c++11
+        typedef typeof((getFun())(getArg())) type;
+    };
 } // end namespace misc
 
 #endif
