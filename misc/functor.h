@@ -73,22 +73,6 @@ namespace misc
             CS obj_;
     };
 
-    template<class CS, class ret_type, class arg_type>
-    class function1
-    {
-        public:
-            // TODO, check if CS define the corresponding function.
-            function1(CS obj, arg_type arg)
-                : obj_(obj), arg_(arg)
-            {}
-
-            ret_type operator()() { return obj_(arg_); }
-
-        private:
-            CS obj_;
-            arg_type arg_;
-    };
-
     template<class ret_type, class arg_type>
     class function
     {
