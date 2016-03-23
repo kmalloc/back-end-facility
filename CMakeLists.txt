@@ -1,0 +1,6 @@
+add_subdirectory(sys)
+add_subdirectory(misc)
+add_subdirectory(slog)
+add_subdirectory(http)
+add_subdirectory(thread)
+add_subdirectory(benchmark)

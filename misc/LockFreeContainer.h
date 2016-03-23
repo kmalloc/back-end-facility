@@ -1,8 +1,6 @@
 #ifndef __LOCK_FREE_CONTAINER_H_
 #define __LOCK_FREE_CONTAINER_H_
 
-#include "AtomicOps.h"
-
 #include <stdio.h>
 #include <assert.h>
 #include <stddef.h>
@@ -10,6 +8,7 @@
 
 #include <linux/kernel.h>
 
+#include "sys/AtomicOps.h"
 #include "misc/NonCopyable.h"
 
 //note:

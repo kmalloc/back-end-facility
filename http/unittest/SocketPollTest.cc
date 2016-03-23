@@ -1,4 +1,4 @@
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 #include "thread/Thread.h"
 #include "http/SocketPoll.h"
@@ -122,6 +122,8 @@ TEST(TestWrite, SocketPollTest)
     EXPECT_EQ(fd_reads[0][0], convert(reads[0]));
     EXPECT_TRUE(writes.empty());
 
+    ASSERT_TRUE(poll.ModifySocket(fd_reads[0][0], &data1));
+
     // write to 3 pipe
     write(fd_reads[0][1], "abc", 4);
     write(fd_reads[1][1], "abc", 4);
@@ -134,9 +136,14 @@ TEST(TestWrite, SocketPollTest)
     const VPE& writes2 = listener.GetWrite();
 
     ASSERT_EQ(3, reads2.size());
+
     EXPECT_TRUE(convert(reads2[0]) != convert(reads2[1]));
     EXPECT_TRUE(convert(reads2[0]) != convert(reads2[2]));
     EXPECT_TRUE(convert(reads2[1]) != convert(reads2[2]));
+
+    ASSERT_TRUE(poll.ModifySocket(fd_reads[0][0], &data1));
+    ASSERT_TRUE(poll.ModifySocket(fd_reads[1][0], &data2));
+    ASSERT_TRUE(poll.ModifySocket(fd_reads[2][0], &data3));
 
     EXPECT_TRUE(convert(reads2[0]) == fd_reads[0][0] || convert(reads2[0]) == fd_reads[1][0] || convert(reads2[0]) == fd_reads[2][0]);
     EXPECT_TRUE(convert(reads2[1]) == fd_reads[0][0] || convert(reads2[1]) == fd_reads[1][0] || convert(reads2[1]) == fd_reads[2][0]);
@@ -200,7 +207,6 @@ TEST(TestWrite, SocketPollTest)
         std::cout << "test write poll" << std::endl;
 
         sem_wait(&sem1);
-
         const VPE& writes4 = listener.GetWrite();
 
         ASSERT_EQ(num_write, writes4.size());
@@ -212,7 +218,31 @@ TEST(TestWrite, SocketPollTest)
         EXPECT_TRUE(convert(writes3[0]) == fd_reads[0][1] || convert(writes3[0]) == fd_reads[1][1] || convert(writes3[0]) == fd_reads[2][1]);
         EXPECT_TRUE(convert(writes3[1]) == fd_reads[0][1] || convert(writes3[1]) == fd_reads[1][1] || convert(writes3[1]) == fd_reads[2][1]);
         EXPECT_TRUE(convert(writes3[2]) == fd_reads[0][1] || convert(writes3[2]) == fd_reads[1][1] || convert(writes3[2]) == fd_reads[2][1]);
+
+        ASSERT_TRUE(poll.ModifySocket(fd_reads[0][1], &data4, true));
+        ASSERT_TRUE(poll.ModifySocket(fd_reads[1][1], &data5, true));
+
+        std::cout << "write again\n";
+
+        int wz1 = write(fd_reads[0][1], bigbuf, big);
+        int wz2 = write(fd_reads[1][1], bigbuf, big);
+        int wz3 = write(fd_reads[2][1], bigbuf, big);
+
+        ASSERT_EQ(wz1, read(fd_reads[0][0], bigbuf, wz1));
+        ASSERT_EQ(wz2, read(fd_reads[1][0], bigbuf, wz2));
+        ASSERT_EQ(wz3, read(fd_reads[2][0], bigbuf, wz3));
+
+        std::cout << "read done\n";
+
+        sem_post(&sem2);
+        sem_wait(&sem1);
+
+        ASSERT_EQ(2, writes4.size());
+        ASSERT_TRUE(convert(writes4[0]) == fd_reads[0][1] || convert(writes4[0]) == fd_reads[1][1]);
+        ASSERT_TRUE(convert(writes4[1]) == fd_reads[0][1] || convert(writes4[1]) == fd_reads[1][1]);
     }
+
+    std::cout << "stopping listener\n";
 
     listener.StopRunning();
     sem_post(&sem2);

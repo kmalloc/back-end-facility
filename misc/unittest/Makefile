@@ -29,7 +29,7 @@ all : $(TESTS)
 	$(CXX) $(CXXFLAGS) $(GTEST_HEADERS) $(SRC_HEAD) $< -o $@
 
 unittest : $(OBJECTS)
-	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
+	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest -lgtest_main -o $(TESTS)
 
 clean :
 	rm -f $(TESTS) $(OBJECTS)

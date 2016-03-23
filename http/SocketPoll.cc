@@ -32,7 +32,7 @@ void SocketPoll::Release() const
 bool SocketPoll::AddSocket(int file, void* data, bool write) const
 {
     struct epoll_event ev;
-    ev.events = EPOLLIN | (write? EPOLLOUT : 0);
+    ev.events = EPOLLIN | (write? EPOLLOUT : 0) | EPOLLONESHOT;
     ev.data.ptr = data;
 
     int ret = epoll_ctl(epoll_, EPOLL_CTL_ADD, file, &ev);
@@ -47,7 +47,7 @@ bool SocketPoll::RemoveSocket(int file) const
 bool SocketPoll::ModifySocket(int file, void* data, bool write) const
 {
     struct epoll_event ev;
-    ev.events = EPOLLIN | (write? EPOLLOUT : 0);
+    ev.events = EPOLLIN | (write? EPOLLOUT : 0) | EPOLLONESHOT;
     ev.data.ptr = data;
 
     return (epoll_ctl(epoll_, EPOLL_CTL_MOD, file, &ev) != -1);

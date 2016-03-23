@@ -11,7 +11,7 @@ static int dummy_func()
     static int s_i = 42;
     if (s_i % 2) SLOG_INFO << "logging from initializing global value:" << s_i;
 
-    SLOG_ERROR<< "logging from initializing global value:" << s_i;
+    SLOG_ERROR << "logging from initializing global value:" << s_i;
 
     return s_i++;
 }

@@ -3,7 +3,7 @@
 #include "thread/Thread.h"
 #include "thread/ThreadPool.h"
 
-#include "gtest.h"
+#include "gtest/gtest.h"
 
 struct perThreadTestNode
 {

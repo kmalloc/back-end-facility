@@ -20,7 +20,7 @@ TESTS = unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
-GTEST_HEADERS = -I$(GTEST_DIR)/include/gtest
+GTEST_HEADERS = -I$(GTEST_DIR)/include
 GTEST_HEADERS += -I$(GTEST_DIR)/include/gtest/internal
 GTEST_HEADERS += -I$(GTEST_DIR)/include
 
@@ -35,7 +35,7 @@ all : $(TESTS)
 	$(CXX) $(CXXFLAGS) $(GTEST_HEADERS) $(SRC_HEAD) $< -o $@
 
 unittest : $(OBJECTS)
-	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest_main -o $(TESTS)
+	$(CXX) $(GTEST_LIB) $(OBJECTS) $(XLIB_PATH) $(XLIB) -lpthread -lrt -lgtest -lgtest_main -o $(TESTS)
 
 
 clean :

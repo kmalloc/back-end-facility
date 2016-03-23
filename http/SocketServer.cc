@@ -28,7 +28,7 @@ typedef int (* SocketPredicateProc)(int, struct addrinfo*);
 enum SocketStatus
 {
     SS_INVALID,
-    SS_LISTEN,
+    SS_LISTENING,
     SS_CONNECTED,
     SS_CONNECTING,
     SS_PACCEPT, // pending accept
@@ -138,7 +138,7 @@ void SocketConnection::CloseConnection()
 
 bool SocketConnection::IsConnected() const
 {
-    return status_ == SS_CONNECTED || status_ == SS_LISTEN;
+    return status_ == SS_CONNECTED || status_ == SS_LISTENING;
 }
 
 uintptr_t SocketConnection::GetOpaqueValue() const
@@ -198,7 +198,6 @@ void ServerImpl::ForceSocketClose(SocketConnection* sock) const
     ResetSocketSlot(sock);
 
     close(sock->fd_);
-
     slog(LOG_VERB, "force closing socket:%d", sock->fd_);
 }
 
@@ -252,7 +251,8 @@ static int TryConnectTo(int fd, struct addrinfo* ai_ptr)
 
 // thread safe
 static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
-        const char* host, const char* port, int* _sock_, int* stat)
+                                      const char* host, const char* port,
+                                      int* sfd, int* stat)
 {
     int status;
     int sock = -1;
@@ -287,9 +287,8 @@ static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
     }
 
     if (sock < 0) goto _failed;
-
+    if (sfd) *sfd = sock;
     if (stat) *stat = status;
-    if (_sock_) *_sock_ = sock;
 
     return ai_ptr;
 
@@ -312,7 +311,7 @@ int ServerImpl::SendBuffer(int fd, const char* buffer, int sz)
         return -2;
     }
 
-    assert(sock->status_ != SS_LISTEN);
+    assert(sock->status_ != SS_LISTENING);
 
     int n = write(fd, buffer, sz);
     if (n < 0)
@@ -349,6 +348,10 @@ int ServerImpl::ReadBuffer(int fd, char* buffer, int sz)
     assert(sock->status_ != SS_INVALID);
 
     int n = (int)read(fd, buffer, sz);
+
+    // epoll is set ot EPOLLONESHOT, need to rewatch the fd after reading.
+    poller_.ModifySocket(sock->fd_, sock, false);
+
     if (n < 0)
     {
         if (errno == EINTR || EAGAIN == errno)
@@ -377,13 +380,11 @@ SocketConnection* ServerImpl::ConnectTo(const char* host, int _port, uintptr_t o
     char port[16];
     sprintf(port, "%d", _port);
 
-    int status = 0;
     int sock;
+    int status = 0;
 
     struct addrinfo* ai_ptr = NULL;
-
     ai_ptr = AllocSocketFd(&TryConnectTo, host, port, &sock, &status);
-
     if (sock < 0 || ai_ptr == NULL) return NULL;
 
     // alloc socket entity, and poll the socket
@@ -405,9 +406,8 @@ SocketConnection* ServerImpl::ConnectTo(const char* host, int _port, uintptr_t o
     {
         new_sock->status_ = SS_CONNECTING;
 
-        // since socket is nonblocking.
-        // connecting is in the progress.
-        // set writable to track status by epoll.
+        // socket is nonblocking, connection is not complete
+        // need to set fd writable to track the status.
         poller_.ModifySocket(new_sock->fd_, new_sock, true);
     }
 
@@ -438,7 +438,6 @@ int ListenTo(const char* host, int _port)
     sprintf(port, "%d", _port);
 
     ai_ptr = AllocSocketFd(&TryListenTo, host, port, &listen_fd, &status);
-
     if (listen_fd < 0 || ai_ptr == NULL) return -1;
 
     return listen_fd;
@@ -447,15 +446,13 @@ int ListenTo(const char* host, int _port)
 int ServerImpl::ListenTo(const char* host, int _port, uintptr_t opaque)
 {
     int listen_fd = ::ListenTo(host, _port);
-
     if (listen_fd < 0) return -1;
 
     // set up socket, but not put it into epoll yet.
     // call start socket to if user wants to.
     SocketConnection* new_sock = SetupSocketConnection(listen_fd, opaque, true);
 
-    new_sock->status_ = SS_LISTEN;
-
+    new_sock->status_ = SS_LISTENING;
     return listen_fd;
 }
 
@@ -463,7 +460,6 @@ int ServerImpl::ListenTo(const char* host, int _port, uintptr_t opaque)
 bool ServerImpl::CloseSocket(int fd)
 {
     SocketConnection* sock = &sockets_[fd];
-
     if (sock->status_ == SS_INVALID || sock->fd_ != fd)
     {
         slog(LOG_WARN, "try to close bad socket, fd(%d)", fd);
@@ -493,7 +489,7 @@ bool ServerImpl::WatchSocket(int fd, bool listen)
         }
         else
         {
-            sock->status_ = SS_LISTEN;
+            sock->status_ = SS_LISTENING;
         }
 
         return true;
@@ -508,7 +504,7 @@ bool ServerImpl::WatchRawSocket(int fd, bool listen)
     if (sock->status_ != SS_INVALID) return false;
 
     sock->fd_ = fd;
-    sock->status_ = listen? SS_LISTEN:SS_CONNECTED;
+    sock->status_ = listen? SS_LISTENING:SS_CONNECTED;
 
     if (!poller_.AddSocket(sock->fd_, sock))
     {
@@ -524,7 +520,6 @@ bool ServerImpl::UnwatchSocket(int fd)
     SocketConnection* conn = &sockets_[fd];
 
     if (conn->status_ == SS_INVALID) return false;
-
     if (!poller_.RemoveSocket(fd)) return false;
 
     ResetSocketSlot(conn);
@@ -576,9 +571,14 @@ SocketCode ServerImpl::HandleAcceptReady(SocketConnection* sock, SocketConnectio
     SocketConnection* new_sock = SetupSocketConnection(client_fd, sock->opaque_, watchAccepted_);
 
     conn = new_sock;
-
-    if (watchAccepted_) new_sock->status_ = SS_CONNECTED;
-    else new_sock->status_ = SS_PACCEPT;
+    if (watchAccepted_)
+    {
+        new_sock->status_ = SS_CONNECTED;
+    }
+    else
+    {
+        new_sock->status_ = SS_PACCEPT;
+    }
 
     void* sin_addr = (ua.s.sa_family == AF_INET)?
         (void*)&ua.v4.sin_addr : (void*)&ua.v6.sin6_addr;
@@ -595,7 +595,6 @@ int ServerImpl::WaitPollerIfNecessary()
     pollEventNum_ = poller_.WaitAll(pollEvent_, maxSocket_);
 
     pollEventIndex_ = 0;
-
     if (pollEventNum_ > 0) return 1;
 
     pollEventNum_ = 0;
@@ -608,7 +607,6 @@ int ServerImpl::WaitPollerIfNecessary()
 void ServerImpl::RunPoll(SocketEvent* result)
 {
     int ret = 0;
-
     static std::queue<SocketEvent> accept_queue;
     static std::queue<SocketEvent> read_write_queue;
 
@@ -646,7 +644,7 @@ void ServerImpl::RunPoll(SocketEvent* result)
                         read_write_queue.push(evt);
                     }
                     break;
-                case SS_LISTEN:
+                case SS_LISTENING:
                     {
                         int ret = HandleAcceptReady(sock, evt.conn);
 
