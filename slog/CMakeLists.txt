@@ -6,5 +6,9 @@ target_include_directories(slog PRIVATE ..)
 
 target_link_libraries(slog PRIVATE boost_thread)
 
-add_subdirectory(test)
 add_subdirectory(samples)
+
+IF(test)
+    add_subdirectory(test)
+ENDIF()
+

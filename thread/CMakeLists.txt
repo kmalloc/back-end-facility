@@ -6,6 +6,6 @@ target_link_libraries(thread_util PRIVATE sys_util)
 target_include_directories(thread_util PRIVATE .)
 target_include_directories(thread_util PRIVATE ..)
 
-#IF(test)
+IF(test)
     add_subdirectory(unittest)
-#ENDIF()
+ENDIF()

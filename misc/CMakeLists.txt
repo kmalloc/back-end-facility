@@ -8,6 +8,6 @@ target_link_libraries(misc_util PUBLIC rt)
 target_include_directories(misc_util PRIVATE .)
 target_include_directories(misc_util PRIVATE ..)
 
-#IF(test)
+IF(test)
     add_subdirectory(unittest)
-#ENDIF()
+ENDIF()
