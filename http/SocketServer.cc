@@ -246,7 +246,9 @@ static int TryConnectTo(int fd, struct addrinfo* ai_ptr)
         return -1;
     }
 
-    return 1;
+    if (status == 0) return 1;
+    
+    return 2;
 }
 
 // thread safe
@@ -280,7 +282,7 @@ static struct addrinfo* AllocSocketFd(SocketPredicateProc proc,
 #endif
 
         status = proc(sock, ai_ptr);
-        if (status >= 0) break;
+        if (status > 0) break;
 
         close(sock);
         sock = -1;
@@ -390,7 +392,7 @@ SocketConnection* ServerImpl::ConnectTo(const char* host, int _port, uintptr_t o
     // alloc socket entity, and poll the socket
     SocketConnection* new_sock = SetupSocketConnection(sock, opaque, true);
 
-    if (status == 0)
+    if (status == 1)
     {
         // convert addr into string
         struct sockaddr* addr = ai_ptr->ai_addr;
